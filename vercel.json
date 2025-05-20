@@ -1,0 +1,22 @@
+{
+  "name": "neetcode",
+  "version": 2,
+  "env": {
+    "NEXTAUTH_URL": "http://localhost:3000",
+    "NEXTAUTH_URL_INTERNAL": "http://localhost:3000",
+    "NEXT_PUBLIC_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_PROTOCOL": "http"
+  },
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
+} 

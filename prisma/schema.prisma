@@ -1,0 +1,324 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+  previewFeatures = ["metrics"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // For direct connections during migrations
+  relationMode = "foreignKeys"
+}
+
+// User model
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  email         String     @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          UserRole   @default(USER)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  userGroups    UserGroup[]
+  submissions   Submission[]
+  problemsCreated Problem[] @relation("ProblemCreator")
+  groupsCreated Group[]     @relation("GroupCreator")
+  challengesCreated Challenge[] @relation("ChallengeCreator")
+  messages      ChatMessage[] @relation("MessageSender")
+  invitationsSent UserInvitation[] @relation("InvitationSender")
+}
+
+enum UserRole {
+  USER
+  GROUP_ADMIN
+  PLATFORM_ADMIN
+}
+
+// NextAuth Models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Group model with expanded features
+model Group {
+  id              String       @id @default(cuid())
+  name            String
+  description     String?      @db.Text
+  inviteCode      String       @unique
+  inviteLink      String?
+  isActive        Boolean      @default(true)
+  visibility      GroupVisibility @default(PUBLIC)
+  memberLimit     Int?         // Optional member limit, null means unlimited
+  currentMembers  Int          @default(1) // Start with 1 (creator)
+  image           String?      // Group image/avatar URL
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  creatorId       String
+
+  // Relations
+  creator         User         @relation("GroupCreator", fields: [creatorId], references: [id])
+  members         UserGroup[]
+  challenges      Challenge[]
+  messages        ChatMessage[]
+}
+
+enum GroupVisibility {
+  PUBLIC      // Anyone can find and join
+  PRIVATE     // Only visible to members, requires invite
+  UNLISTED    // Not visible in search, but anyone with link can join
+}
+
+// UserGroup model (many-to-many relationship)
+model UserGroup {
+  id          String     @id @default(cuid())
+  userId      String
+  groupId     String
+  role        GroupRole  @default(MEMBER)
+  joinedAt    DateTime   @default(now())
+  lastActive  DateTime   @default(now())
+  score       Int        @default(0)  // For leaderboard tracking
+  solvedCount Int        @default(0)  // Number of problems solved in group
+
+  // Relations
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+}
+
+enum GroupRole {
+  MEMBER
+  ADMIN
+}
+
+// Category model for problem categorization
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  problems    ProblemCategory[]
+}
+
+// Problem model
+model Problem {
+  id              String    @id @default(cuid())
+  title           String
+  description     String    @db.Text
+  difficulty      Difficulty
+  exampleInput    String?   @db.Text
+  exampleOutput   String?   @db.Text
+  constraints     String?   @db.Text
+  solution        String?   @db.Text
+  timeComplexity  String?
+  spaceComplexity String?
+  templateCode    Json?
+  testCases       Json?     // Store test cases directly for custom problems
+  tags            String[]
+  solutionCode    String?   @db.Text
+  isFeatured      Boolean   @default(false)
+  isPublic        Boolean   @default(true)
+  isCustom        Boolean   @default(false) // Whether this is a custom problem created by a group admin
+  groupId         String?   // Associated group for custom problems
+  creatorId       String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  creator         User      @relation("ProblemCreator", fields: [creatorId], references: [id])
+  testCasesRel    TestCase[] // Keep backward compatibility
+  challenges      ChallengeProblems[]
+  submissions     Submission[]
+  categories      ProblemCategory[]
+}
+
+// ProblemCategory model (many-to-many relationship)
+model ProblemCategory {
+  id          String   @id @default(cuid())
+  problemId   String
+  categoryId  String
+
+  // Relations
+  problem     Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, categoryId])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+// TestCase model
+model TestCase {
+  id            String   @id @default(cuid())
+  problemId     String
+  input         String   @db.Text
+  expectedOutput String   @db.Text
+  explanation   String?  @db.Text
+  isHidden      Boolean  @default(false)
+  
+  // Relations
+  problem       Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+// Enhanced Challenge model
+model Challenge {
+  id                   String   @id @default(cuid())
+  title                String
+  description          String?  @db.Text
+  groupId              String
+  creatorId            String
+  startTime            DateTime
+  endTime              DateTime
+  isActive             Boolean  @default(false)
+  isCustom             Boolean  @default(false) // Whether this challenge has custom problems
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  maxScore             Int      @default(100)     // Maximum score possible
+  realTimeLeaderboard  Boolean  @default(true)    // Whether to show live leaderboard
+  allowLateSubmissions Boolean  @default(false)   // Whether to allow submissions after end time
+  visibleToParticipants Boolean @default(true)    // Visibility to group members
+
+  // Relations
+  group          Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  creator        User     @relation("ChallengeCreator", fields: [creatorId], references: [id])
+  problems       ChallengeProblems[]
+  submissions    Submission[]
+  messages       ChatMessage[]
+}
+
+// ChallengeProblems model (many-to-many relationship)
+model ChallengeProblems {
+  id            String   @id @default(cuid())
+  challengeId   String
+  problemId     String
+  order         Int      @default(0)
+  points        Int      @default(10)    // Points for solving this problem
+  timeLimit     Int?     // Optional time limit in seconds
+  memoryLimit   Int?     // Optional memory limit in MB
+
+  // Relations
+  challenge     Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  problem       Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, problemId])
+}
+
+// Enhanced Submission model
+model Submission {
+  id           String   @id @default(cuid())
+  userId       String
+  problemId    String
+  challengeId  String?
+  code         String   @db.Text
+  language     String
+  status       SubmissionStatus
+  results      Json?
+  score        Int?
+  executionTime Int?
+  memoryUsed   Int?
+  submittedAt  DateTime @default(now())
+  pointsEarned Int      @default(0)
+
+  // Relations
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem      Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  challenge    Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  RUNTIME_ERROR
+  COMPILATION_ERROR
+}
+
+// Enhanced ChatMessage model for real-time chat
+model ChatMessage {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  senderId    String
+  groupId     String
+  challengeId String?
+  sentAt      DateTime @default(now())
+  isSystem    Boolean  @default(false)  // For system messages
+  replyToId   String?  // For message replies
+
+  // Relations
+  sender      User     @relation("MessageSender", fields: [senderId], references: [id])
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  challenge   Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+}
+
+// Setting model for storing application settings
+model Setting {
+  key         String   @id
+  value       String   @db.Text
+  updatedAt   DateTime @updatedAt
+}
+
+// User invitation model
+model UserInvitation {
+  id          String     @id @default(cuid())
+  email       String     @unique
+  token       String     @unique
+  role        UserRole   @default(USER)
+  expires     DateTime
+  isAccepted  Boolean    @default(false)
+  invitedBy   String     // User who sent the invitation
+  createdAt   DateTime   @default(now())
+  
+  // Relations
+  inviter     User       @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: Cascade)
+  
+  @@index([email, token])
+}

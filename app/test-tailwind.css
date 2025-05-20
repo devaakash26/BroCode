@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.test-bg-blue {
+  @apply bg-blue-500 text-white p-4 rounded-md;
+}
+
+.test-bg-red {
+  @apply bg-red-500 text-white p-4 rounded-md;
+}
+
+.test-bg-green {
+  @apply bg-green-500 text-white p-4 rounded-md;
+} 
