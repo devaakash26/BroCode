@@ -96,6 +96,11 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['lucide-react', 'framer-motion'],
+    turbotrace: {
+      logLevel: 'error',
+      memoryLimit: 4000
+    },
+    staticWorkersDuringDev: true,
   },
 };
 
