@@ -35,22 +35,22 @@ export default function ClientLayout({ children }) {
       {/* Sidebar - only visible on desktop and when not on admin pages */}
       {!isMobile && !isAdminPage && (
         <div className="fixed lg:static z-50 lg:z-0 transition-all duration-300 translate-x-0">
-          <SidebarNavigation 
-            collapsed={sidebarCollapsed} 
-            setCollapsed={setSidebarCollapsed} 
-            className="h-screen"
-          />
-        </div>
+        <SidebarNavigation 
+          collapsed={sidebarCollapsed} 
+          setCollapsed={setSidebarCollapsed} 
+          className="h-screen"
+        />
+      </div>
       )}
       
       {/* Main content */}
       <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage ? '' : 'w-full'}`}>
         {!isAdminPage && (
           <>
-            <Navbar 
-              sidebarCollapsed={sidebarCollapsed} 
-              setSidebarCollapsed={setSidebarCollapsed}
-              isMobile={isMobile}
+        <Navbar 
+          sidebarCollapsed={sidebarCollapsed} 
+          setSidebarCollapsed={setSidebarCollapsed}
+          isMobile={isMobile}
             />
             <div className="px-4 md:px-6 lg:px-8">
               <VerificationAlert />

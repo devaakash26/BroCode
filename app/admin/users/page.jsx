@@ -191,13 +191,13 @@ export default function AdminUsersPage() {
             <UserPlus className="h-5 w-5" />
             Invite User
           </button>
-          <Link 
-            href="/admin/users/new" 
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
-          >
-            <PlusCircle className="h-5 w-5" />
-            Add User
-          </Link>
+        <Link 
+          href="/admin/users/new" 
+          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+        >
+          <PlusCircle className="h-5 w-5" />
+          Add User
+        </Link>
         </div>
       </div>
       
@@ -317,9 +317,9 @@ export default function AdminUsersPage() {
                       ) : (
                         <div className="flex items-center">
                           <span className="inline-flex items-center text-yellow-600 dark:text-yellow-500 mr-2">
-                            <XCircle className="h-4 w-4 mr-1.5" />
-                            Unverified
-                          </span>
+                          <XCircle className="h-4 w-4 mr-1.5" />
+                          Unverified
+                        </span>
                           <button
                             onClick={() => sendVerificationEmail(user.id, user.email)}
                             className="p-1 bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800"
@@ -361,7 +361,7 @@ export default function AdminUsersPage() {
                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                  currentPage === 1
+                  currentPage === 1 
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                     : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
@@ -372,7 +372,7 @@ export default function AdminUsersPage() {
                 onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
                 className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md ${
-                  currentPage === totalPages
+                  currentPage === totalPages 
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                     : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600'
                 }`}
@@ -396,7 +396,7 @@ export default function AdminUsersPage() {
                     onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
                     className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                      currentPage === 1
+                      currentPage === 1 
                         ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                         : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
@@ -410,21 +410,21 @@ export default function AdminUsersPage() {
                     const pageNumber = index + 1;
                     const isCurrentPage = pageNumber === currentPage;
                     const isNearCurrentPage = 
-                      pageNumber === 1 || 
-                      pageNumber === totalPages || 
+                      pageNumber === 1 ||
+                      pageNumber === totalPages ||
                       Math.abs(pageNumber - currentPage) <= 1;
                     
                     if (!isNearCurrentPage && pageNumber !== 1 && pageNumber !== totalPages) {
                       if (pageNumber === 2 || pageNumber === totalPages - 1) {
-                        return (
-                          <span
-                            key={pageNumber}
+                      return (
+                        <span
+                          key={pageNumber}
                             className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium"
-                          >
-                            ...
-                          </span>
-                        );
-                      }
+                        >
+                          ...
+                        </span>
+                      );
+                    }
                       return null;
                     }
                     
@@ -447,7 +447,7 @@ export default function AdminUsersPage() {
                     onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                     disabled={currentPage === totalPages}
                     className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 text-sm font-medium ${
-                      currentPage === totalPages
+                      currentPage === totalPages 
                         ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
                         : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
@@ -461,15 +461,15 @@ export default function AdminUsersPage() {
           </div>
         )}
       </div>
-      
+
       {/* User details modal */}
       {isModalOpen && (
-        <UserDetailsModal
-          userId={selectedUser}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          onUserDeleted={handleUserDeleted}
-        />
+      <UserDetailsModal 
+        userId={selectedUser}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onUserDeleted={handleUserDeleted}
+      />
       )}
 
       {/* Invite user modal with improved styling */}

@@ -31,15 +31,15 @@ export async function GET(request) {
     const submissions = await prisma.submission.findMany({
       where: {
         userId: targetUserId,
-        submittedAt: {
+        createdAt: {
           gte: oneYearAgo
         }
       },
       select: {
-        submittedAt: true
+        createdAt: true
       },
       orderBy: {
-        submittedAt: 'asc'
+        createdAt: 'asc'
       }
     });
     
@@ -47,7 +47,7 @@ export async function GET(request) {
     const contributionMap = new Map();
     
     for (const submission of submissions) {
-      const dateStr = submission.submittedAt.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+      const dateStr = submission.createdAt.toISOString().split('T')[0]; // Format: YYYY-MM-DD
       
       if (contributionMap.has(dateStr)) {
         contributionMap.set(dateStr, contributionMap.get(dateStr) + 1);

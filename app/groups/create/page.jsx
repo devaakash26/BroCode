@@ -245,24 +245,24 @@ export default function CreateGroupPage() {
                   <div className="mt-3">
                     <label htmlFor="image" className="block text-sm font-medium mb-1">
                       Or add image URL
-                    </label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
-                        <ImageIcon className="h-4 w-4" />
-                      </span>
-                      <input
-                        type="url"
-                        id="image"
-                        name="image"
-                        value={formData.image}
-                        onChange={handleChange}
-                        placeholder="https://example.com/image.jpg"
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-r-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Optional: Add an image URL for your group's avatar
-                    </p>
+                  </label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                      <ImageIcon className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="url"
+                      id="image"
+                      name="image"
+                      value={formData.image}
+                      onChange={handleChange}
+                      placeholder="https://example.com/image.jpg"
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-r-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optional: Add an image URL for your group's avatar
+                  </p>
                   </div>
                 </div>
               </div>

@@ -16,7 +16,7 @@ export async function POST(request) {
         { status: 401 }
       );
     }
-
+    
     // Check if the request is a multipart form data request
     const contentType = request.headers.get('content-type') || '';
     let groupData;

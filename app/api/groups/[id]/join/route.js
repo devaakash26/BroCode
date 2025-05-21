@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/app/lib/db';
-import { sendGroupJoinEmail } from '@/app/lib/email';
 
 export async function POST(request, { params }) {
   try {
@@ -55,26 +54,6 @@ export async function POST(request, { params }) {
         role: 'MEMBER', // Default role is MEMBER
       },
     });
-
-    // Update group member count
-    await prisma.group.update({
-      where: { id: groupId },
-      data: { currentMembers: { increment: 1 } },
-    });
-
-    // Send email notification
-    try {
-      await sendGroupJoinEmail({
-        to: session.user.email,
-        name: session.user.name || 'User',
-        groupName: group.name,
-        groupDescription: group.description,
-      });
-      console.log(`Group join email sent to ${session.user.email}`);
-    } catch (emailError) {
-      console.error('Error sending group join email:', emailError);
-      // Don't fail the request if email sending fails
-    }
 
     return NextResponse.json({
       message: 'Successfully joined the group',

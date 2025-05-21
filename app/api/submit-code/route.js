@@ -30,16 +30,118 @@ function validateCodeSyntax(code, language) {
       if (!code.includes('#include') && !code.includes('int') && !code.includes('{')) {
         return { valid: false, error: 'C++ code should include proper headers and function definitions' };
       }
+      
+      // Check if the solution is just printing and not returning a value
+      const userCode = extractUserCodeFromLockedSections(code);
+      if (userCode.includes('cout') && !userCode.includes('return') && 
+          (userCode.includes('vector<int>') || userCode.includes('vector <int>') || 
+           userCode.includes('vector<string>') || userCode.includes('vector <string>'))) {
+        return { valid: false, error: 'Your solution should return a value, not just print to console' };
+      }
       break;
   }
   return { valid: true };
 }
 
+// Helper to wrap user code in proper boilerplate
+function wrapCodeWithBoilerplate(userCode, language, problem) {
+  const functionName = extractMainFunctionName(problem.title, language);
+  
+  // Check if code contains locked sections
+  const hasLockedSections = userCode.includes('BEGIN LOCKED') && userCode.includes('END LOCKED');
+  
+  // If it has locked sections, preserve them and only use the user-editable parts
+  if (hasLockedSections) {
+    return userCode; // Keep the locked sections intact
+  }
+  
+  // Otherwise use the original wrapping logic for backward compatibility
+  switch (language) {
+    case 'javascript':
+      // Check if the code already has module.exports
+      if (!userCode.includes('module.exports')) {
+        return `${userCode.trim()}\n\n// Auto-added for testing\nmodule.exports = ${functionName};`;
+      }
+      return userCode;
+      
+    case 'python':
+      // Check if the code already has main block
+      if (!userCode.includes('if __name__ == "__main__"')) {
+        return `${userCode.trim()}\n\n# Auto-added for testing\nif __name__ == "__main__":\n    import json\n    import sys\n    # Example test\n    print(${functionName}(*json.loads(sys.argv[1])))`;
+      }
+      return userCode;
+      
+    case 'java':
+      // If the code doesn't have a main method, add one
+      if (!userCode.includes('public static void main')) {
+        // Check if the code has the Solution class
+        if (!userCode.includes('class Solution')) {
+          return `import java.util.*;\n\nclass Solution {\n    ${userCode.trim()}\n    \n    // Auto-added for testing\n    public static void main(String[] args) {\n        Solution solution = new Solution();\n        // Example test will be run\n    }\n}`;
+        } else {
+          // Find the end of the Solution class and add main method there
+          const lastBraceIndex = userCode.lastIndexOf('}');
+          if (lastBraceIndex !== -1) {
+            return userCode.substring(0, lastBraceIndex) + 
+                   '\n    // Auto-added for testing\n    public static void main(String[] args) {\n        Solution solution = new Solution();\n        // Example test will be run\n    }\n}';
+          }
+        }
+      }
+      return userCode;
+      
+    case 'cpp':
+      // If the code doesn't have a main function, add one
+      if (!userCode.includes('int main(')) {
+        // Check if code has the Solution class
+        if (!userCode.includes('class Solution')) {
+          return `#include <vector>\n#include <iostream>\n\nclass Solution {\npublic:\n    ${userCode.trim()}\n};\n\n// Auto-added for testing\nint main() {\n    Solution solution;\n    // Example test will be run\n    return 0;\n}`;
+        } else {
+          // Add main function after the Solution class
+          return `${userCode.trim()}\n\n// Auto-added for testing\nint main() {\n    Solution solution;\n    // Example test will be run\n    return 0;\n}`;
+        }
+      }
+      return userCode;
+  }
+  
+  return userCode; // Default fallback
+}
+
+// Function to extract user code from submissions with locked sections
+function extractUserCodeFromLockedSections(fullCode) {
+  if (!fullCode.includes('BEGIN LOCKED') || !fullCode.includes('END LOCKED')) {
+    return fullCode; // No locked sections, return the full code
+  }
+  
+  const lines = fullCode.split('\n');
+  const userCodeParts = [];
+  let inLockedSection = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].includes('BEGIN LOCKED')) {
+      inLockedSection = true;
+      continue;
+    }
+    
+    if (lines[i].includes('END LOCKED')) {
+      inLockedSection = false;
+      continue;
+    }
+    
+    if (!inLockedSection) {
+      userCodeParts.push(lines[i]);
+    }
+  }
+  
+  return userCodeParts.join('\n');
+}
+
 // Helper to analyze code for solution quality
 function analyzeCodeQuality(code, language, problem) {
+  // If code has locked sections, only analyze the user-editable parts
+  const codeToAnalyze = extractUserCodeFromLockedSections(code);
+  
   // More advanced code analysis to detect trivial or incomplete solutions
-  const codeLength = code.trim().length;
-  const nonCommentLines = code.split('\n')
+  const codeLength = codeToAnalyze.trim().length;
+  const nonCommentLines = codeToAnalyze.split('\n')
     .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('#') && !line.trim().startsWith('*'))
     .filter(line => line.trim().length > 0)
     .length;
@@ -53,11 +155,11 @@ function analyzeCodeQuality(code, language, problem) {
   switch (language) {
     case 'javascript':
       // Check for minimal solution components
-      const hasProperFunction = code.includes('function') && code.includes('(') && code.includes(')');
-      const hasArrowFunction = code.includes('=>');
-      const hasReturn = code.includes('return');
-      const hasMeaningfulLogic = code.includes('if') || code.includes('for') || code.includes('while') || 
-                               code.includes('.map') || code.includes('.filter') || code.includes('.reduce');
+      const hasProperFunction = codeToAnalyze.includes('function') && codeToAnalyze.includes('(') && codeToAnalyze.includes(')');
+      const hasArrowFunction = codeToAnalyze.includes('=>');
+      const hasReturn = codeToAnalyze.includes('return');
+      const hasMeaningfulLogic = codeToAnalyze.includes('if') || codeToAnalyze.includes('for') || codeToAnalyze.includes('while') || 
+                               codeToAnalyze.includes('.map') || codeToAnalyze.includes('.filter') || codeToAnalyze.includes('.reduce');
       
       if (!(hasProperFunction || hasArrowFunction) || !hasReturn) {
         return { isQualitySolution: false, reason: 'JavaScript solution must define and return from a function' };
@@ -70,10 +172,10 @@ function analyzeCodeQuality(code, language, problem) {
       
     case 'python':
       // Check for Python solution components
-      const hasPyFunction = code.includes('def') && code.includes(':');
-      const hasPyReturn = code.includes('return');
-      const hasPyLogic = code.includes('if') || code.includes('for') || code.includes('while') || 
-                      code.includes('in ') || code.includes('range(');
+      const hasPyFunction = codeToAnalyze.includes('def') && codeToAnalyze.includes(':');
+      const hasPyReturn = codeToAnalyze.includes('return');
+      const hasPyLogic = codeToAnalyze.includes('if') || codeToAnalyze.includes('for') || codeToAnalyze.includes('while') || 
+                      codeToAnalyze.includes('in ') || codeToAnalyze.includes('range(');
       
       if (!hasPyFunction || !hasPyReturn) {
         return { isQualitySolution: false, reason: 'Python solution must define a function and return a value' };
@@ -86,11 +188,11 @@ function analyzeCodeQuality(code, language, problem) {
       
     case 'java':
       // Check for Java solution components
-      const hasClass = code.includes('class') && code.includes('{') && code.includes('}');
-      const hasMethod = code.includes('public') && 
-                      (code.includes('static') || code.includes('void') || code.includes('int') || 
-                       code.includes('String') || code.includes('boolean'));
-      const hasJavaReturn = !code.includes('void') || code.includes('return');
+      const hasClass = codeToAnalyze.includes('class') && codeToAnalyze.includes('{') && codeToAnalyze.includes('}');
+      const hasMethod = codeToAnalyze.includes('public') && 
+                      (codeToAnalyze.includes('static') || codeToAnalyze.includes('void') || codeToAnalyze.includes('int') || 
+                       codeToAnalyze.includes('String') || codeToAnalyze.includes('boolean'));
+      const hasJavaReturn = !codeToAnalyze.includes('void') || codeToAnalyze.includes('return');
       
       if (!hasClass || !hasMethod) {
         return { isQualitySolution: false, reason: 'Java solution must include a class with proper method' };
@@ -103,30 +205,30 @@ function analyzeCodeQuality(code, language, problem) {
       
     case 'cpp':
       // Check for C++ solution components
-      const hasInclude = code.includes('#include');
-      const hasMainOrFunction = (code.includes('int main') || code.includes('void main')) || 
-                             (code.includes('int ') && code.includes('(') && code.includes(')') && !code.includes('main'));
-      const hasCppReturn = code.includes('return');
+      const hasInclude = codeToAnalyze.includes('#include');
+      const hasMainOrFunction = (codeToAnalyze.includes('int main') || codeToAnalyze.includes('void main')) || 
+                             (codeToAnalyze.includes('int ') && codeToAnalyze.includes('(') && codeToAnalyze.includes(')') && !codeToAnalyze.includes('main'));
+      const hasCppReturn = codeToAnalyze.includes('return');
       
       // Look for actual algorithm implementation
       const hasMeaningfulCppLogic = 
-        code.includes('for (') || 
-        code.includes('while (') || 
-        code.includes('if (') || 
-        (code.match(/vector/g) || []).length > 1 || // Using vectors for processing
-        code.includes('unordered_map') && code.includes('[') || // Using map with indexing
-        code.includes('push_back') || 
-        code.includes('sort(') ||
-        code.match(/cin >>/g) && code.match(/cout <</g); // Has both input and output
+        codeToAnalyze.includes('for (') || 
+        codeToAnalyze.includes('while (') || 
+        codeToAnalyze.includes('if (') || 
+        (codeToAnalyze.match(/vector/g) || []).length > 1 || // Using vectors for processing
+        codeToAnalyze.includes('unordered_map') && codeToAnalyze.includes('[') || // Using map with indexing
+        codeToAnalyze.includes('push_back') || 
+        codeToAnalyze.includes('sort(') ||
+        codeToAnalyze.match(/cin >>/g) && codeToAnalyze.match(/cout <</g); // Has both input and output
       
       // Detect if the code actually processes data and does calculations
       const hasActualProcessing = 
-        code.includes('++') || 
-        code.includes('--') || 
-        code.includes('+=') || 
-        code.includes('-=') || 
-        code.includes('*=') || 
-        (code.match(/=/g) || []).length >= 2; // Multiple assignments
+        codeToAnalyze.includes('++') || 
+        codeToAnalyze.includes('--') || 
+        codeToAnalyze.includes('+=') || 
+        codeToAnalyze.includes('-=') || 
+        codeToAnalyze.includes('*=') || 
+        (codeToAnalyze.match(/=/g) || []).length >= 2; // Multiple assignments
       
       if (!hasInclude) {
         return { isQualitySolution: false, reason: 'C++ solution should include necessary headers' };
@@ -136,12 +238,17 @@ function analyzeCodeQuality(code, language, problem) {
         return { isQualitySolution: false, reason: 'C++ solution must define a function or main method' };
       }
       
-      if (!hasCppReturn && !code.includes('void')) {
+      if (!hasCppReturn && !codeToAnalyze.includes('void')) {
         return { isQualitySolution: false, reason: 'Solution must return a value or be declared void' };
       }
       
+      // Check if solution only prints to console without returning anything
+      if (codeToAnalyze.includes('cout') && !hasCppReturn) {
+        return { isQualitySolution: false, reason: 'Your solution should return a value, not just print to console' };
+      }
+      
       // Detect trivial solutions like just "int main() {}"
-      if (code.includes('int main') && nonCommentLines < 8) {
+      if (codeToAnalyze.includes('int main') && nonCommentLines < 8) {
         // Check for empty or nearly empty main function with no meaningful logic
         if (!hasMeaningfulCppLogic || !hasActualProcessing) {
           return { isQualitySolution: false, reason: 'C++ solution is incomplete. Add algorithm implementation with loops, conditionals, or data structures.' };
@@ -171,6 +278,46 @@ const calculatePoints = (difficulty) => {
       return 10;
   }
 };
+
+// Helper to extract main function name from problem title
+function extractMainFunctionName(title, language) {
+  if (!title) return language === 'javascript' ? 'solve' : 'solve';
+  
+  // Convert title to function name format based on language conventions
+  let functionName = title
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')  // Remove special characters
+    .replace(/\s+/g, '_');    // Replace spaces with underscores
+  
+  switch (language) {
+    case 'javascript':
+      // Convert to camelCase for JavaScript
+      functionName = functionName
+        .split('_')
+        .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+      break;
+      
+    case 'python':
+      // Python uses snake_case
+      functionName = functionName.replace(/([A-Z])/g, '_$1').toLowerCase();
+      if (functionName.startsWith('_')) {
+        functionName = functionName.substring(1);
+      }
+      break;
+      
+    case 'java':
+    case 'cpp':
+      // Java/C++ methods are typically camelCase
+      functionName = functionName
+        .split('_')
+        .map((word, index) => index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+      break;
+  }
+  
+  return functionName || (language === 'javascript' ? 'solve' : 'solve');
+}
 
 export async function POST(request) {
   try {
@@ -244,7 +391,10 @@ export async function POST(request) {
     const problem = await prisma.problem.findUnique({
       where: { id: problemId },
       include: {
-        testCasesRel: true,
+        testCasesRel: {
+          // For submissions, use non-example test cases
+          where: { isExample: false }
+        },
       },
     });
 
@@ -267,6 +417,9 @@ export async function POST(request) {
       }, { status: 200 });
     }
 
+    // Wrap the code with proper boilerplate if needed
+    const completeCode = wrapCodeWithBoilerplate(code, language, problem);
+
     // Generate fake console output for debugging purposes
     const consoleOutput = `Running ${language} code...\n` +
       `Processing ${problem.testCasesRel.length} test cases (including hidden test cases).\n` +
@@ -275,8 +428,21 @@ export async function POST(request) {
        language === 'java' ? 'OpenJDK 11.0.15\n' : 
        'GCC 11.2.0\n');
     
+    // Flag to identify trivial "print only" solutions
+    const isPrintOnlySolution = 
+      (language === 'cpp' && 
+       code.includes('cout') && 
+       !extractUserCodeFromLockedSections(code).includes('return')) ||
+      (language === 'python' && 
+       code.includes('print') && 
+       !extractUserCodeFromLockedSections(code).includes('return')) ||
+      (language === 'javascript' && 
+       code.includes('console.log') && 
+       !extractUserCodeFromLockedSections(code).includes('return'));
+    
     // Check for special test cases - if TEST_ALL_PASS is present, bypass all testing
-    const shouldAllPass = code.includes('// TEST_ALL_PASS') || code.includes('# TEST_ALL_PASS');
+    const shouldAllPass = (code.includes('// TEST_ALL_PASS') || code.includes('# TEST_ALL_PASS')) && 
+                         !isPrintOnlySolution; // Never pass print-only solutions
     
     // For the prototype, we're using a more realistic mock execution
     // Mock test results with more realistic behavior
@@ -294,6 +460,15 @@ export async function POST(request) {
           // For demonstration purposes only - allow instructors to force all passing
           passed = true;
           output = testCase.output;
+        } else if (isPrintOnlySolution) {
+          // Always fail print-only solutions that don't return values
+          passed = false;
+          error = language === 'cpp' 
+              ? "Runtime error: Function doesn't return a value"
+              : language === 'python'
+              ? "Runtime error: Function returns None instead of expected result"
+              : "Runtime error: Function doesn't return a value";
+          output = language === 'cpp' ? 'Hello' : 'undefined';
         } else {
           // For testing purposes, we can force errors/failures with special comments
           const shouldGenerateError = code.includes('// TEST_ERROR') || code.includes('# TEST_ERROR');
@@ -322,28 +497,79 @@ export async function POST(request) {
             }
             passed = false;
           } else {
-            // By default, for the prototype, we'll say most detailed solutions pass
-            // But randomize a bit to make testing more interesting
-            // In a real implementation, this would run actual code
+            // Special handling for common problems like Two Sum
+            const isProblemTwoSum = 
+              problem.title.includes('Two Sum') || 
+              (problem.description && problem.description.includes('sum') && problem.description.includes('target'));
             
-            // The longer the solution, the more likely it passes (for demo purposes)
-            const solutionComplexity = code.length / 100; // rough complexity metric
-            const randomFactor = Math.random() + solutionComplexity;
-            
-            // For demo, more complex solutions are more likely to pass
-            passed = randomFactor > 0.7; // slightly easier to pass for submissions
-            
-            if (passed) {
-              output = testCase.output;
-            } else {
-              // Generate plausible wrong output
-              if (testCase.output && testCase.output.match(/^\d+$/)) {
-                const expectedNum = parseInt(testCase.output);
-                output = (expectedNum + (index + 1)).toString();
-              } else if (testCase.output && testCase.output.includes('[') && testCase.output.includes(']')) {
-                output = testCase.output.replace(/\d+/, match => parseInt(match) + 1);
+            if (isProblemTwoSum) {
+              // Check if solution has the right components for Two Sum
+              const userCode = extractUserCodeFromLockedSections(code);
+              const hasTwoSumAlgorithm = 
+                // Check for HashMap/unordered_map approach
+                ((language === 'cpp' && (userCode.includes('unordered_map') || userCode.includes('map<'))) ||
+                 (language === 'javascript' && (userCode.includes('Map') || userCode.includes('{}') || userCode.includes('Object.') || userCode.includes('[') && userCode.includes(']'))) ||
+                 (language === 'python' && (userCode.includes('dict') || userCode.includes('{}')))) &&
+                // Check for proper loop and difference calculation
+                ((userCode.includes('for') || userCode.includes('while') || userCode.includes('forEach') || userCode.includes('map(') || 
+                  userCode.includes('each') || userCode.includes('reduce')) &&
+                 (userCode.includes('-') || userCode.includes('+')));
+              
+              // For Two Sum, if code shows right algorithm components, it's likely correct
+              if (hasTwoSumAlgorithm && userCode.includes('return') && !userCode.includes('cout') && userCode.length > 100) {
+                passed = true;
+                output = testCase.output;
               } else {
-                output = `Wrong output for test case ${index + 1}`;
+                // Provide more realistic output for incorrect Two Sum solutions
+                // Always output a pair of indices, just not the correct ones
+                if (testCase.output && testCase.output.includes('[') && testCase.output.includes(',')) {
+                  // Generate wrong but plausible indices
+                  const wrongIndices = JSON.parse(testCase.output);
+                  const altIndex1 = (wrongIndices[0] + 1) % 4; // Keep within array bounds
+                  const altIndex2 = (wrongIndices[1] + 1) % 4;
+                  output = `[${altIndex1},${altIndex2}]`;
+                } else {
+                  output = '[1,1]'; // Default wrong output for Two Sum
+                }
+                passed = false;
+              }
+            } else {
+              // For other problems, use the standard simulation logic
+              // The longer the solution, the more likely it passes (for demo purposes)
+              const solutionComplexity = extractUserCodeFromLockedSections(code).length / 100; // rough complexity metric
+              
+              // Check for essential elements in a valid solution for this problem
+              const hasValidSolutionComponents = 
+                (language === 'cpp' && (
+                  (code.includes('unordered_map') || code.includes('for') || code.includes('while')) &&
+                  code.includes('return') && 
+                  !code.includes('cout') // Valid solutions shouldn't print
+                )) ||
+                (language === 'javascript' && (
+                  code.includes('Map') || code.includes('for') || code.includes('while') || code.includes('forEach') ||
+                  code.includes('reduce') || code.includes('filter')
+                )) ||
+                (language === 'python' && (
+                  code.includes('dict') || code.includes('for ') || code.includes('while')
+                ));
+              
+              const randomFactor = Math.random() + solutionComplexity;
+              
+              // Make passing more dependent on having proper solution components
+              passed = hasValidSolutionComponents && randomFactor > 0.7; // slightly easier to pass for submissions
+              
+              if (passed) {
+                output = testCase.output;
+              } else {
+                // Generate plausible wrong output
+                if (testCase.output && testCase.output.match(/^\d+$/)) {
+                  const expectedNum = parseInt(testCase.output);
+                  output = (expectedNum + (index + 1)).toString();
+                } else if (testCase.output && testCase.output.includes('[') && testCase.output.includes(']')) {
+                  output = testCase.output.replace(/\d+/, match => parseInt(match) + 1);
+                } else {
+                  output = `Wrong output for test case ${index + 1}`;
+                }
               }
             }
           }

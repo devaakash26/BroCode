@@ -12,8 +12,11 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
   // Extract stats
   const { total, solved, easy, medium, hard, tags } = stats;
   
+  // Remove duplicates from initialProblems based on id
+  const uniqueProblems = Array.from(new Map(initialProblems.map(problem => [problem.id, problem])).values());
+  
   // State for problems and filters
-  const [problems, setProblems] = useState(initialProblems);
+  const [problems, setProblems] = useState(uniqueProblems);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [difficulty, setDifficulty] = useState(searchParams.get('difficulty') || '');
@@ -26,7 +29,7 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
   useEffect(() => {
     setLoading(true);
     
-    let filtered = [...initialProblems];
+    let filtered = [...uniqueProblems];
     
     // Apply search filter
     if (searchTerm) {
@@ -83,7 +86,7 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
     
     setProblems(filtered);
     setLoading(false);
-  }, [searchTerm, difficulty, status, selectedTags, sortBy, sortOrder, initialProblems]);
+  }, [searchTerm, difficulty, status, selectedTags, sortBy, sortOrder, uniqueProblems]);
   
   // Update URL with filters
   const updateUrlParams = () => {
@@ -350,7 +353,7 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
             </thead>
             <tbody className={`divide-y divide-gray-200 dark:divide-gray-700 ${loading ? 'opacity-50' : ''}`}>
               {problems.map((problem, index) => (
-                <tr key={problem.id} className={`hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors duration-150`}>
+                <tr key={problem.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
                   <td className="pl-6 pr-3 py-4 whitespace-nowrap">
                     <div className="flex justify-center">
                       {problem.solved ? (
@@ -446,14 +449,14 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
             </div>
             <div>
               <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                <button className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-600/30 dark:text-gray-500">
+                <button className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-700 dark:text-gray-500">
                   <span className="sr-only">Previous</span>
                   <ChevronLeft className="h-5 w-5" />
                 </button>
                 <button className="relative z-10 inline-flex items-center bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                   1
                 </button>
-                <button className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-600/30 dark:text-gray-500">
+                <button className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-700 dark:text-gray-500">
                   <span className="sr-only">Next</span>
                   <ChevronDown className="h-5 w-5 rotate-270" />
                 </button>

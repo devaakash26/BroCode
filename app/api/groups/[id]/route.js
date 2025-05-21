@@ -189,7 +189,14 @@ export async function DELETE(request, { params }) {
 
     // Check if the group exists
     const group = await prisma.group.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        members: {
+          where: {
+            userId: session.user.id
+          }
+        }
+      }
     });
 
     if (!group) {
@@ -199,10 +206,13 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // Only the creator can delete the group
-    if (group.creatorId !== session.user.id) {
+    // Check if the user is the creator or an admin
+    const isCreator = group.creatorId === session.user.id;
+    const isAdmin = group.members.length > 0 && group.members[0].role === 'ADMIN';
+
+    if (!isCreator && !isAdmin) {
       return NextResponse.json(
-        { message: 'Only the group creator can delete this group' },
+        { message: 'Only the group creator or admins can delete this group' },
         { status: 403 }
       );
     }

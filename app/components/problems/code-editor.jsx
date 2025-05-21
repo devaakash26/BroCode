@@ -6,10 +6,10 @@ import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, Ch
 import toast from 'react-hot-toast';
 
 const defaultLanguages = [
-  { id: 'javascript', name: 'JavaScript', defaultCode: '// Write your JavaScript solution here\n\n' },
-  { id: 'python', name: 'Python', defaultCode: '# Write your Python solution here\n\n' },
-  { id: 'java', name: 'Java', defaultCode: '// Write your Java solution here\n\n' },
   { id: 'cpp', name: 'C++', defaultCode: '// Write your C++ solution here\n\n' },
+  { id: 'javascript', name: 'JavaScript', defaultCode: '// Write your JavaScript solution here\n\n' },
+  { id: 'python', name: 'Python', defaultCode: '// Write your Python solution here\n\n' },
+  { id: 'java', name: 'Java', defaultCode: '// Write your Java solution here\n\n' },
 ];
 
 export default function CodeEditor({ 
@@ -20,7 +20,7 @@ export default function CodeEditor({
   readOnly = false,
   challengeId = null,
 }) {
-  const [language, setLanguage] = useState('javascript');
+  const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(initialCode || defaultLanguages[0].defaultCode);
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,6 +32,7 @@ export default function CodeEditor({
   const [executionProgress, setExecutionProgress] = useState(0);
   const [compilationStatus, setCompilationStatus] = useState(null);
   const [testCaseStatus, setTestCaseStatus] = useState([]);
+  const [lockedRanges, setLockedRanges] = useState([]);
 
   // Reset code when language changes
   useEffect(() => {
@@ -39,6 +40,8 @@ export default function CodeEditor({
       const selectedLang = defaultLanguages.find(lang => lang.id === language);
       setCode(selectedLang?.defaultCode || '');
     }
+    // Identify locked ranges in the code when language changes
+    identifyLockedRanges();
   }, [language, initialCode]);
 
   // Auto-open panel when results are available (and close it when results are cleared)
@@ -136,6 +139,39 @@ export default function CodeEditor({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isPanelOpen]);
+
+  // Function to identify locked ranges in code
+  const identifyLockedRanges = () => {
+    // Reset locked ranges
+    const ranges = [];
+    
+    if (!code) return;
+    
+    // Find all locked regions marked with special comments
+    const lines = code.split('\n');
+    let startLine = -1;
+    
+    for (let i = 0; i < lines.length; i++) {
+      // Look for markers that indicate locked code regions
+      if (lines[i].includes('// BEGIN LOCKED') || lines[i].includes('/* BEGIN LOCKED */') ||
+          lines[i].includes('# BEGIN LOCKED') || lines[i].includes('<!-- BEGIN LOCKED -->')) {
+        startLine = i;
+      }
+      
+      if ((lines[i].includes('// END LOCKED') || lines[i].includes('/* END LOCKED */') ||
+           lines[i].includes('# END LOCKED') || lines[i].includes('<!-- END LOCKED -->')) && 
+          startLine !== -1) {
+        ranges.push({
+          startLineNumber: startLine + 1,
+          endLineNumber: i + 1,
+          isReadOnly: true
+        });
+        startLine = -1;
+      }
+    }
+    
+    setLockedRanges(ranges);
+  };
 
   const handleEditorChange = (value) => {
     setCode(value);
@@ -593,6 +629,20 @@ export default function CodeEditor({
     );
   };
 
+  // Monaco editor options with support for locked regions
+  const editorOptions = {
+    readOnly: readOnly,
+    minimap: { enabled: false },
+    fontSize: 14,
+    lineNumbers: 'on',
+    roundedSelection: true,
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    tabSize: 2,
+    // Support for locked ranges
+    readOnlyEditableRanges: lockedRanges
+  };
+
   return (
     <div className="flex flex-col h-full relative">
       <div className="flex flex-wrap gap-4 p-4 bg-gray-100 dark:bg-gray-800">
@@ -646,7 +696,7 @@ export default function CodeEditor({
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
                 onClick={runCode}
-                disabled={isRunning || isSubmitting}
+                disabled={isRunning || isSubmitting || readOnly}
               >
                 {isRunning ? (
                   <>
@@ -664,7 +714,7 @@ export default function CodeEditor({
                 type="button"
                 className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
                 onClick={submitCode}
-                disabled={isRunning || isSubmitting}
+                disabled={isRunning || isSubmitting || readOnly}
               >
                 {isSubmitting ? (
                   <>
@@ -700,18 +750,7 @@ export default function CodeEditor({
           value={code}
           theme={theme}
           onChange={handleEditorChange}
-          options={{
-            minimap: { enabled: true },
-            fontSize: 14,
-            wordWrap: 'on',
-            readOnly: readOnly || isRunning || isSubmitting,
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            tabSize: 2,
-            lineNumbers: 'on',
-            renderLineHighlight: 'all',
-            fontLigatures: true,
-          }}
+          options={editorOptions}
         />
         
         {/* Execution Status Overlay - shown when running */}

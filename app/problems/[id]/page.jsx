@@ -31,12 +31,14 @@ async function getProblem(id, userId) {
       isPublic: true,
     },
     include: {
-      testCases: {
-        where: { isHidden: false },
+      testCasesRel: {
+        where: { isExample: true },
         select: {
           id: true,
           input: true,
           expectedOutput: true,
+          explanation: true,
+          isExample: true
         },
       },
       submissions: {
@@ -63,6 +65,7 @@ async function getProblem(id, userId) {
 
   return {
     ...problem,
+    testCases: problem.testCasesRel, // Map testCasesRel to testCases for compatibility
     lastSubmission,
   };
 }
@@ -78,7 +81,7 @@ export default async function ProblemDetailPage({ params }) {
   }
 
   const initialCode = problem.lastSubmission?.code || '';
-  const initialLanguage = problem.lastSubmission?.language || 'javascript';
+  const initialLanguage = problem.lastSubmission?.language || 'cpp';
 
   return (
     <div className="container py-10">
@@ -126,6 +129,20 @@ export default async function ProblemDetailPage({ params }) {
               <div dangerouslySetInnerHTML={{ __html: problem.description }} />
             </div>
 
+            {/* Complexity Info */}
+            <div className="mt-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="p-3 flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                  <p className="text-sm font-semibold mb-1 text-blue-700 dark:text-blue-300">Expected Time Complexity</p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">{problem.timeComplexity}</p>
+                </div>
+                <div className="p-3 flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-md">
+                  <p className="text-sm font-semibold mb-1 text-purple-700 dark:text-purple-300">Expected Space Complexity</p>
+                  <p className="text-sm text-purple-600 dark:text-purple-400">{problem.spaceComplexity}</p>
+                </div>
+              </div>
+            </div>
+
             {problem.testCases.length > 0 && (
               <div className="mt-8">
                 <h3 className="text-lg font-semibold mb-4">Example Test Cases</h3>
@@ -147,6 +164,12 @@ export default async function ProblemDetailPage({ params }) {
                           </pre>
                         </div>
                       </div>
+                      {testCase.explanation && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Explanation:</p>
+                          <p className="text-sm text-gray-700 dark:text-gray-300">{testCase.explanation}</p>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -179,7 +202,7 @@ export default async function ProblemDetailPage({ params }) {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow h-[calc(100vh-14rem)]">
           <CodeEditor 
             problemId={problem.id}
-            initialCode={initialCode}
+            initialCode={initialCode || (problem.templateCode && problem.templateCode[initialLanguage])}
             initialLanguage={initialLanguage}
             testCases={problem.testCases}
           />

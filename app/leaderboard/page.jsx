@@ -15,12 +15,17 @@ export const metadata = {
 async function getLeaderboard(searchQuery = '', sortBy = 'total') {
   // Get top users by solved problems count
   const users = await prisma.user.findMany({
-    where: searchQuery ? {
-      OR: [
-        { name: { contains: searchQuery, mode: 'insensitive' } },
-        { email: { contains: searchQuery, mode: 'insensitive' } },
-      ],
-    } : undefined,
+    where: {
+      // Exclude the system user
+      email: { not: 'system@neetcode.io' },
+      // Include search query if provided
+      ...(searchQuery ? {
+        OR: [
+          { name: { contains: searchQuery, mode: 'insensitive' } },
+          { email: { contains: searchQuery, mode: 'insensitive' } },
+        ],
+      } : {}),
+    },
     select: {
       id: true,
       name: true,
