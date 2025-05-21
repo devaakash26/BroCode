@@ -8,14 +8,36 @@ const fs = require('fs');
 // Set NODE_ENV explicitly to development if not set
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Log configuration for debugging
-console.log('Starting server with config:');
-console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
-console.log(`- PORT: ${process.env.PORT || '3000'}`);
+// Log configuration for debugging - less verbose in production
+if (process.env.NODE_ENV === 'development') {
+  console.log('Starting server with config:');
+  console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`- PORT: ${process.env.PORT || '3000'}`);
+}
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
+const hostname = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
 const port = parseInt(process.env.PORT || '3000', 10);
+
+// Memory leak protection in production
+const memoryUsageMonitoring = setInterval(() => {
+  if (process.env.NODE_ENV === 'production') {
+    const memoryUsage = process.memoryUsage();
+    const memoryUsedMB = Math.round(memoryUsage.rss / 1024 / 1024);
+    const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+    
+    // Log only if memory usage is high
+    if (memoryUsedMB > 900) { // Warning at 900MB
+      console.warn(`High memory usage: ${memoryUsedMB}MB RSS, ${heapUsedMB}MB heap`);
+    }
+    
+    // Force garbage collection if available and memory usage is critically high
+    if (global.gc && memoryUsedMB > 950) {
+      console.warn('Forcing garbage collection');
+      global.gc();
+    }
+  }
+}, 60000); // Check every minute
 
 // Global error handling
 process.on('uncaughtException', (err) => {
@@ -28,8 +50,18 @@ process.on('unhandledRejection', (reason, promise) => {
   // Don't exit the process, just log the error
 });
 
-// Initialize Next.js app
-const app = next({ dev, hostname, port });
+// Initialize Next.js app with optimized configuration
+const nextConfig = {
+  dev,
+  hostname,
+  port,
+  conf: {
+    compress: true, // Enable compression
+    poweredByHeader: false, // Remove X-Powered-By header
+  }
+};
+
+const app = next(nextConfig);
 const nextHandler = app.getRequestHandler();
 
 // Ensure uploads directory exists
@@ -45,10 +77,27 @@ app.prepare().then(() => {
   const expressApp = express();
   const server = http.createServer(expressApp);
   
-  // Socket.IO server with correct configuration
+  // Production optimizations for Express
+  if (process.env.NODE_ENV === 'production') {
+    // Enable compression
+    const compression = require('compression');
+    expressApp.use(compression());
+    
+    // Set security headers
+    expressApp.use((req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      next();
+    });
+  }
+  
+  // Socket.IO server with optimized configuration
   const io = new Server(server, {
     cors: {
-      origin: '*',
+      origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.NEXTAUTH_URL || 'https://neetcode.vercel.app'] 
+        : '*',
       methods: ['GET', 'POST'],
       credentials: true
     },
@@ -56,22 +105,98 @@ app.prepare().then(() => {
     transports: ['websocket', 'polling'], // Add polling as fallback
     pingTimeout: 60000,
     pingInterval: 25000,
-    maxHttpBufferSize: 5e6, // 5MB
-    connectTimeout: 30000
+    maxHttpBufferSize: 1e6, // Reduced to 1MB for production
+    connectTimeout: 30000,
+    // Production optimizations
+    perMessageDeflate: {
+      threshold: 1024, // Only compress messages larger than 1KB
+    },
+    // Cache adapters
+    adapter: process.env.REDIS_URL ? require("@socket.io/redis-adapter") : null
   });
   
-  // Store active connections
-  const socketConnections = new Map();
+  // Store active connections with expiry to prevent memory leaks
+  class ConnectionManager {
+    constructor(expiryMs = 3600000) { // 1 hour default
+      this.connections = new Map();
+      this.expiryMs = expiryMs;
+    }
+
+    set(id, data) {
+      const expiry = Date.now() + this.expiryMs;
+      this.connections.set(id, { ...data, expiry });
+    }
+
+    get(id) {
+      const entry = this.connections.get(id);
+      if (!entry) return null;
+      
+      // Refresh expiry on access
+      entry.expiry = Date.now() + this.expiryMs;
+      return entry;
+    }
+
+    delete(id) {
+      this.connections.delete(id);
+    }
+
+    cleanup() {
+      const now = Date.now();
+      let removed = 0;
+      
+      for (const [id, data] of this.connections.entries()) {
+        if (data.expiry < now) {
+          this.connections.delete(id);
+          removed++;
+        }
+      }
+      
+      if (removed > 0 && process.env.NODE_ENV === 'development') {
+        console.log(`Cleaned up ${removed} expired connections`);
+      }
+    }
+
+    get size() {
+      return this.connections.size;
+    }
+
+    [Symbol.iterator]() {
+      return this.connections[Symbol.iterator]();
+    }
+
+    entries() {
+      return this.connections.entries();
+    }
+  }
+  
+  // Create optimized connection managers
+  const socketConnections = new ConnectionManager();
   const groupRooms = new Map(); // Track users in group rooms
   
-  // Debug socket.io connection events
-  io.engine.on('connection_error', (err) => {
-    console.error('Socket.io connection error:', err);
-  });
+  // Periodic cleanup
+  const cleanupInterval = setInterval(() => {
+    socketConnections.cleanup();
+    
+    // Cleanup empty group rooms
+    for (const [groupId, members] of groupRooms.entries()) {
+      if (members.size === 0) {
+        groupRooms.delete(groupId);
+      }
+    }
+  }, 300000); // Every 5 minutes
+  
+  // Debug socket.io connection events in development only
+  if (process.env.NODE_ENV === 'development') {
+    io.engine.on('connection_error', (err) => {
+      console.error('Socket.io connection error:', err);
+    });
+  }
   
   // Socket connection handler
   io.on('connection', (socket) => {
-    console.log('Socket connected:', socket.id);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Socket connected:', socket.id);
+    }
     
     // Store socket connection with user ID when authenticated
     socket.on('identify', (userData) => {
@@ -80,7 +205,10 @@ app.prepare().then(() => {
           socketId: socket.id,
           userData
         });
-        console.log(`User ${userData.id} (${userData.name || 'Unknown'}) identified with socket ${socket.id}`);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`User ${userData.id} (${userData.name || 'Unknown'}) identified with socket ${socket.id}`);
+        }
       }
     });
     
@@ -90,7 +218,10 @@ app.prepare().then(() => {
       
       const roomName = `group:${groupId}`;
       socket.join(roomName);
-      console.log(`Socket ${socket.id} joined room ${roomName}`);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Socket ${socket.id} joined room ${roomName}`);
+      }
       
       // Track room membership
       if (!groupRooms.has(groupId)) {
@@ -223,7 +354,9 @@ app.prepare().then(() => {
     
     // Handle disconnection
     socket.on('disconnect', () => {
-      console.log('Socket disconnected:', socket.id);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Socket disconnected:', socket.id);
+      }
       
       // Find user associated with this socket
       let disconnectedUserId = null;
@@ -232,7 +365,10 @@ app.prepare().then(() => {
         if (data.socketId === socket.id) {
           disconnectedUserId = userId;
           socketConnections.delete(userId);
-          console.log(`User ${userId} disconnected`);
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`User ${userId} disconnected`);
+          }
           break;
         }
       }
@@ -261,7 +397,8 @@ app.prepare().then(() => {
       status: 'ok',
       connections: socketConnections.size,
       groups: groupRooms.size,
-      uptime: process.uptime()
+      uptime: process.uptime(),
+      memory: process.env.NODE_ENV === 'production' ? undefined : process.memoryUsage()
     });
   });
 
@@ -286,13 +423,15 @@ app.prepare().then(() => {
   
   // Start the server with error handling
   try {
-    server.listen(port, (err) => {
+    server.listen(port, hostname, (err) => {
       if (err) {
         console.error('Error starting server:', err);
         return;
       }
-      console.log(`> Ready on http://${hostname}:${port}`);
-      console.log(`> Socket.IO server running on port ${port}`);
+      console.log(`> Ready on http://${hostname === '0.0.0.0' ? 'localhost' : hostname}:${port}`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`> Socket.IO server running on port ${port}`);
+      }
     });
 
     server.on('error', (error) => {
@@ -305,13 +444,17 @@ app.prepare().then(() => {
   console.error('Error preparing Next.js app:', err);
 });
 
-// Handle termination signals
+// Handle termination signals with proper cleanup
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
+  // Clean up resources
+  clearInterval(memoryUsageMonitoring);
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
+  // Clean up resources
+  clearInterval(memoryUsageMonitoring);
   process.exit(0);
 }); 

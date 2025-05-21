@@ -2,10 +2,10 @@
   "name": "neetcode",
   "version": 2,
   "env": {
-    "NEXTAUTH_URL": "http://localhost:3000",
-    "NEXTAUTH_URL_INTERNAL": "http://localhost:3000",
-    "NEXT_PUBLIC_URL": "http://localhost:3000",
-    "NEXT_PUBLIC_PROTOCOL": "http"
+    "NEXTAUTH_URL": "https://neetcode.vercel.app",
+    "NEXTAUTH_URL_INTERNAL": "https://neetcode.vercel.app",
+    "NEXT_PUBLIC_URL": "https://neetcode.vercel.app",
+    "NEXT_PUBLIC_PROTOCOL": "https"
   },
   "builds": [
     {
@@ -17,6 +17,51 @@
     {
       "src": "/(.*)",
       "dest": "/"
+    }
+  ],
+  "regions": ["iad1"],
+  "functions": {
+    "app/api/**/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/_next/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ]
 } 
