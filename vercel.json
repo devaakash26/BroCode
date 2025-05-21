@@ -7,18 +7,6 @@
     "NEXT_PUBLIC_URL": "https://neetcode.vercel.app",
     "NEXT_PUBLIC_PROTOCOL": "https"
   },
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/"
-    }
-  ],
   "regions": ["iad1"],
   "functions": {
     "app/api/**/*": {
