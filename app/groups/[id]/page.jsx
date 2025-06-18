@@ -32,6 +32,7 @@ export default function GroupDetailPage({ params }) {
   const [group, setGroup] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMember, setIsMember] = useState(false);
   const [activeMembers, setActiveMembers] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [showActiveChallenges, setShowActiveChallenges] = useState(true);
@@ -52,6 +53,7 @@ export default function GroupDetailPage({ params }) {
         
         setGroup(data.group);
         setIsAdmin(data.isAdmin);
+        setIsMember(data.isMember);
         
         // Prepare leaderboard data from members
         if (data.group.members) {
@@ -232,20 +234,20 @@ export default function GroupDetailPage({ params }) {
                 </div>
                 
                 <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-                  {isAdmin && (
+                  <InviteMembersDialog 
+                    group={group} 
+                    className="inline-flex items-center px-3.5 py-1.5 text-sm font-medium rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
+                  />
+                  
+                  {isMember && (
                     <Link
                       href={`/groups/${groupId}/settings`}
                       className="inline-flex items-center px-3.5 py-1.5 text-sm font-medium rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
                     >
                       <Settings className="h-4 w-4 mr-1.5" />
-                      Manage Group
+                      Group Settings
                     </Link>
                   )}
-                  
-                  <InviteMembersDialog 
-                    group={group} 
-                    className="inline-flex items-center px-3.5 py-1.5 text-sm font-medium rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors"
-                  />
                 </div>
               </div>
               

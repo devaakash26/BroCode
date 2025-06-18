@@ -55,34 +55,19 @@ export async function GET(request, { params }) {
     });
 
     if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: 'Group not found' }, { status: 404 });
     }
 
-    // Check if the user is a member of the group
-    const userMembership = group.members.find(member => member.userId === session.user.id);
-    
-    // If the group is private and the user is not a member, deny access
-    if (group.visibility === 'PRIVATE' && !userMembership) {
-      return NextResponse.json(
-        { message: 'You do not have permission to view this group' },
-        { status: 403 }
-      );
-    }
+    const userRole = group.members.find(member => member.userId === session.user.id)?.role;
+    const isAdmin = userRole === 'ADMIN' || userRole === 'CREATOR';
+    const isMember = !!userRole;
 
-    // Check if the user is an admin or creator
-    const isCreator = group.creatorId === session.user.id;
-    const isAdmin = isCreator || userMembership?.role === 'ADMIN';
-
-    // Return the group data with user permission flags
     return NextResponse.json({
+      success: true,
       group,
       isAdmin,
-      isCreator,
-      isMember: !!userMembership,
-      userRole: userMembership?.role || null,
+      isMember,
+      userRole: userRole || null,
     });
   } catch (error) {
     console.error('Error fetching group:', error);

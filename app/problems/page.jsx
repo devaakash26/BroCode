@@ -36,6 +36,17 @@ async function getProblems(userId) {
     },
   });
 
+  // A simple hashing function to get a deterministic "random" number
+  const simpleHash = (str) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  };
+
   // Format the data to include submission status
   return problems.map(problem => ({
     ...problem,
@@ -43,7 +54,7 @@ async function getProblems(userId) {
     submissions: undefined, // Remove submissions from the returned object
     submissionCount: problem._count.submissions,
     _count: undefined, // Remove _count from the returned object
-    acceptance: Math.floor(Math.random() * 41) + 60, // Random acceptance rate between 60-100% for demo
+    acceptance: 60 + (simpleHash(problem.id) % 41), // Deterministic acceptance rate
   }));
 }
 

@@ -298,4 +298,23 @@ export async function sendInvitationEmail({ to, inviterName, invitationLink, rol
     console.error('Error sending invitation email:', error);
     return { success: false, error };
   }
-} 
+}
+
+// Generic email sending function
+export async function sendEmail({ to, subject, html }) {
+  const mailOptions = {
+    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${to} with subject "${subject}"`);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending email to ${to}:`, error);
+    return { success: false, error };
+  }
+}

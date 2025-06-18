@@ -78,10 +78,10 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
           break;
         default: // Recent by default
           // Assuming ID correlates with recency, higher ID = more recent
-          comparison = parseInt(a.id) - parseInt(b.id);
+          comparison = b.id.localeCompare(a.id);
       }
       
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === 'asc' ? -comparison : comparison;
     });
     
     setProblems(filtered);
@@ -282,7 +282,7 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
       </div>
       
       {/* Problems table */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
@@ -351,81 +351,71 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y divide-gray-200 dark:divide-gray-700 ${loading ? 'opacity-50' : ''}`}>
-              {problems.map((problem, index) => (
-                <tr key={problem.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                  <td className="pl-6 pr-3 py-4 whitespace-nowrap">
-                    <div className="flex justify-center">
-                      {problem.solved ? (
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600"></div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <Link 
-                      href={`/problems/${problem.id}`} 
-                      className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
-                    >
-                      {problem.title}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <span 
-                      className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {loading ? (
+                <tr><td colSpan="4" className="text-center py-4">Loading...</td></tr>
+              ) : problems.length > 0 ? (
+                problems.map((problem) => (
+                  <tr key={problem.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {problem.solved ? <span className="text-green-500 font-bold">✔</span> : ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Link href={`/problems/${problem.id}`} className="text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
+                        {problem.title}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         problem.difficulty === 'EASY' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
                           problem.difficulty === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 
                             'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}
-                    >
-                      {problem.difficulty.charAt(0) + problem.difficulty.slice(1).toLowerCase()}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <span className={`text-sm ${
-                        problem.acceptance > 75 ? 'text-green-600 dark:text-green-400' : 
-                        problem.acceptance > 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {problem.acceptance}%
+                      >
+                        {problem.difficulty.charAt(0) + problem.difficulty.slice(1).toLowerCase()}
                       </span>
-                      <div className="ml-2 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            problem.acceptance > 75 ? 'bg-green-600' : 
-                            problem.acceptance > 50 ? 'bg-yellow-600' : 'bg-red-600'
-                          }`}
-                          style={{ width: `${problem.acceptance}%` }}
-                        ></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center">
+                        <span className={`text-sm ${
+                          problem.acceptance > 75 ? 'text-green-600 dark:text-green-400' : 
+                          problem.acceptance > 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {problem.acceptance}%
+                        </span>
+                        <div className="ml-2 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                          <div
+                            className={`h-1.5 rounded-full ${
+                              problem.acceptance > 75 ? 'bg-green-600' : 
+                              problem.acceptance > 50 ? 'bg-yellow-600' : 'bg-red-600'
+                            }`}
+                            style={{ width: `${problem.acceptance}%` }}
+                          ></div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {problem.submissionCount}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap">
-                    <div className="flex flex-wrap gap-1">
-                      {problem.tags.slice(0, 2).map((tag) => (
-                        <span 
-                          key={tag} 
-                          className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {problem.tags.length > 2 && (
-                        <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded">
-                          +{problem.tags.length - 2}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {problems.length === 0 && (
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {problem.submissionCount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        {problem.tags.slice(0, 2).map((tag) => (
+                          <span 
+                            key={tag} 
+                            className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {problem.tags.length > 2 && (
+                          <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded">
+                            +{problem.tags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan="6" className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                     No problems found. Try adjusting your filters.
