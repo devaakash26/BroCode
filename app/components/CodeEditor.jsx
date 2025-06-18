@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Editor } from '@monaco-editor/react';
+import dynamic from 'next/dynamic';
+const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
+
+
 
 export default function CodeEditor({ 
   value, 

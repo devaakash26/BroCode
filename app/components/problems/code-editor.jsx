@@ -1,7 +1,7 @@
 'use client';
-
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef } from 'react';
-import { Editor } from '@monaco-editor/react';
+const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code } from 'lucide-react';
 import toast from 'react-hot-toast';
 

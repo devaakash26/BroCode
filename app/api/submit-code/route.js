@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/app/lib/db';
-import { sendChallengeJoinEmail } from '@/app/lib/email';
 
 // Helper to validate code syntax based on language
 function validateCodeSyntax(code, language) {
@@ -49,8 +48,6 @@ function wrapCodeWithBoilerplate(userCode, language, problem) {
   
   // Check if code contains locked sections
   const hasLockedSections = userCode.includes('BEGIN LOCKED') && userCode.includes('END LOCKED');
-  
-  // If it has locked sections, preserve them and only use the user-editable parts
   if (hasLockedSections) {
     return userCode; // Keep the locked sections intact
   }
@@ -621,24 +618,6 @@ export async function POST(request) {
         pointsEarned
       },
     });
-
-    // Send email notification for first challenge submission
-    if (isFirstChallengeSubmission && challengeInfo && groupInfo) {
-      try {
-        await sendChallengeJoinEmail({
-          to: session.user.email,
-          name: session.user.name || 'User',
-          challengeName: challengeInfo.title,
-          groupName: groupInfo.name,
-          startTime: challengeInfo.startTime,
-          endTime: challengeInfo.endTime,
-        });
-        console.log(`Challenge join email sent to ${session.user.email} for challenge ${challengeId}`);
-      } catch (emailError) {
-        console.error('Error sending challenge join email:', emailError);
-        // Don't fail the submission if email sending fails
-      }
-    }
 
     // If it's part of a challenge and status is ACCEPTED, update user's score
     if (challengeId && status === 'ACCEPTED') {

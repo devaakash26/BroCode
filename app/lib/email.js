@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Email template for verification
-const verificationEmailTemplate = ({ name, verificationLink }) => `
+const  verificationEmailTemplate = ({ name, verificationLink }) => `
 <!DOCTYPE html>
 <html>
 <head>

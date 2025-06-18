@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, PlusCircle, Clock, Calendar, Trophy, Flag } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
+import { ChallengeSkeleton } from '@/components/ui/card-skeleton';
 
 export default function GroupChallengesPage({ params }) {
   const { id: groupId } = params;
@@ -60,11 +61,7 @@ export default function GroupChallengesPage({ params }) {
   }, [status, router, groupId]);
   
   if (isLoading || status === 'loading') {
-    return (
-      <div className="container py-8 flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <ChallengeSkeleton />;
   }
   
   if (!group) {

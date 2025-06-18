@@ -258,14 +258,32 @@ export default function AdminUsersPage() {
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
-                <tr>
-                  <td colSpan="5" className="px-6 py-4 text-center">
-                    <div className="flex justify-center items-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                      <span className="ml-2">Loading...</span>
-                    </div>
-                  </td>
-                </tr>
+                // Render skeleton rows with the same structure as actual rows
+                Array(5).fill(0).map((_, index) => (
+                  <tr key={`skeleton-${index}`} className="animate-pulse">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700"></div>
+                        <div className="ml-4">
+                          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          <div className="mt-2 h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+                    </td>
+                  </tr>
+                ))
               ) : currentUsers.length === 0 ? (
                 <tr>
                   <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import { Toaster, toast } from 'react-hot-toast';
 import ChallengeInterface from '../../../components/challenges/challenge-interface';
+import { ProblemSkeleton } from '@/components/ui/card-skeleton';
 
 export default function ChallengeProblemPage({ params }) {
   const { id: problemId } = params;
@@ -76,11 +77,7 @@ export default function ChallengeProblemPage({ params }) {
   }, [problemId, challengeId, groupId, status]);
 
   if (loading || status === 'loading') {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-      </div>
-    );
+    return <ProblemSkeleton />;
   }
 
   if (!problem || !challenge || !problems.length) {

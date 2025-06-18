@@ -1,6 +1,68 @@
 'use client';
 
+import Image from 'next/image';
+import { useState } from 'react';
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Skeleton component for loading state
+export function LeaderboardSkeleton() {
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-8 w-32" />
+      </div>
+
+      {/* Rows */}
+      {[...Array(10)].map((_, i) => (
+        <div 
+          key={i}
+          className={`grid grid-cols-12 gap-4 px-6 py-4 ${
+            i % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'
+          }`}
+        >
+          {/* Rank */}
+          <div className="col-span-1 flex items-center">
+            <Skeleton className="h-10 w-10 rounded-full" />
+          </div>
+          
+          {/* User */}
+          <div className="col-span-3 flex items-center">
+            <div className="flex items-center">
+              <Skeleton className="h-10 w-10 rounded-full mr-3" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+          
+          {/* Problems Solved */}
+          <div className="col-span-3 flex items-center space-x-3">
+            <Skeleton className="h-4 w-8" />
+            <Skeleton className="h-2 w-full" />
+          </div>
+          
+          {/* Recent Activity */}
+          <div className="col-span-3">
+            <Skeleton className="h-4 w-40" />
+          </div>
+          
+          {/* Level */}
+          <div className="col-span-2 flex items-center space-x-2">
+            <Skeleton className="h-2.5 w-2.5 rounded-full" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function LeaderboardRow({ user, isCurrentUser, isEvenRow }) {
+  const [imageError, setImageError] = useState(false);
+
   // Determine user level based on problems solved
   const level = user.solvedCount > 100 ? 'Master' :
               user.solvedCount > 50 ? 'Expert' :
@@ -40,16 +102,20 @@ export default function LeaderboardRow({ user, isCurrentUser, isEvenRow }) {
       {/* User */}
       <div className="col-span-3 flex items-center">
         <div className="h-10 w-10 relative mr-3">
-          {user.image ? (
-            <img
-              className="h-10 w-10 rounded-full object-cover"
-              src={user.image}
-              alt={user.name}
-              width={40}
-              height={40}
-            />
+          {user.image && !imageError ? (
+            <div className="relative h-10 w-10 rounded-full overflow-hidden">
+              <Image
+                className="rounded-full object-cover"
+                src={user.image}
+                alt={user.name || 'User avatar'}
+                fill
+                sizes="40px"
+                onError={() => setImageError(true)}
+                priority={user.rank <= 3}
+              />
+            </div>
           ) : (
-            <div className={`h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center`}>
+            <div className="h-10 w-10 rounded-full bg-indigo-600 flex items-center justify-center">
               <span className="text-white text-lg font-medium">
                 {user.name?.charAt(0).toUpperCase() || 'A'}
               </span>

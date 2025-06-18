@@ -17,17 +17,16 @@ export async function GET(request) {
       orderBy: {
         updatedAt: 'desc',
       },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        isPublic: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
+        creator: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
         _count: {
           select: {
             members: true,
-            admins: true,
             challenges: true,
           },
         },
@@ -39,12 +38,15 @@ export async function GET(request) {
       id: group.id,
       name: group.name,
       description: group.description,
-      isPublic: group.isPublic,
+      visibility: group.visibility,
       memberCount: group._count.members,
-      adminCount: group._count.admins,
       challengeCount: group._count.challenges,
+      creatorName: group.creator.name,
+      creatorEmail: group.creator.email,
       createdAt: group.createdAt,
       updatedAt: group.updatedAt,
+      inviteCode: group.inviteCode,
+      isActive: group.isActive,
     }));
 
     return NextResponse.json({ success: true, groups: formattedGroups });

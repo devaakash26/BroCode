@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { io } from 'socket.io-client';
 import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
 import getSocketConfig from '@/lib/socket-config';
@@ -17,7 +16,7 @@ export default function useSocket(options = {}) {
   // Initialize socket connection
   const initSocket = useCallback(async () => {
     if (socketInitializedRef.current || !session?.user) return;
-    
+
     setIsConnecting(true);
     socketInitializedRef.current = true;
     console.log('Initializing socket connection...', { user: session?.user });
@@ -31,12 +30,13 @@ export default function useSocket(options = {}) {
       } catch (error) {
         console.warn('Health check failed, continuing anyway:', error);
       }
-      
+
       // Get socket configuration
       const socketConfig = getSocketConfig();
       console.log('Socket configuration:', socketConfig);
-      
+
       // Create socket connection with config
+      const { io } = await import('socket.io-client');
       const socketInstance = io(socketConfig.url, socketConfig.options);
 
       console.log('Socket instance created', socketInstance);
@@ -46,7 +46,7 @@ export default function useSocket(options = {}) {
         console.log('Socket connected with ID:', socketInstance.id);
         setIsConnected(true);
         setIsConnecting(false);
-        
+
         // Identify user to server
         if (session?.user) {
           console.log('Identifying user to server:', session.user);
@@ -72,7 +72,7 @@ export default function useSocket(options = {}) {
       socketInstance.on('disconnect', (reason) => {
         console.log('Socket disconnected, reason:', reason);
         setIsConnected(false);
-        
+
         // If the disconnection is due to a server error, try to reconnect
         if (reason === 'io server disconnect') {
           // The server has forcefully disconnected the socket
@@ -101,7 +101,7 @@ export default function useSocket(options = {}) {
       socketInstance.on('memberActive', (data) => {
         console.log('Member active event received:', data);
       });
-      
+
       socketInstance.on('memberCountUpdate', (data) => {
         console.log('Member count update received:', data);
       });
@@ -176,11 +176,11 @@ export default function useSocket(options = {}) {
 
   // Subscribe to an event with automatic cleanup
   const subscribe = useCallback((event, callback) => {
-    if (!socket) return () => {};
-    
+    if (!socket) return () => { };
+
     console.log(`Subscribing to ${event} event`);
     socket.on(event, callback);
-    
+
     // Return cleanup function
     return () => {
       socket.off(event, callback);

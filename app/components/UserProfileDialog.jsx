@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { CardSkeleton } from '@/components/ui/card-skeleton';
 
 export default function UserProfileDialog({ userId, isOpen, onClose }) {
   const [userData, setUserData] = useState(null);
@@ -100,9 +101,7 @@ export default function UserProfileDialog({ userId, isOpen, onClose }) {
             </div>
             
             {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-              </div>
+              <CardSkeleton />
             ) : error ? (
               <div className="p-6 text-center text-red-400">
                 {error}

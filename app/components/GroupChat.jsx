@@ -7,6 +7,7 @@ import Image from 'next/image';
 import useSocket from '@/app/hooks/useSocket';
 import { format } from 'date-fns';
 import TypingIndicator from '@/app/components/ui/typing-indicator';
+import { GroupChatSkeleton } from '@/components/ui/card-skeleton';
 
 export default function GroupChat({ groupId }) {
   const { data: session } = useSession();
@@ -384,9 +385,7 @@ export default function GroupChat({ groupId }) {
       {/* Messages */}
       <div className="flex-1 p-4 overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-          </div>
+          <GroupChatSkeleton />
         ) : loadError ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
             <p className="mb-2">Failed to load messages</p>

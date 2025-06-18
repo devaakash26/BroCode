@@ -21,6 +21,7 @@ import {
   Info,
   Users
 } from 'lucide-react';
+import { LeaderboardSkeleton } from '@/components/ui/card-skeleton';
 
 export default function ChallengeInterface({ 
   challengeId, 
@@ -484,9 +485,7 @@ export default function ChallengeInterface({
               </h2>
               
               {isLeaderboardLoading ? (
-                <div className="flex justify-center items-center py-20">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-                </div>
+                <LeaderboardSkeleton />
               ) : leaderboard && leaderboard.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">

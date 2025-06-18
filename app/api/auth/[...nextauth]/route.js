@@ -2,25 +2,9 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
 import { compare } from "bcrypt";
 import { sendWelcomeEmail } from "@/app/lib/email";
-
-// Safely create Prisma client
-let prisma;
-
-try {
-  prisma = new PrismaClient();
-} catch (error) {
-  console.error("Failed to initialize Prisma client:", error);
-  // Provide fallback
-  prisma = {
-    user: {
-      findUnique: async () => null,
-      update: async () => null
-    }
-  };
-}
+import { prisma } from "@/app/lib/db";
 
 export const authOptions = {
   adapter: PrismaAdapter(prisma),
@@ -37,33 +21,33 @@ export const authOptions = {
       },
       async authorize(credentials) {
         try {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
+          if (!credentials?.email || !credentials?.password) {
+            return null;
           }
-        });
 
-        if (!user || !user.password) {
-          return null;
-        }
+          const user = await prisma.user.findUnique({
+            where: {
+              email: credentials.email
+            }
+          });
 
-        const isPasswordValid = await compare(credentials.password, user.password);
+          if (!user || !user.password) {
+            return null;
+          }
 
-        if (!isPasswordValid) {
-          return null;
-        }
+          const isPasswordValid = await compare(credentials.password, user.password);
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          emailVerified: user.emailVerified
-        };
+          if (!isPasswordValid) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            emailVerified: user.emailVerified
+          };
         } catch (error) {
           console.error("Authorization error:", error);
           return null;
@@ -102,16 +86,14 @@ export const authOptions = {
       if (account?.provider === 'google' && isNewUser) {
         try {
           console.log("New OAuth user signed in, sending welcome email:", user.email);
-          // Send welcome email
           await sendWelcomeEmail({
             to: user.email,
-            name: user.name || profile?.name || user.email.split('@')[0], // Use available name or fallback
+            name: user.name || profile?.name || user.email.split('@')[0],
           });
         } catch (error) {
           console.error("Error sending welcome email to OAuth user:", error);
         }
       }
-      // Always allow sign in
       return true;
     }
   },
@@ -119,10 +101,9 @@ export const authOptions = {
     createUser: async ({ user }) => {
       try {
         console.log("New user created, sending welcome email:", user.email);
-        // Send welcome email
         await sendWelcomeEmail({
           to: user.email,
-          name: user.name || user.email.split('@')[0], // Use name or fallback to email username
+          name: user.name || user.email.split('@')[0],
         });
       } catch (error) {
         console.error("Error sending welcome email:", error);
@@ -134,9 +115,10 @@ export const authOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   secret: process.env.NEXTAUTH_SECRET || "supersecretkey",
-  debug: false,
+  debug: process.env.NODE_ENV === 'development',
 };
 
 const handler = NextAuth(authOptions);
