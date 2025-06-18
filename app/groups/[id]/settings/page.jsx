@@ -87,8 +87,8 @@ export default function GroupSettingsPage() {
          const isMember = groupInfo.members.some(m => m.userId === session?.user?.id);
          if (!isMember) {
             toast.error('You are not a member of this group.');
-            router.push(`/groups/${params.id}`);
-            return;
+        router.push(`/groups/${params.id}`);
+        return;
          }
       }
       
@@ -118,7 +118,7 @@ export default function GroupSettingsPage() {
       router.push('/auth/signin');
     }
   }, [status, fetchGroupDetails, router]);
-
+  
   const handleUpdateBasicInfo = async () => {
     if (!editedName.trim()) {
       toast.error('Group name cannot be empty');
@@ -146,7 +146,7 @@ export default function GroupSettingsPage() {
       toast.error(`Error: ${error.message || 'Something went wrong'}`);
     }
   };
-
+  
   const handleLeaveGroup = async () => {
     try {
       const loadingToast = toast.loading('Leaving group...');
@@ -213,7 +213,7 @@ export default function GroupSettingsPage() {
             Group Settings
           </h1>
         </div>
-
+        
         {/* Admin-only settings */}
         {isAdmin && (
           <>
@@ -243,16 +243,16 @@ export default function GroupSettingsPage() {
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400 max-w-xl">
                     Once you delete a group, there is no going back. All data will be permanently removed.
                   </p>
-                </div>
-                <button
+                        </div>
+                            <button 
                   onClick={() => setShowDeleteConfirm(true)}
                   className="mt-4 md:mt-0 md:ml-6 flex-shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors"
-                >
+                            >
                   Delete Group
-                </button>
+                            </button>
               </div>
-            </div>
-          ) : (
+                          </div>
+                        ) : (
             <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/20 rounded-lg p-6">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
@@ -261,12 +261,12 @@ export default function GroupSettingsPage() {
                     If you leave this group, you will lose access to all its content and will need to be re-invited to join again.
                   </p>
                 </div>
-                <button
+                            <button
                   onClick={() => setShowLeaveConfirm(true)}
                   className="mt-4 md:mt-0 md:ml-6 flex-shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition-colors"
-                >
+                            >
                   Leave Group
-                </button>
+                            </button>
               </div>
             </div>
           )}
@@ -310,8 +310,8 @@ export default function GroupSettingsPage() {
                 Leave
               </button>
             </div>
-          </div>
-        </div>
+      </div>
+    </div>
       )}
     </>
   );

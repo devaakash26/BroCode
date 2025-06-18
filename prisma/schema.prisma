@@ -39,6 +39,7 @@ model User {
   challengesCreated Challenge[] @relation("ChallengeCreator")
   messages      ChatMessage[] @relation("MessageSender")
   invitationsSent UserInvitation[] @relation("InvitationSender")
+  bookmarks     Bookmark[]
 }
 
 enum UserRole {
@@ -173,6 +174,7 @@ model Problem {
   challenges      ChallengeProblems[]
   submissions     Submission[]
   categories      ProblemCategory[]
+  bookmarks       Bookmark[]
 }
 
 // ProblemCategory model (many-to-many relationship)
@@ -323,4 +325,18 @@ model UserInvitation {
   inviter     User       @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: Cascade)
   
   @@index([email, token])
+}
+
+// Bookmark model for saving problems
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  problemId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId])
+  @@map("bookmarks")
 }
