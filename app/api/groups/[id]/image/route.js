@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma, disconnectPrisma } from '@/app/lib/db';
-import { saveFileLocally } from '@/app/lib/fileUpload';
+import { prisma } from '@/app/lib/db';
+import { uploadToCloudinary } from '@/app/lib/fileUpload';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request, { params }) {
   try {
@@ -44,32 +45,34 @@ export async function POST(request, { params }) {
 
     // Parse form data for image
     const formData = await request.formData();
-    const image = formData.get('image');
+    const imageFile = formData.get('image');
 
-    if (!image) {
+    if (!imageFile || imageFile.size === 0) {
       return NextResponse.json({ success: false, error: 'No image provided' }, { status: 400 });
     }
 
-    // Upload image to local storage
-    const imageFile = await image.arrayBuffer();
-    const buffer = Buffer.from(imageFile);
+    // Read file into buffer
+    const imageBuffer = await imageFile.arrayBuffer();
+    const buffer = Buffer.from(imageBuffer);
     
-    const originalFilename = image.name || `group_${groupId}.jpg`;
+    // Generate a unique identifier for the image
+    const public_id = `group_${groupId}_${uuidv4()}`;
     
-    const result = await saveFileLocally(buffer, {
-      folder: 'groups',
-      filename: originalFilename
+    // Upload image to Cloudinary
+    const result = await uploadToCloudinary(buffer, {
+      folder: `groups/${groupId}`, // Organize uploads by group
+      public_id: public_id,
     });
 
     if (!result || !result.secure_url) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Failed to upload image' 
+        error: 'Failed to upload image to Cloudinary' 
       }, { status: 500 });
     }
 
     // Update group with new image URL
-    await prisma.group.update({
+    const updatedGroup = await prisma.group.update({
       where: { id: groupId },
       data: { image: result.secure_url }
     });
@@ -77,7 +80,7 @@ export async function POST(request, { params }) {
     return NextResponse.json({ 
       success: true, 
       message: 'Group image updated successfully',
-      imageUrl: result.secure_url
+      imageUrl: updatedGroup.image
     });
   } catch (error) {
     console.error('Error updating group image:', error);
@@ -85,7 +88,5 @@ export async function POST(request, { params }) {
       success: false, 
       error: 'Failed to update group image' 
     }, { status: 500 });
-  } finally {
-    await disconnectPrisma();
   }
 } 

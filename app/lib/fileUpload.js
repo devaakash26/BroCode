@@ -1,62 +1,44 @@
-import fs from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { v2 as cloudinary } from 'cloudinary';
+import streamifier from 'streamifier';
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-const groupUploadsDir = path.join(uploadsDir, 'groups');
-
-// Ensure directories exist
-try {
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-  if (!fs.existsSync(groupUploadsDir)) {
-    fs.mkdirSync(groupUploadsDir, { recursive: true });
-  }
-} catch (err) {
-  console.error('Error creating uploads directories:', err);
-}
+// Configure Cloudinary with credentials from environment variables
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true, // Ensure URLs are HTTPS
+});
 
 /**
- * Save a file to the local filesystem
- * @param {Buffer} buffer - The file buffer
- * @param {Object} options - Upload options
- * @param {string} options.folder - The subfolder within uploads (e.g., 'groups')
- * @param {string} options.filename - The filename to use (will be made unique)
- * @returns {Object} - Object with the file URL
+ * Uploads a file buffer to Cloudinary.
+ * @param {Buffer} buffer - The file buffer to upload.
+ * @param {Object} options - Upload options for Cloudinary.
+ * @param {string} options.folder - The folder in Cloudinary to store the file.
+ * @param {string} options.public_id - A unique identifier for the file.
+ * @returns {Promise<Object>} - A promise that resolves with the Cloudinary upload result.
  */
-export async function saveFileLocally(buffer, options = {}) {
-  try {
-    const { folder = 'misc', filename = 'file' } = options;
-    
-    // Generate unique filename
-    const fileExt = path.extname(filename) || '.jpg';
-    const baseName = path.basename(filename, fileExt);
-    const uniqueFilename = `${baseName}_${uuidv4()}${fileExt}`;
-    
-    // Create folder path
-    const folderPath = path.join(uploadsDir, folder);
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
-    
-    // Full path for the file
-    const filePath = path.join(folderPath, uniqueFilename);
-    
-    // Write the file
-    fs.writeFileSync(filePath, buffer);
-    
-    // Return the URL (relative to public directory)
-    const fileUrl = `/uploads/${folder}/${uniqueFilename}`;
-    
-    return {
-      secure_url: fileUrl,
-      public_id: uniqueFilename,
-      success: true
-    };
-  } catch (error) {
-    console.error('Error saving file locally:', error);
-    throw error;
-  }
+export async function uploadToCloudinary(buffer, options = {}) {
+  return new Promise((resolve, reject) => {
+    // Create an upload stream to Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: options.folder || 'neetcode_uploads', // Default folder
+        public_id: options.public_id,
+        // Automatically detect resource type (image, video, raw file)
+        resource_type: 'auto', 
+      },
+      (error, result) => {
+        if (error) {
+          // If there's an error, reject the promise
+          console.error('Cloudinary upload error:', error);
+          return reject(error);
+        }
+        // If successful, resolve the promise with the result
+        resolve(result);
+      }
+    );
+
+    // Pipe the buffer to the upload stream
+    streamifier.createReadStream(buffer).pipe(uploadStream);
+  });
 } 

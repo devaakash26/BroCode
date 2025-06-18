@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/app/lib/db';
 import { nanoid } from 'nanoid';
-import { saveFileLocally } from '@/app/lib/fileUpload';
+import { uploadToCloudinary } from '@/app/lib/fileUpload';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request) {
   try {
@@ -17,29 +18,18 @@ export async function POST(request) {
       );
     }
     
-    // Check if the request is a multipart form data request
-    const contentType = request.headers.get('content-type') || '';
-    let groupData;
-    let imageFile = null;
+    const formData = await request.formData();
     
-    if (contentType.includes('multipart/form-data')) {
-      // Handle multipart form data with file upload
-      const formData = await request.formData();
-      
-      // Extract the form fields
-      groupData = {
-        name: formData.get('name'),
-        description: formData.get('description'),
-        visibility: formData.get('visibility'),
-        memberLimit: formData.get('memberLimit'),
-      };
-      
-      // Get the image file if provided
-      imageFile = formData.get('imageFile');
-    } else {
-      // Handle JSON request (fallback)
-      groupData = await request.json();
-    }
+    // Extract the form fields
+    const groupData = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      visibility: formData.get('visibility'),
+      memberLimit: formData.get('memberLimit'),
+    };
+    
+    // Get the image file if provided
+    const imageFile = formData.get('imageFile');
     
     // Validate input
     if (!groupData.name || groupData.name.trim().length < 3) {
@@ -95,11 +85,11 @@ export async function POST(request) {
     const inviteLink = `${baseUrl}/groups/join?code=${inviteCode}`;
     
     // Process image file if provided
-    let imageUrl = groupData.image || null; // Default to image URL if provided
+    let imageUrl = null;
     
-    if (imageFile && imageFile instanceof File) {
+    if (imageFile && imageFile instanceof File && imageFile.size > 0) {
       try {
-        // Validate file type
+        // Validate file type and size
         const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
         if (!allowedTypes.includes(imageFile.type)) {
           return NextResponse.json(
@@ -108,7 +98,6 @@ export async function POST(request) {
           );
         }
         
-        // Validate file size (max 5MB)
         const maxSize = 5 * 1024 * 1024; // 5MB
         if (imageFile.size > maxSize) {
           return NextResponse.json(
@@ -117,23 +106,26 @@ export async function POST(request) {
           );
         }
         
-        // Read file data
+        // Read file data into a buffer
         const imageBuffer = await imageFile.arrayBuffer();
         const buffer = Buffer.from(imageBuffer);
         
-        // Save the file using our utility
-        const result = await saveFileLocally(buffer, {
-          folder: 'groups',
-          filename: imageFile.name || `group_${inviteCode}.jpg`
+        // Generate a unique public_id for Cloudinary
+        const public_id = `group_${inviteCode}_${uuidv4()}`;
+
+        // Upload the file using our new Cloudinary utility
+        const result = await uploadToCloudinary(buffer, {
+          folder: `groups/${session.user.id}`, // Organize by user and group
+          public_id: public_id
         });
         
-        // Use the stored image URL
+        // Use the secure URL from Cloudinary
         if (result && result.secure_url) {
           imageUrl = result.secure_url;
         }
       } catch (error) {
-        console.error('Error processing image upload:', error);
-        // We'll continue with group creation but without the image
+        console.error('Error processing image upload to Cloudinary:', error);
+        // Continue with group creation but without the image
       }
     }
     
@@ -145,11 +137,10 @@ export async function POST(request) {
         inviteCode,
         inviteLink,
         visibility: groupData.visibility,
-        memberLimit,
+        memberLimit: memberLimit, // Make sure memberLimit is defined from validation logic
         image: imageUrl,
         creatorId: session.user.id,
-        currentMembers: 1, // Start with creator as the first member
-        // Create the creator as the first member with ADMIN role
+        currentMembers: 1,
         members: {
           create: {
             userId: session.user.id,
