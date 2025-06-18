@@ -20,8 +20,11 @@ export async function middleware(request) {
 
   const { pathname } = request.nextUrl;
   
-  // Skip middleware for these paths
+  // Define public paths that don't require authentication
   const publicPaths = [
+    '/',              // Home page
+    '/problems',      // Public problems list
+    '/leaderboard',   // Public leaderboard
     '/auth/signin',
     '/auth/signup',
     '/auth/verify-email',
@@ -36,34 +39,40 @@ export async function middleware(request) {
     '/images'
   ];
   
-  // Check if the path is an API route or a public route
-  if (pathname.startsWith('/api/') || publicPaths.some(path => pathname.startsWith(path))) {
+  // Check if the current path is public
+  if (pathname === '/' || publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
   
   // Get the user token
   const token = await getToken({ req: request });
   
-  // If not logged in, redirect to sign-in
-  if (!token) {
-    // Create a relative URL instead of absolute
+  // Protected routes - require authentication
+  const protectedPaths = [
+    '/dashboard',
+    '/profile',
+    '/groups',
+    '/challenges',
+    '/admin'
+  ];
+  
+  // If accessing a protected route and not logged in, redirect to sign-in
+  if (protectedPaths.some(path => pathname.startsWith(path)) && !token) {
     const url = new URL('/auth/signin', request.url);
-    url.host = new URL(request.url).host; // Keep the same host
+    url.host = new URL(request.url).host;
     url.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(url);
   }
   
   // Check if email is verified - Only check for non-OAuth users
-  // OAuth users (e.g., Google login) are automatically verified
-  const isOAuthUser = token.isOAuthUser || false;
-  const isVerified = token.emailVerified ? true : false;
+  const isOAuthUser = token?.isOAuthUser || false;
+  const isVerified = token?.emailVerified ? true : false;
   
   // If logged in but not verified and not OAuth, redirect to verification required page
   // Skip this check for admins and OAuth users
-  if (!isVerified && !isOAuthUser && token.role !== 'PLATFORM_ADMIN' && !pathname.startsWith('/auth/verification-required')) {
-    // Create a relative URL instead of absolute
+  if (token && !isVerified && !isOAuthUser && token.role !== 'PLATFORM_ADMIN' && !pathname.startsWith('/auth/verification-required')) {
     const url = new URL('/auth/verification-required', request.url);
-    url.host = new URL(request.url).host; // Keep the same host
+    url.host = new URL(request.url).host;
     return NextResponse.redirect(url);
   }
   
