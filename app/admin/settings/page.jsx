@@ -24,7 +24,7 @@ export default function AdminSettingsPage() {
   // Settings state
   const [settings, setSettings] = useState({
     general: {
-      siteName: 'NeetCode',
+      siteName: 'BroCode',
       siteDescription: 'Platform for learning algorithms and data structures',
       logoUrl: '/images/logo.svg',
       allowRegistration: true,
@@ -39,7 +39,7 @@ export default function AdminSettingsPage() {
       enableTwoFactorAuth: false,
     },
     email: {
-      senderName: 'NeetCode Team',
+      senderName: 'BroCode Team',
       senderEmail: 'noreply@neetcode.io',
       smtpHost: 'smtp.example.com',
       smtpPort: 587,

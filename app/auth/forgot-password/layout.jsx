@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Forgot Password - NeetCode',
-  description: 'Reset your NeetCode password',
+  title: 'Forgot Password - BroCode',
+  description: 'Reset your BroCode password',
 };
  
 export default function ForgotPasswordLayout({ children }) {

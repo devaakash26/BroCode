@@ -5,6 +5,19 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { Menu, X, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import ThemeToggle from '@/app/components/theme-toggle';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+  } from "@/components/ui/dropdown-menu"
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -39,7 +52,7 @@ export default function Navbar() {
           <div className="flex">
             <div className="flex flex-shrink-0 items-center">
               <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                NeetCode
+                BroCode
               </Link>
             </div>
             

@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { Clock, Calendar, Users, ArrowRight, Filter } from 'lucide-react';
 import { prisma } from '@/app/lib/db';
 import { formatDistanceToNow } from 'date-fns';
+import { Button } from '@/components/ui/button';
 
 export const metadata = {
-  title: 'Challenges - NeetCode',
-  description: 'View all your coding challenges',
+  title: 'Challenges - BroCode',
+  description: 'View and participate in group coding challenges.',
 };
 
 async function getChallenges(userId) {

@@ -73,7 +73,7 @@ export async function POST(request) {
     // Send invitation email
     await sendInvitationEmail({
       to: email,
-      inviterName: session.user.name || "NeetCode Admin",
+      inviterName: session.user.name || "BroCode Admin",
       invitationLink,
       role
     });

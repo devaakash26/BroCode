@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, Settings, BookOpen, Folder } from 'lucide-react';
+import ThemeToggle from '@/app/components/theme-toggle';
 
 const sidebarLinks = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -28,7 +29,11 @@ export default function AdminLayout({ children, user }) {
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden md:block">
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">NeetCode Admin</h2>
+            <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">
+                BroCode Admin
+              </span>
+            </h2>
           </div>
           <nav className="flex-1 p-4 space-y-1">
             {sidebarLinks.map((link) => (
@@ -62,6 +67,18 @@ export default function AdminLayout({ children, user }) {
       
       {/* Main content */}
       <main className="flex-1 overflow-y-auto p-6">
+        <header className="bg-white dark:bg-gray-800 shadow">
+          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">
+                BroCode Admin
+              </span>
+            </h1>
+            <div className="flex items-center space-x-4">
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
         {children}
       </main>
     </div>

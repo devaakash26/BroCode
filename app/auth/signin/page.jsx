@@ -1,8 +1,8 @@
 import SignInForm from '@/app/components/auth/signin-form';
 
 export const metadata = {
-  title: 'Sign In - NeetCode',
-  description: 'Sign in to your NeetCode account',
+  title: 'Sign In - BroCode',
+  description: 'Sign in to your BroCode account',
 };
 
 export default function SignInPage() {

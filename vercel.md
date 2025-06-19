@@ -1,6 +1,6 @@
-# NeetCode Vercel Deployment Guide
+# BroCode Vercel Deployment Guide
 
-This guide will help you deploy the NeetCode application to Vercel with optimized performance to prevent timeout errors.
+This guide will help you deploy the BroCode application to Vercel with optimized performance to prevent timeout errors.
 
 ## Pre-Deployment Checklist
 

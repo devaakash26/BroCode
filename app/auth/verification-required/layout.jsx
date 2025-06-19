@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Email Verification Required - NeetCode',
-  description: 'Please verify your email address to access your account',
+  title: 'Email Verification Required - BroCode',
+  description: 'Please verify your email to continue using BroCode.',
 };
  
 export default function VerificationRequiredLayout({ children }) {

@@ -7,10 +7,11 @@ import Image from 'next/image';
 import SearchForm from '@/app/components/SearchForm';
 import ProfileDialogWrapper from '@/app/components/ProfileDialogWrapper';
 import LeaderboardRow, { LeaderboardSkeleton } from '@/app/components/LeaderboardRow';
+import { Trophy } from 'lucide-react';
 
 export const metadata = {
-  title: 'Leaderboard - NeetCode',
-  description: 'Global rankings of NeetCode users',
+  title: 'Leaderboard - BroCode',
+  description: 'Global rankings of BroCode users',
 };
 
 async function getLeaderboard(searchQuery = '', sortBy = 'total') {

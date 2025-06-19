@@ -27,6 +27,7 @@ model User {
   image         String?
   role          UserRole   @default(USER)
   leetcodeUsername String?   @unique
+  lastSeen      DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

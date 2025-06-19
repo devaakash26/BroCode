@@ -20,8 +20,8 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${problem.title} - NeetCode`,
-    description: `Solve the ${problem.title} problem on NeetCode`,
+    title: `${problem.title} - BroCode`,
+    description: `Solve the ${problem.title} problem on BroCode`,
   };
 }
 

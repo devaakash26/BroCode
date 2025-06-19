@@ -90,7 +90,7 @@ export async function POST(request, { params }) {
                 Go to Group
               </a>
               <p style="margin-top: 20px; font-size: 12px; color: #888;">
-                You are receiving this email because you are the admin of the "${groupWithAdmin.name}" group on NeetCode.
+                You are receiving this email because you are the admin of the "${groupWithAdmin.name}" group on BroCode.
               </p>
             `,
           });

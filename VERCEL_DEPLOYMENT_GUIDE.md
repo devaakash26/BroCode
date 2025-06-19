@@ -1,12 +1,12 @@
-# NeetCode Vercel Deployment Guide
+# BroCode Vercel Deployment Guide
 
-This comprehensive guide covers deploying NeetCode to Vercel with special focus on database consistency.
+This comprehensive guide covers deploying BroCode to Vercel with special focus on database consistency.
 
 ## Prerequisites
 
 1. [Vercel account](https://vercel.com/signup)
-2. GitHub repository with your NeetCode codebase
-3. Database service account (Vercel Postgres, MongoDB Atlas, etc.)
+2. GitHub repository with your BroCode codebase
+3. Supabase account for PostgreSQL database (or any other PostgreSQL provider)
 
 ## Step 1: Prepare Your Codebase
 
@@ -102,8 +102,8 @@ Set these in your Vercel project settings:
 
 ```
 # App URLs
-NEXTAUTH_URL=https://neetcode.vercel.app
-NEXT_PUBLIC_APP_URL=https://neetcode.vercel.app
+NEXTAUTH_URL=https://brocode.vercel.app
+NEXT_PUBLIC_APP_URL=https://brocode.vercel.app
 
 # Database URLs
 DATABASE_URL=postgres://username:password@host:port/database
@@ -244,7 +244,7 @@ Vercel Postgres automatically handles connection pooling.
 
 ## Scaling Considerations
 
-As your NeetCode platform grows:
+As your BroCode platform grows:
 
 1. **Database Scaling**:
    - Vercel Postgres: Upgrade compute size as needed
@@ -259,6 +259,39 @@ As your NeetCode platform grows:
    - Move API logic to Edge functions when possible
    - Use Edge config for global configuration
 
----
+## 7. Final Checks & Troubleshooting
 
-By following this guide, you'll ensure your NeetCode platform runs reliably on Vercel with good database consistency and performance. 
+- **Logs**: If you encounter issues, the first place to check is the Vercel deployment logs and the runtime logs for your functions.
+- **Supabase Logs**: Check your Supabase database logs for any connection errors or query issues.
+- **Local Testing**: Always ensure that your application runs correctly locally before deploying.
+
+### Example `.env.local` for local development
+
+```
+# App URLs
+NEXTAUTH_URL=https://brocode.vercel.app
+NEXT_PUBLIC_APP_URL=https://brocode.vercel.app
+
+# Database URLs
+DATABASE_URL=postgres://username:password@host:port/database
+REDIS_URL=redis://username:password@host:port
+
+# Auth Secret (generate with: openssl rand -base64 32)
+NEXTAUTH_SECRET=your-secure-nextauth-secret
+
+# OAuth Providers (if applicable)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GITHUB_ID=your-github-id
+GITHUB_SECRET=your-github-secret
+
+# Node environment
+NODE_ENV=production
+```
+
+As your BroCode platform grows:
+- **Monitor Usage**: Keep an eye on your Vercel and Supabase usage to stay within free tier limits or upgrade as needed.
+- **Custom Domain**: Add a custom domain to your Vercel project for a professional look.
+- **CI/CD**: Set up a CI/CD pipeline for automated testing and deployments.
+
+By following this guide, you'll ensure your BroCode platform runs reliably on Vercel with good database consistency and performance. 

@@ -4,10 +4,11 @@ import { prisma } from '@/app/lib/db';
 import Link from 'next/link';
 import { Users, Plus, ChevronRight, AlertTriangle, RefreshCw, Search, Globe } from 'lucide-react';
 import { LoadingPage } from '@/components/ui/loading';
+import { Button } from '@/components/ui/button';
 
 export const metadata = {
-  title: 'Groups - NeetCode',
-  description: 'Join or create groups for DSA challenges',
+  title: 'Groups - BroCode',
+  description: 'Find, create, and manage your coding groups.',
 };
 
 async function getGroups(userId) {

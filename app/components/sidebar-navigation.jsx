@@ -98,11 +98,11 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
       <div className="flex items-center justify-between p-3 h-16 border-b border-gray-200 dark:border-gray-800">
         {!collapsed ? (
           <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            NeetCode
+            BroCode
           </Link>
         ) : (
           <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            NC
+            BC
           </Link>
         )}
        

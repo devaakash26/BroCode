@@ -2,15 +2,17 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 import ClientLayout from './client-layout';
+import { Analytics } from "@vercel/analytics/react"
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: {
-    default: 'NeetCode',
-    template: '%s | NeetCode'
+    default: 'BroCode',
+    template: '%s | BroCode'
   },
   description: 'A platform for mastering data structures and algorithms through collaborative challenges',
+  keywords: ['coding', 'interviews', 'dsa', 'algorithms', 'data structures', 'programming', 'tech'],
 };
 
 export default function RootLayout({ children }) {

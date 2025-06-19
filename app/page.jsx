@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { ArrowRight, Code, Trophy, Users, Zap, BrainCircuit, UsersRound, Star } from 'lucide-react';
+import { ArrowRight, Code, Trophy, Users, Zap, BrainCircuit, UsersRound, Star, Globe } from 'lucide-react';
 import { Analytics } from "@vercel/analytics/next"
+import { Button } from '@/components/ui/button';
+
 export const metadata = {
-  title: 'NeetCode - Ace Your Coding Interviews',
-  description: 'The ultimate platform to prepare for technical interviews with curated problems, group challenges, and live leaderboards.',
+  title: 'BroCode - Ace Your Coding Interviews',
+  description: 'A platform to practice coding problems, compete with friends, and prepare for technical interviews.',
 };
 
 export default async function HomePage() {
@@ -35,13 +37,11 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:py-40">
             <div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl lg:flex-shrink-0 lg:pt-8">
               <h1 className="mt-10 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl">
-                The New Way to Prepare for&nbsp;
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">
-                  Coding Interviews
-                </span>
+                <span className="block">Welcome to</span>
+                <span className="block text-indigo-600 dark:text-indigo-400">BroCode</span>
               </h1>
               <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
-                Stop grinding aimlessly. NeetCode offers a structured path with curated problems, real-time collaboration, and competitive challenges to help you land your dream job.
+                Stop grinding aimlessly. BroCode offers a structured path with curated problems, real-time collaboration, and competitive challenges to help you land your dream job.
               </p>
               <div className="mt-10 flex items-center gap-x-6">
                 <Link

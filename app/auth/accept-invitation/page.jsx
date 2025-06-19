@@ -219,25 +219,24 @@ export default function AcceptInvitationPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
       <Toaster position="top-center" />
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/">
-            <div className="flex justify-center">
-              <Image 
-                src="/logo.svg" 
-                alt="NeetCode" 
-                width={50} 
-                height={50} 
-                className="mx-auto" 
-              />
-            </div>
-          </Link>
-          <h2 className="mt-4 text-2xl font-bold text-gray-900 dark:text-white">
-            Accept Invitation
-          </h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Create your account to join NeetCode
+        <div className="flex flex-col space-y-2 text-center">
+          <div className="mx-auto mb-4">
+            <Image 
+              src="/logo.svg" 
+              width={64} 
+              height={64} 
+              alt="BroCode"
+              className="rounded-full"
+            />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            You've been invited!
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Create your account to join BroCode
           </p>
         </div>
+        {error && <div className="text-red-500 text-center">{error}</div>}
         
         <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           {isLoading ? (

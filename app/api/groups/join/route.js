@@ -23,17 +23,11 @@ async function notifyAdmin(group, newUser) {
       if (admin.email && admin.id !== newUser.id) {
         await sendEmail({
           to: admin.email,
-          subject: `New Member Alert: ${newUser.name} joined ${groupWithAdmin.name}`,
+          subject: `New member in your group "${groupWithAdmin.name}"`,
           html: `
-            <h1>A new member has joined your group!</h1>
-            <p><strong>${newUser.name}</strong> (<em>${newUser.email}</em>) has just joined your group: <strong>${groupWithAdmin.name}</strong>.</p>
-            <p>You can view your group members and manage your group settings by visiting your dashboard.</p>
-            <a href="${process.env.NEXT_PUBLIC_APP_URL}/groups/${group.id}" style="display: inline-block; padding: 10px 20px; font-size: 16px; color: #fff; background-color: #007bff; text-decoration: none; border-radius: 5px;">
-              Go to Group
-            </a>
-            <p style="margin-top: 20px; font-size: 12px; color: #888;">
-              You are receiving this email because you are the admin of the "${groupWithAdmin.name}" group on NeetCode.
-            </p>
+            <p>Hi ${groupWithAdmin.admin.name || 'Admin'},</p>
+            <p>A new member, ${newUser.name}, has joined your group "${groupWithAdmin.name}".</p>
+            <p>You are receiving this email because you are the admin of the "${groupWithAdmin.name}" group on BroCode.</p>
           `,
         });
       }

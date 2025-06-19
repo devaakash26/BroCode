@@ -4,8 +4,8 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import AdminLayout from '@/app/components/admin/AdminLayout';
 
 export const metadata = {
-  title: 'Admin Portal - NeetCode',
-  description: 'Admin portal for NeetCode platform',
+  title: 'Admin Portal - BroCode',
+  description: 'Admin portal for BroCode platform',
 };
 
 export default async function Layout({ children }) {

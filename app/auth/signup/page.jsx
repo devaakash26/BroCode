@@ -1,8 +1,8 @@
 import SignUpForm from '@/app/components/auth/signup-form';
 
 export const metadata = {
-  title: 'Sign Up - NeetCode',
-  description: 'Create your NeetCode account',
+  title: 'Sign Up - BroCode',
+  description: 'Create your BroCode account',
 };
 
 export default function SignUpPage() {

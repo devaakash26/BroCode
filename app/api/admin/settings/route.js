@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma, disconnectPrisma } from '@/app/lib/db';
+import { z } from 'zod';
 
 // Default settings if none exist in the database
 const defaultSettings = {
   general: {
-    siteName: 'NeetCode',
+    siteName: 'BroCode',
     siteDescription: 'Platform for learning algorithms and data structures',
     logoUrl: '/images/logo.svg',
     allowRegistration: true,
@@ -21,7 +22,7 @@ const defaultSettings = {
     enableTwoFactorAuth: false,
   },
   email: {
-    senderName: 'NeetCode Team',
+    senderName: 'BroCode Team',
     senderEmail: 'noreply@neetcode.io',
     smtpHost: '',
     smtpPort: 587,
@@ -132,4 +133,38 @@ export async function POST(request) {
   } finally {
     await disconnectPrisma();
   }
-} 
+}
+
+const settingsSchema = z.object({
+  general: z.object({
+    siteName: z.string().min(1, 'Site name is required').default('BroCode'),
+    siteDescription: z.string().optional(),
+    logoUrl: z.string().url().optional(),
+  }),
+  email: z.object({
+    senderName: z.string().min(1, 'Sender name is required').default('BroCode Team'),
+    senderEmail: z.string().email('Invalid email address'),
+    smtpHost: z.string().optional(),
+  }),
+  security: z.object({
+    sessionLength: z.number().min(1, 'Session length must be at least 1 hour'),
+    maxLoginAttempts: z.number().min(1, 'Maximum login attempts must be at least 1'),
+    passwordMinLength: z.number().min(1, 'Password minimum length must be at least 1'),
+    requireStrongPasswords: z.boolean(),
+    enableTwoFactorAuth: z.boolean(),
+  }),
+  social: z.object({
+    enableDiscord: z.boolean(),
+    discordWebhook: z.string().url().optional(),
+    enableGithub: z.boolean(),
+    githubClientId: z.string().optional(),
+    githubClientSecret: z.string().optional(),
+  }),
+  problems: z.object({
+    defaultTimeLimit: z.number().min(1, 'Default time limit must be at least 1 second'),
+    enableAutomaticSubmissionRejection: z.boolean(),
+    submissionCooldown: z.number().min(1, 'Submission cooldown must be at least 1 second'),
+    showProblemsBeforeLogin: z.boolean(),
+    allowProblemComments: z.boolean(),
+  }),
+}); 

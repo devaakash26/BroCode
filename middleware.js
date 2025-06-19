@@ -1,87 +1,62 @@
+import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
-// COMPLETELY DISABLE middleware for localhost
-// This ensures no auth redirects happen in local development
-export async function middleware(request) {
-  // Check if running locally (localhost or 127.0.0.1)
-  const url = new URL(request.url);
-  
-  // COMPLETELY DISABLE middleware for localhost
-  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-    // Just pass through all requests
+export default withAuth(
+  async function middleware(req) {
+    const { token } = req.nextauth;
+    const { pathname } = req.nextUrl;
+
+    // Role-based access control for admin routes
+    if (pathname.startsWith('/admin') && token?.role !== 'PLATFORM_ADMIN') {
+      const url = req.nextUrl.clone()
+      url.pathname = '/unauthorized' // Redirect to a generic unauthorized page
+      return NextResponse.redirect(url);
+    }
+    
+    // Let all other authorized requests pass.
     return NextResponse.next();
-  }
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const { pathname } = req.nextUrl;
 
-  // Skip middleware entirely in development mode
-  if (process.env.NODE_ENV === 'development') {
-    return NextResponse.next();
-  }
+        // Allow public access to home, auth, and specific API routes
+        const publicPaths = [
+          '/',
+          '/auth',
+          '/api/auth',
+          '/api/trpc', // Allow tRPC requests
+          '/problems' // Let's make problems public
+        ];
 
-  const { pathname } = request.nextUrl;
-  
-  // Define public paths that don't require authentication
-  const publicPaths = [
-    '/',              // Home page
-    '/problems',      // Public problems list
-    '/leaderboard',   // Public leaderboard
-    '/auth/signin',
-    '/auth/signup',
-    '/auth/verify-email',
-    '/auth/forgot-password',
-    '/auth/reset-password',
-    '/auth/verification-required',
-    '/api',
-    '/socket-health',
-    '/socket.io',
-    '/_next',
-    '/favicon.ico',
-    '/images'
-  ];
-  
-  // Check if the current path is public
-  if (pathname === '/' || publicPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next();
-  }
-  
-  // Get the user token
-  const token = await getToken({ req: request });
-  
-  // Protected routes - require authentication
-  const protectedPaths = [
-    '/dashboard',
-    '/profile',
-    '/groups',
-    '/challenges',
-    '/admin'
-  ];
-  
-  // If accessing a protected route and not logged in, redirect to sign-in
-  if (protectedPaths.some(path => pathname.startsWith(path)) && !token) {
-    const url = new URL('/auth/signin', request.url);
-    url.host = new URL(request.url).host;
-    url.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(url);
-  }
-  
-  // Check if email is verified - Only check for non-OAuth users
-  const isOAuthUser = token?.isOAuthUser || false;
-  const isVerified = token?.emailVerified ? true : false;
-  
-  // If logged in but not verified and not OAuth, redirect to verification required page
-  // Skip this check for admins and OAuth users
-  if (token && !isVerified && !isOAuthUser && token.role !== 'PLATFORM_ADMIN' && !pathname.startsWith('/auth/verification-required')) {
-    const url = new URL('/auth/verification-required', request.url);
-    url.host = new URL(request.url).host;
-    return NextResponse.redirect(url);
-  }
-  
-  return NextResponse.next();
-}
+        if (publicPaths.some(path => pathname.startsWith(path))) {
+          return true;
+        }
 
-// Specify which paths the middleware should run on
+        // For all other paths, user must be authenticated
+        return !!token;
+      },
+    },
+    // If authorization fails, redirect to the login page.
+    pages: {
+      signIn: '/auth/signin',
+      error: '/auth/error', // Error code passed in query string
+    }
+  }
+);
+
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|public/|.*\\.png$|.*\\.svg$|.*\\.jpg$|.*\\.ico$).*)' 
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api/health - health check
+     * - api/socket - websocket
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - /logo.svg (logo file)
+     */
+    '/((?!api/health|api/socket|_next/static|_next/image|favicon.ico|logo.svg).*)',
   ],
-}; 
+};

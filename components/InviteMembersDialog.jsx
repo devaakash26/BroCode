@@ -132,9 +132,14 @@ export default function InviteMembersDialog({ group, className }) {
     try {
       if (navigator.share) {
         await navigator.share({
-          title: `Join ${group.name} on NeetCode`,
-          text: `I'm inviting you to join ${group.name} on NeetCode!`,
+          title: `Join ${group.name} on BroCode`,
+          text: `I'm inviting you to join ${group.name} on BroCode!`,
           url: inviteData.inviteLink,
+        }).catch(err => {
+          console.error('Error sharing:', err);
+          if (err.name !== 'AbortError') {
+            toast.error('Failed to share invite link');
+          }
         });
         toast.success('Shared successfully!');
       } else {
@@ -159,12 +164,10 @@ export default function InviteMembersDialog({ group, className }) {
       return;
     }
 
-    const emailSubject = `Join ${group.name} on NeetCode`;
-    const emailBody = `Hello,\n\nI'm inviting you to join our coding group "${group.name}" on NeetCode!\n\nJoin using this invite code: ${inviteData.inviteCode}\n\nOr use this link: ${inviteData.inviteLink}\n\nSee you there!`;
+    const emailSubject = `Join ${group.name} on BroCode`;
+    const emailBody = `Hello,\n\nI'm inviting you to join our coding group "${group.name}" on BroCode!\n\nJoin using this invite code: ${inviteData.inviteCode}\n\nOr use this link: ${inviteData.inviteLink}\n\nSee you there!`;
     
-    const mailtoLink = `mailto:${emailText}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    
-    window.open(mailtoLink, '_blank');
+    window.location.href = `mailto:${emailText}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
     toast.success('Email client opened');
   };
 

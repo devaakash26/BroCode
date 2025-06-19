@@ -78,6 +78,14 @@ export const authOptions = {
         session.user.role = token.role || 'user';
         session.user.emailVerified = token.emailVerified;
         session.user.isOAuthUser = token.isOAuthUser || false;
+
+        // Update lastSeen in the background
+        if (token.id) {
+          prisma.user.update({
+            where: { id: token.id },
+            data: { lastSeen: new Date() }
+          }).catch(console.error);
+        }
       }
       return session;
     },

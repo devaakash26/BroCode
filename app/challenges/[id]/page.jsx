@@ -13,13 +13,13 @@ export async function generateMetadata({ params }) {
   
   if (!challenge) {
     return {
-      title: 'Challenge Not Found - NeetCode',
+      title: 'Challenge Not Found - BroCode',
     };
   }
   
   return {
-    title: `${challenge.title} - NeetCode Challenge`,
-    description: challenge.description,
+    title: `${challenge.title} - BroCode Challenge`,
+    description: `Participate in the ${challenge.title} challenge.`,
   };
 }
 

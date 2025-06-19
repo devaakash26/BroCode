@@ -52,7 +52,7 @@ export default function Navbar({
             {isMobile && (
               <div className="flex-shrink-0 flex items-center">
                 <NavLink href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                  NeetCode
+                  BroCode
                 </NavLink>
               </div>
             )}

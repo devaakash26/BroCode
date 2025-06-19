@@ -33,7 +33,7 @@ const  verificationEmailTemplate = ({ name, verificationLink }) => `
     </div>
     <div class="content">
       <p>Hello ${name},</p>
-      <p>Thank you for creating an account on NeetCode. To complete your registration and access all features, please verify your email address by clicking the button below:</p>
+      <p>Thank you for creating an account on BroCode. To complete your registration and access all features, please verify your email address by clicking the button below:</p>
       <p style="text-align: center;">
         <a href="${verificationLink}" class="button">Verify Email Address</a>
       </p>
@@ -43,7 +43,7 @@ const  verificationEmailTemplate = ({ name, verificationLink }) => `
       <p>${verificationLink}</p>
     </div>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} NeetCode. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -74,7 +74,7 @@ const passwordResetEmailTemplate = ({ name, resetLink }) => `
     </div>
     <div class="content">
       <p>Hello ${name},</p>
-      <p>We received a request to reset your password for your NeetCode account. Click the button below to create a new password:</p>
+      <p>We received a request to reset your password for your BroCode account. Click the button below to create a new password:</p>
       <p style="text-align: center;">
         <a href="${resetLink}" class="button">Reset Password</a>
       </p>
@@ -84,7 +84,7 @@ const passwordResetEmailTemplate = ({ name, resetLink }) => `
       <p>${resetLink}</p>
     </div>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} NeetCode. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -98,7 +98,7 @@ const welcomeEmailTemplate = ({ name }) => `
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to NeetCode!</title>
+  <title>Welcome to BroCode!</title>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -113,13 +113,13 @@ const welcomeEmailTemplate = ({ name }) => `
 <body>
   <div class="container">
     <div class="header">
-      <h1>Welcome to NeetCode!</h1>
+      <h1>Welcome to BroCode!</h1>
     </div>
     <div class="content">
       <p>Hello ${name},</p>
-      <p>Thank you for joining NeetCode! We're excited to have you on board.</p>
+      <p>Thank you for joining BroCode! We're excited to have you on board.</p>
       
-      <p>NeetCode is a platform designed to help you master coding interviews and improve your problem-solving skills. Here are some features to get you started:</p>
+      <p>BroCode is a platform designed to help you master coding interviews and improve your problem-solving skills. Here are some features to get you started:</p>
       
       <div class="feature">
         <div class="feature-title">🧩 Curated Problems</div>
@@ -148,10 +148,10 @@ const welcomeEmailTemplate = ({ name }) => `
       <p>If you have any questions or need assistance, feel free to reach out to our support team.</p>
       
       <p>Happy coding!</p>
-      <p>The NeetCode Team</p>
+      <p>The BroCode Team</p>
     </div>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} NeetCode. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -165,7 +165,7 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You've Been Invited to NeetCode</title>
+  <title>You've Been Invited to BroCode</title>
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -184,11 +184,11 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
 <body>
   <div class="container">
     <div class="header">
-      <h1>You've Been Invited to NeetCode</h1>
+      <h1>You've Been Invited to BroCode</h1>
     </div>
     <div class="content">
       <p>Hello,</p>
-      <p><strong>${inviterName}</strong> has invited you to join NeetCode as a:</p>
+      <p><strong>${inviterName}</strong> has invited you to join BroCode as a:</p>
       
       <div style="text-align: center;">
         <span class="role-badge ${role === 'PLATFORM_ADMIN' ? 'platform-admin' : role === 'GROUP_ADMIN' ? 'group-admin' : 'user'}">
@@ -198,7 +198,7 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
       
       <div class="divider"></div>
       
-      <p>NeetCode is a platform designed to help developers master coding interviews and improve their problem-solving skills with:</p>
+      <p>BroCode is a platform designed to help developers master coding interviews and improve their problem-solving skills with:</p>
       
       <ul>
         <li>Curated coding problems organized by topic and difficulty</li>
@@ -217,7 +217,7 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
       <p style="word-break: break-all; font-size: 14px; color: #4f46e5;">${invitationLink}</p>
     </div>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} NeetCode. All rights reserved.</p>
+      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
     </div>
   </div>
 </body>
@@ -227,7 +227,7 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
 // Send verification email
 export async function sendVerificationEmail({ to, name, verificationLink }) {
   const mailOptions = {
-    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
     subject: 'Verify Your Email Address',
     html: verificationEmailTemplate({ name, verificationLink }),
@@ -246,7 +246,7 @@ export async function sendVerificationEmail({ to, name, verificationLink }) {
 // Send password reset email
 export async function sendPasswordResetEmail({ to, name, resetLink }) {
   const mailOptions = {
-    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
     subject: 'Reset Your Password',
     html: passwordResetEmailTemplate({ name, resetLink }),
@@ -265,9 +265,9 @@ export async function sendPasswordResetEmail({ to, name, resetLink }) {
 // Send welcome email
 export async function sendWelcomeEmail({ to, name }) {
   const mailOptions = {
-    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'Welcome to NeetCode!',
+    subject: 'Welcome to BroCode!',
     html: welcomeEmailTemplate({ name }),
   };
 
@@ -284,9 +284,9 @@ export async function sendWelcomeEmail({ to, name }) {
 // Send invitation email
 export async function sendInvitationEmail({ to, inviterName, invitationLink, role }) {
   const mailOptions = {
-    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'You\'ve Been Invited to NeetCode',
+    subject: 'You\'ve Been Invited to BroCode',
     html: invitationEmailTemplate({ inviterName, invitationLink, role }),
   };
 
@@ -303,7 +303,7 @@ export async function sendInvitationEmail({ to, inviterName, invitationLink, rol
 // Generic email sending function
 export async function sendEmail({ to, subject, html }) {
   const mailOptions = {
-    from: `"NeetCode" <${process.env.EMAIL_USER}>`,
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,

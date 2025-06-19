@@ -4,7 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import ClientProblemsPage from './client-page';
 
 export const metadata = {
-  title: 'Problems - NeetCode',
+  title: 'Problems - BroCode',
   description: 'Browse and solve DSA problems',
 };
 

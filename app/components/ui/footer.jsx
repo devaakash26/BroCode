@@ -18,10 +18,8 @@ export default function Footer() {
             Terms
           </Link>
         </div>
-        <div className="mt-8 md:order-1 md:mt-0">
-          <p className="text-center text-xs leading-5 text-gray-500">
-            &copy; {new Date().getFullYear()} NeetCode. All rights reserved.
-          </p>
+        <div className="mt-8 text-center text-sm text-gray-400">
+          <p>&copy; {new Date().getFullYear()} BroCode. All rights reserved.</p>
         </div>
       </div>
     </footer>
