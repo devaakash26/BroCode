@@ -4,6 +4,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { ArrowRight, Code, Trophy, Users, Zap, BrainCircuit, UsersRound, Star, Globe } from 'lucide-react';
 import { Analytics } from "@vercel/analytics/next"
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 export const metadata = {
   title: 'BroCode - Ace Your Coding Interviews',
@@ -18,63 +19,50 @@ export default async function HomePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-gray-950">
-      <main className="flex-1">
-        <div className="relative isolate overflow-hidden">
-          {/* Background Grid */}
-          <div
-            className="absolute -top-80 left-1/2 -z-10 -translate-x-1/2 transform-gpu blur-3xl"
-            aria-hidden="true"
-          >
-            <div
-              className="aspect-[1155/678] w-[72.1875rem] bg-gradient-to-tr from-[#8085ff] to-[#4c51bf] opacity-30 dark:opacity-20"
-              style={{
-                clipPath:
-                  'polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)',
-              }}
-            />
-          </div>
-          
-          <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:py-40">
-            <div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl lg:flex-shrink-0 lg:pt-8">
-              <h1 className="mt-10 text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl">
-                <span className="block">Welcome to</span>
-                <span className="block text-indigo-600 dark:text-indigo-400">BroCode</span>
-              </h1>
-              <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
-                Stop grinding aimlessly. BroCode offers a structured path with curated problems, real-time collaboration, and competitive challenges to help you land your dream job.
-              </p>
-              <div className="mt-10 flex items-center gap-x-6">
-                <Link
-                  href={buttonHref}
-                  className="rounded-md bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 transition-colors duration-200"
-                >
-                  {buttonText} <ArrowRight className="inline-block ml-1 h-4 w-4" />
-                </Link>
-                <Link href="/problems" className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-100">
-                  Explore Problems <span aria-hidden="true">→</span>
-                </Link>
+      <main className="flex-grow bg-white dark:bg-[#0D1117]">
+        {/* Hero Section */}
+        <section className="relative text-gray-900 dark:text-white">
+          <div className="absolute inset-0 bg-grid-gray-200/40 dark:bg-grid-[#30363d]/30 [mask-image:linear-gradient(to_bottom,white_10%,transparent_70%)] dark:[mask-image:linear-gradient(to_bottom,white_10%,transparent_90%)]"></div>
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+            <div className="lg:grid lg:grid-cols-12 lg:gap-16 lg:items-center">
+              <div className="lg:col-span-7">
+                <div className="max-w-xl mx-auto lg:mx-0">
+                  <h1 className="text-4xl text-center lg:text-left font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+                    <span className="block">Code Your</span>
+                    <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-400 dark:to-indigo-500">Dharma.</span>
+                  </h1>
+                  <p className="mt-6 max-w-md mx-auto lg:mx-0 text-center lg:text-left text-lg text-gray-600 dark:text-gray-400 sm:text-xl md:max-w-3xl">
+                    Forge your path in the world of code. Master your craft through dedicated practice and collaborative challenges.
+                  </p>
+                  <div className="mt-10 max-w-sm mx-auto lg:mx-0 sm:flex sm:justify-center lg:justify-start gap-4">
+                    <Button asChild size="lg" className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-lg transform hover:-translate-y-1 transition-all duration-300">
+                      <Link href="/problems">Start Solving</Link>
+                    </Button>
+                    <Button asChild variant="outline" size="lg" className="w-full sm:w-auto mt-4 sm:mt-0 border-indigo-500 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-300 font-bold transition-colors duration-300">
+                      <Link href="/groups">Explore Groups</Link>
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
-              <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
-                <div className="-m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
-                  <img
-                    src="https://images.unsplash.com/photo-1587620962725-abab7fe55159?q=80&w=2831&auto=format&fit=crop"
-                    alt="A developer sitting at a desk, focused on coding"
-                    width={2432}
-                    height={1442}
-                    className="w-[76rem] rounded-md shadow-2xl ring-1 ring-gray-900/10"
+              <div className="lg:col-span-5 mt-20 lg:mt-0">
+                <div className="relative w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] lg:w-[450px] lg:h-[450px] mx-auto">
+                  <div className="absolute inset-0 bg-indigo-500/10 rounded-full blur-3xl"></div>
+                  <Image
+                    src="/tech-chakra.svg"
+                    alt="Tech-inspired Chakra"
+                    layout="fill"
+                    className="opacity-80 dark:opacity-100"
                   />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Features Section */}
-        <div className="bg-white dark:bg-gray-950 py-24 sm:py-32">
-          <div className="mx-auto max-w-7xl px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl lg:text-center">
+        {/* Feature Section */}
+        <section className="py-20 sm:py-32 bg-white dark:bg-[#0D1117] border-t border-gray-200 dark:border-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
               <h2 className="text-base font-semibold leading-7 text-indigo-600 dark:text-indigo-400">Practice Smarter</h2>
               <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
                 Everything you need to succeed
@@ -124,7 +112,7 @@ export default async function HomePage() {
               </dl>
             </div>
           </div>
-        </div>
+        </section>
       </main>
     </div>
   );

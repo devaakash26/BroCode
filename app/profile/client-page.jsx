@@ -69,13 +69,15 @@ export function ProfileClientPage({ user: initialUser }) {
             <ProfileTabs activeTab={activeTab} setActiveTab={setActiveTab} />
             <div className="mt-6">
               {activeTab === 'overview' && (
-                <div className="space-y-8">
-                  <LeetCodeStats stats={leetcodeStats} isLoading={isLoadingStats} />
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                  <div className="lg:col-span-2 space-y-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
                       <ContributionGraph data={user.contributionData} />
                     </div>
-                    <div>
+                  </div>
+                  <div className="lg:col-span-1 sticky top-24 space-y-8">
+                    <LeetCodeStats stats={leetcodeStats} isLoading={isLoadingStats} />
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
                       <RecentActivity activity={user.recentActivity} />
                     </div>
                   </div>

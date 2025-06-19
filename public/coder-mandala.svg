@@ -1,0 +1,70 @@
+<svg width="800" height="800" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" class="dark">
+  <defs>
+    <linearGradient id="fire-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F97316" /> <!-- Orange 500 -->
+      <stop offset="50%" stop-color="#EA580C" /> <!-- Orange 600 -->
+      <stop offset="100%" stop-color="#C2410C" /> <!-- Orange 700 -->
+    </linearGradient>
+    <filter id="matrix-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background circle -->
+  <circle cx="200" cy="200" r="195" fill="none" stroke="#1F2937" stroke-width="2"/>
+
+  <!-- Main radiating pattern -->
+  <g transform="translate(200, 200)">
+    
+    <!-- Silhouette -->
+    <g id="silhouette" opacity="0.85">
+        <path d="M0 -30 C 15 -30, 20 -25, 20 -10 L20 10 C 20 25, 15 30, 0 30 C -15 30, -20 25, -20 10 L-20 -10 C -20 -25, -15 -30, 0 -30 Z M 0 -50 C 10 -50, 10 -40, 0 -40 C -10 -40, -10 -50, 0 -50 Z" fill="#111827" stroke="url(#fire-grad)" stroke-width="0.5"/>
+    </g>
+
+    <!-- Circuit/Data patterns -->
+    <g id="circuit-arm">
+      <path d="M0,-35 L0,-120" stroke="url(#fire-grad)" stroke-width="1.5" opacity="0.7" />
+      <path d="M0,-50 L20,-60 L20,-70" stroke="#F97316" stroke-width="1" fill="none"/>
+      <path d="M0,-80 L-25,-95 L-25,-105" stroke="#F97316" stroke-width="1" fill="none"/>
+      <circle cx="0" cy="-120" r="4" fill="#F97316" filter="url(#matrix-glow)"/>
+      <circle cx="20" cy="-70" r="2.5" fill="#EA580C"/>
+      <circle cx="-25" cy="-105" r="2.5" fill="#EA580C"/>
+    </g>
+
+    <!-- Repeating the pattern in a circle -->
+    <use href="#circuit-arm" transform="rotate(45)"/>
+    <use href="#circuit-arm" transform="rotate(90)"/>
+    <use href="#circuit-arm" transform="rotate(135)"/>
+    <use href="#circuit-arm" transform="rotate(180)"/>
+    <use href="#circuit-arm" transform="rotate(225)"/>
+    <use href="#circuit-arm" transform="rotate(270)"/>
+    <use href="#circuit-arm" transform="rotate(315)"/>
+    <use href="#circuit-arm" transform="rotate(0)"/>
+
+    <!-- Inner connecting rings -->
+    <circle cx="0" cy="0" r="60" fill="none" stroke="#4B5563" stroke-width="0.5" stroke-dasharray="2 4"/>
+    <circle cx="0" cy="0" r="90" fill="none" stroke="#374151" stroke-width="0.75"/>
+
+    <!-- Outer tech pattern -->
+    <g id="outer-pattern" opacity="0.6">
+        <path d="M 150 0 A 150 150 0 0 1 140 50" stroke="#F97316" stroke-width="1" fill="none" />
+        <rect x="145" y="-10" width="10" height="20" fill="#EA580C" rx="2" transform="rotate(15, 150, 0)"/>
+    </g>
+    <g id="outer-ring-text" font-family="monospace" font-size="8px" fill="#6B7280">
+        <path id="text-path" d="M 170, 200 A 170, 170, 0, 1, 1, 170, 200.1" fill="none"/>
+        <text>
+            <textPath href="#text-path">
+                01100110 01101111 01110010 01100111 01100101 00100000 01111001 01101111 01110101 01110010 00100000 01100110 01110101 01110100 01110101 01110010 01100101 00100000 
+            </textPath>
+        </text>
+    </g>
+    
+    <use href="#outer-pattern" transform="rotate(90)"/>
+    <use href="#outer-pattern" transform="rotate(180)"/>
+    <use href="#outer-pattern" transform="rotate(270)"/>
+  </g>
+</svg>

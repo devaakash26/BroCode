@@ -1,0 +1,57 @@
+<svg width="600" height="600" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF9933;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF6347;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#138808;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E8B57;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g transform="translate(100,100)">
+    <!-- Central Element -->
+    <circle cx="0" cy="0" r="10" fill="url(#grad1)" />
+
+    <!-- Petal-like shapes -->
+    <g id="petals">
+      <path d="M0 -30 C 20 -50, 20 -10, 0 -10 C -20 -10, -20 -50, 0 -30 Z" fill="url(#grad1)" opacity="0.8"/>
+    </g>
+    <use href="#petals" transform="rotate(60)"/>
+    <use href="#petals" transform="rotate(120)"/>
+    <use href="#petals" transform="rotate(180)"/>
+    <use href="#petals" transform="rotate(240)"/>
+    <use href="#petals" transform="rotate(300)"/>
+
+    <!-- Outer circles -->
+    <circle cx="0" cy="0" r="40" fill="none" stroke="url(#grad2)" stroke-width="2" stroke-dasharray="4 2"/>
+    <circle cx="0" cy="0" r="55" fill="none" stroke="#FFFFFF" stroke-width="0.5" opacity="0.7"/>
+
+    <!-- Decorative arms -->
+    <g id="arms" filter="url(#glow)">
+      <path d="M0,-60 L20,-70 L0,-80 L-20,-70 Z" fill="url(#grad2)" />
+      <circle cx="0" cy="-60" r="3" fill="#FFFFFF"/>
+    </g>
+    <use href="#arms" transform="rotate(72)"/>
+    <use href="#arms" transform="rotate(144)"/>
+    <use href="#arms" transform="rotate(216)"/>
+    <use href="#arms" transform="rotate(288)"/>
+
+     <!-- Intertwined Waves -->
+    <g opacity="0.6">
+        <path d="M0,0 Q50,50 80,0 T160,0" stroke="url(#grad1)" stroke-width="1.5" fill="none" transform="rotate(15) scale(0.55)"/>
+        <path d="M0,0 Q50,-50 80,0 T160,0" stroke="url(#grad2)" stroke-width="1.5" fill="none" transform="rotate(-15) scale(0.55)"/>
+    </g>
+
+    <!-- Outer rim -->
+    <circle cx="0" cy="0" r="90" fill="none" stroke="url(#grad1)" stroke-width="4" opacity="0.5"/>
+  </g>
+</svg> 
