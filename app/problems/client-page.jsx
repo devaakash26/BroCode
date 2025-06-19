@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, ArrowUpDown, ChevronUp, ChevronDown, Filter, ChevronLeft } from 'lucide-react';
@@ -12,8 +12,11 @@ export default function ClientProblemsPage({ initialProblems, stats }) {
   // Extract stats
   const { total, solved, easy, medium, hard, tags } = stats;
   
-  // Remove duplicates from initialProblems based on id
-  const uniqueProblems = Array.from(new Map(initialProblems.map(problem => [problem.id, problem])).values());
+  // Memoize uniqueProblems to prevent re-creation on every render
+  const uniqueProblems = useMemo(() => 
+    Array.from(new Map(initialProblems.map(problem => [problem.id, problem])).values()),
+    [initialProblems]
+  );
   
   // State for problems and filters
   const [problems, setProblems] = useState(uniqueProblems);

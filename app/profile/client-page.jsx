@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import ProfileHeader from '../components/profile/ProfileHeader';
 import ProfileTabs from '../components/profile/ProfileTabs';
@@ -44,10 +44,10 @@ export function ProfileClientPage({ user: initialUser }) {
     fetchLeetCodeStats();
   }, [user.leetcodeUsername]);
 
-  const onUserUpdate = (updatedUser) => {
+  const onUserUpdate = useCallback((updatedUser) => {
     setUser(prevUser => ({ ...prevUser, ...updatedUser }));
     update(updatedUser);
-  };
+  }, [update]);
 
   if (!session) {
     return (

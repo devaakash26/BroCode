@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { ArrowRight, Code, Trophy, Users, Zap, BrainCircuit, UsersRound, Star } from 'lucide-react';
-
+import { Analytics } from "@vercel/analytics/next"
 export const metadata = {
   title: 'NeetCode - Ace Your Coding Interviews',
   description: 'The ultimate platform to prepare for technical interviews with curated problems, group challenges, and live leaderboards.',
