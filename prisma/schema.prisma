@@ -26,6 +26,7 @@ model User {
   password      String?
   image         String?
   role          UserRole   @default(USER)
+  leetcodeUsername String?   @unique
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -327,7 +328,7 @@ model UserInvitation {
   @@index([email, token])
 }
 
-// Bookmark model for saving problems
+// Bookmark model for users to save problems
 model Bookmark {
   id        String   @id @default(cuid())
   userId    String
@@ -338,5 +339,4 @@ model Bookmark {
   problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   @@unique([userId, problemId])
-  @@map("bookmarks")
 }

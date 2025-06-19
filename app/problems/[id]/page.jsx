@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import CodeEditor from '@/app/components/problems/code-editor';
 import Link from 'next/link';
 import { ChevronLeft, BookOpen, Info, Zap } from 'lucide-react';
+import BookmarkButton from '@/app/components/problems/BookmarkButton';
 
 export async function generateMetadata({ params }) {
   const problem = await prisma.problem.findUnique({
@@ -53,6 +54,11 @@ async function getProblem(id, userId) {
           submittedAt: true,
         },
       },
+      bookmarks: {
+        where: {
+          userId: userId || '',
+        },
+      },
     },
   });
 
@@ -62,11 +68,13 @@ async function getProblem(id, userId) {
 
   // Get the previous submission if available
   const lastSubmission = problem.submissions[0] || null;
+  const isBookmarked = problem.bookmarks.length > 0;
 
   return {
     ...problem,
     testCases: problem.testCasesRel, // Map testCasesRel to testCases for compatibility
     lastSubmission,
+    isBookmarked,
   };
 }
 
@@ -101,7 +109,10 @@ export default async function ProblemDetailPage({ params }) {
           <div className="p-6">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-bold">{problem.title}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">{problem.title}</h1>
+                  {session && <BookmarkButton problemId={problem.id} initialBookmarked={problem.isBookmarked} />}
+                </div>
                 <div className="mt-2 flex items-center gap-3">
                   <span 
                     className={`px-2 py-1 text-xs font-semibold rounded-full 

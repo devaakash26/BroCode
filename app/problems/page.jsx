@@ -18,7 +18,6 @@ async function getProblems(userId) {
       title: true,
       difficulty: true,
       tags: true,
-      createdAt: true,
       _count: {
         select: {
           submissions: true,
@@ -31,12 +30,6 @@ async function getProblems(userId) {
         },
         take: 1,
       },
-      bookmarks: {
-        where: {
-          userId,
-        },
-        take: 1,
-      }
     },
     orderBy: {
       createdAt: 'desc',
@@ -57,11 +50,8 @@ async function getProblems(userId) {
   // Format the data to include submission status
   return problems.map(problem => ({
     ...problem,
-    tags: problem.tags.sort(),
     solved: problem.submissions.length > 0,
-    bookmarked: problem.bookmarks.length > 0,
     submissions: undefined, // Remove submissions from the returned object
-    bookmarks: undefined,
     submissionCount: problem._count.submissions,
     _count: undefined, // Remove _count from the returned object
     acceptance: 60 + (simpleHash(problem.id) % 41), // Deterministic acceptance rate

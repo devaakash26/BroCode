@@ -166,29 +166,47 @@ export async function PATCH(request) {
 
     // Get the data from the request
     const data = await request.json();
-    const { name } = data;
+    const { name, leetcodeUsername } = data;
 
-    // Validate the data
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return NextResponse.json(
-        { success: false, message: 'Name is required' },
-        { status: 400 }
-      );
+    const updateData = {};
+    if (name) {
+      if (typeof name !== 'string' || name.trim() === '') {
+        return NextResponse.json(
+          { success: false, message: 'Name is required' },
+          { status: 400 }
+        );
+      }
+      updateData.name = name.trim();
+    }
+    
+    if (leetcodeUsername !== undefined) {
+        if (typeof leetcodeUsername !== 'string') {
+            return NextResponse.json(
+                { success: false, message: 'Invalid LeetCode username' },
+                { status: 400 }
+            );
+        }
+        updateData.leetcodeUsername = leetcodeUsername.trim();
     }
 
+    if (Object.keys(updateData).length === 0) {
+        return NextResponse.json(
+            { success: false, message: 'No data provided to update' },
+            { status: 400 }
+        );
+    }
     // Update the user
     const updatedUser = await prisma.user.update({
       where: {
         id: session.user.id,
       },
-      data: {
-        name: name.trim(),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,
         email: true,
         image: true,
+        leetcodeUsername: true,
       },
     });
 

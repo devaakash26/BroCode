@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { prisma } from '@/app/lib/db';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { nanoid } from 'nanoid';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request) {
   try {
@@ -29,10 +34,10 @@ export async function POST(request) {
     }
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { success: false, message: 'File type not supported. Please upload an image file (JPEG, PNG, GIF).' },
+        { success: false, message: 'File type not supported.' },
         { status: 400 }
       );
     }
@@ -41,36 +46,38 @@ export async function POST(request) {
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       return NextResponse.json(
-        { success: false, message: 'File size too large. Please upload an image less than 5MB.' },
+        { success: false, message: 'File size too large (max 5MB).' },
         { status: 400 }
       );
     }
 
-    // Generate a unique filename
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const uniqueId = nanoid(10);
-    const fileExtension = file.name.split('.').pop();
-    const fileName = `${session.user.id}-${uniqueId}.${fileExtension}`;
-    
-    // Define the path where the file will be saved
-    const publicDirectory = join(process.cwd(), 'public');
-    const uploadsDirectory = join(publicDirectory, 'uploads');
-    const filePath = join(uploadsDirectory, fileName);
-    
-    // Create directories if they don't exist
-    try {
-      await writeFile(filePath, buffer);
-    } catch (error) {
-      console.error('Error saving file:', error);
-      return NextResponse.json(
-        { success: false, message: 'Error saving file' },
-        { status: 500 }
+
+    // Upload to Cloudinary
+    const cloudinaryResponse = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'neetcode-profiles',
+          public_id: session.user.id,
+          overwrite: true,
+          format: 'webp',
+          transformation: [{ width: 250, height: 250, crop: 'fill', gravity: 'face' }],
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
       );
+      uploadStream.end(buffer);
+    });
+
+    if (!cloudinaryResponse || !cloudinaryResponse.secure_url) {
+      throw new Error('Cloudinary upload failed');
     }
 
-    // Generate URL for the uploaded image
-    const imageUrl = `/uploads/${fileName}`;
+    const imageUrl = cloudinaryResponse.secure_url;
 
     // Update the user's profile image
     await prisma.user.update({

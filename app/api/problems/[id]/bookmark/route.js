@@ -1,24 +1,19 @@
-import { NextResponse } from 'next/server';
+import { prisma } from '@/app/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { prisma } from '@/app/lib/db';
+import { NextResponse } from 'next/server';
 
-export async function POST(req, { params }) {
+export async function POST(request, { params }) {
   const session = await getServerSession(authOptions);
 
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const userId = session.user.id;
   const problemId = params.id;
 
-  if (!problemId) {
-    return NextResponse.json({ message: 'Problem ID is required' }, { status: 400 });
-  }
-
   try {
-    // Check if the bookmark already exists
     const existingBookmark = await prisma.bookmark.findUnique({
       where: {
         userId_problemId: {
@@ -29,25 +24,25 @@ export async function POST(req, { params }) {
     });
 
     if (existingBookmark) {
-      // If it exists, delete it
+      // Bookmark exists, so delete it
       await prisma.bookmark.delete({
         where: {
           id: existingBookmark.id,
         },
       });
-      return NextResponse.json({ status: 'deleted' }, { status: 200 });
+      return NextResponse.json({ success: true, bookmarked: false });
     } else {
-      // If it does not exist, create it
-      const newBookmark = await prisma.bookmark.create({
+      // Bookmark doesn't exist, so create it
+      await prisma.bookmark.create({
         data: {
           userId,
           problemId,
         },
       });
-      return NextResponse.json({ status: 'created', bookmark: newBookmark }, { status: 201 });
+      return NextResponse.json({ success: true, bookmarked: true });
     }
   } catch (error) {
-    console.error('Bookmark toggle error:', error);
-    return NextResponse.json({ message: 'Something went wrong' }, { status: 500 });
+    console.error('Error toggling bookmark:', error);
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
   }
 } 

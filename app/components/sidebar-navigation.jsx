@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
   Code, 
@@ -23,6 +23,7 @@ import {
 
 export default function SidebarNavigation({ collapsed, setCollapsed, className = '' }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -149,7 +150,15 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
             )}
             <ul className="mt-2 space-y-1">
               {problemLists.map((item) => {
-                const isActive = pathname === item.href || pathname === item.href.split('?')[0] && item.href.includes(pathname);
+                const [itemPath, itemQuery] = item.href.split('?');
+                const currentQuery = searchParams.toString();
+                let isActive;
+                if (itemQuery) {
+                  isActive = pathname === itemPath && itemQuery === currentQuery;
+                } else {
+                  isActive = pathname === itemPath && currentQuery === '';
+                }
+                
                 return (
                   <li key={item.name}>
                     <Link
