@@ -1,6 +1,6 @@
 # NeetCode Platform
 
-A full-stack Data Structures and Algorithms group challenge platform built with Next.js.
+This is a feature-rich, full-stack web application designed to help users practice Data Structures and Algorithms in a collaborative and competitive environment. It provides a platform where users can form groups, participate in timed coding challenges, track their progress, and even showcase their LeetCode statistics. Built with a modern tech stack, this project aims to provide a seamless and engaging experience for developers looking to hone their coding skills.
 
 ## Features
 
