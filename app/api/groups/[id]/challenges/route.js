@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/app/lib/db';
 
 // Create a new challenge in a group
@@ -11,6 +11,17 @@ export async function POST(request, { params }) {
     if (!session) {
       return NextResponse.json(
         { message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    console.log('Session data:', session);
+    console.log('User data:', session.user);
+    console.log('User ID:', session.user?.id);
+    
+    if (!session.user?.id) {
+      return NextResponse.json(
+        { message: 'User ID not found in session' },
         { status: 401 }
       );
     }
@@ -84,19 +95,23 @@ export async function POST(request, { params }) {
     
     // Check if this is a custom challenge with user-created problems
     if (isCustom && Array.isArray(customProblems) && customProblems.length > 0) {
-    try {
+      try {
         // Create the challenge first
-      const challenge = await prisma.challenge.create({
-        data: {
-          title,
-          description: description || '',
-          startTime: start,
-          endTime: end,
-          isPublic: isPublic !== undefined ? isPublic : true,
-          groupId,
-          creatorId: session.user.id,
-        },
-      });
+        const challenge = await prisma.challenge.create({
+          data: {
+            title,
+            description: description || '',
+            startTime: start,
+            endTime: end,
+            visibleToParticipants: isPublic !== undefined ? isPublic : true,
+            group: {
+              connect: { id: groupId }
+            },
+            creator: {
+              connect: { id: session.user.id }
+            }
+          },
+        });
       
         // Create custom problems and associate them with the challenge
         for (const customProblem of customProblems) {
@@ -111,17 +126,21 @@ export async function POST(request, { params }) {
               constraints: customProblem.constraints || '',
               templateCode: customProblem.templateCode || {},
               testCases: customProblem.testCases || [],
-              isCustom: true, // Mark as a custom problem
-              creatorId: session.user.id,
-              groupId, // Associate with the group
+              isCustom: true,
+              group: {
+                connect: { id: groupId }
+              },
+              creator: {
+                connect: { id: session.user.id }
+              }
             }
           });
           
           // Link the problem to the challenge
-          await prisma.challengeProblem.create({
+          await prisma.ChallengeProblems.create({
             data: {
               challengeId: challenge.id,
-              problemId: problem.id,
+              problemId: problem.id
             }
           });
         }
@@ -149,25 +168,29 @@ export async function POST(request, { params }) {
     // Standard challenge with existing problems
     try {
       // Create the challenge with existing problems
-          const challenge = await prisma.challenge.create({
-            data: {
-              title,
-              description: description || '',
-              startTime: start,
-              endTime: end,
-              isPublic: isPublic !== undefined ? isPublic : true,
-              groupId,
-              creatorId: session.user.id,
-              problems: {
-                create: problemIds.map(problemId => ({
-                  problem: {
-                    connect: { id: problemId },
-                  },
-                })),
+      const challenge = await prisma.challenge.create({
+        data: {
+          title,
+          description: description || '',
+          startTime: start,
+          endTime: end,
+          visibleToParticipants: isPublic !== undefined ? isPublic : true,
+          group: {
+            connect: { id: groupId }
+          },
+          creator: {
+            connect: { id: session.user.id }
+          },
+          problems: {
+            create: problemIds.map(problemId => ({
+              problem: {
+                connect: { id: problemId },
               },
-            },
-          });
-          
+            })),
+          },
+        },
+      });
+      
       return NextResponse.json({
         id: challenge.id,
         title: challenge.title,
@@ -175,41 +198,15 @@ export async function POST(request, { params }) {
       });
     } catch (createError) {
       console.error('Failed to create challenge:', createError);
-      // Try various fallback options if the schema might be different
-      try {
-        const challenge = await prisma.challenge.create({
-          data: {
-            title,
-            description: description || '',
-            startTime: start,
-            endTime: end,
-            visibleToParticipants: isPublic !== undefined ? isPublic : true,
-            groupId,
-            creatorId: session.user.id,
-            problems: {
-              create: problemIds.map(problemId => ({
-                problem: {
-                  connect: { id: problemId },
-                },
-              })),
-            },
-          },
-        });
-        
-        return NextResponse.json({
-          id: challenge.id,
-          title: challenge.title,
-          message: 'Challenge created successfully'
-        });
-      } catch (retryError) {
-        console.error('Error on retry:', retryError);
-        throw retryError;
-      }
+      return NextResponse.json(
+        { message: 'Error creating challenge', error: createError.message },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error('Error creating challenge:', error);
+    console.error('Error in challenge creation:', error);
     return NextResponse.json(
-      { message: 'Error creating challenge', error: error.message },
+      { message: 'Internal server error', error: error.message },
       { status: 500 }
     );
   }

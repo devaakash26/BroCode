@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -14,7 +15,7 @@ import {
   EyeOff, 
   Loader2 
 } from 'lucide-react';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 export default function AcceptInvitationPage() {
   const router = useRouter();
@@ -193,7 +194,6 @@ export default function AcceptInvitationPage() {
   if (showSuccess) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-        <Toaster position="top-center" />
         <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
           <div className="flex flex-col items-center text-center">
             <div className="h-16 w-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
@@ -217,7 +217,6 @@ export default function AcceptInvitationPage() {
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <Toaster position="top-center" />
       <div className="w-full max-w-md">
         <div className="flex flex-col space-y-2 text-center">
           <div className="mx-auto mb-4">

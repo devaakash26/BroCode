@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect, notFound } from 'next/navigation';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Clock, Users, Trophy, Code, ArrowRight } from 'lucide-react';
 import { prisma } from '@/app/lib/db';
@@ -87,6 +87,9 @@ async function getChallenge(id, userId) {
           },
         },
       },
+      participants: {
+        where: { userId }
+      },
       _count: {
         select: {
           problems: true,
@@ -103,6 +106,7 @@ async function getChallenge(id, userId) {
   // Check if user is a member of this group
   const isMember = challenge.group.members.length > 0;
   const isAdmin = challenge.group.members.some(member => member.role === 'ADMIN');
+  const participant = challenge.participants[0] || null;
 
   // Calculate challenge status
   const now = new Date();
@@ -128,6 +132,7 @@ async function getChallenge(id, userId) {
     isMember,
     isAdmin,
     status,
+    isDisqualified: participant?.disqualified || false,
     userProgress: {
       solved: solvedProblems,
       total: totalProblems,
@@ -152,6 +157,19 @@ export default async function ChallengePage({ params }) {
   // If user is not a member of the group, redirect to group page
   if (!challenge.isMember) {
     redirect(`/groups/${challenge.group.id}`);
+  }
+
+  // If the user tries to access the page directly and is disqualified
+  if (challenge.isDisqualified) {
+    return (
+        <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+            <h1 className="text-4xl font-bold text-red-500 mb-4">Disqualified</h1>
+            <p className="text-lg">You have been disqualified from this challenge and cannot rejoin.</p>
+            <Link href={`/groups/${challenge.groupId}`} className="mt-6 text-blue-400 hover:underline">
+                Return to Group
+            </Link>
+        </div>
+    );
   }
 
   const startDate = new Date(challenge.startTime);

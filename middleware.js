@@ -60,3 +60,4 @@ export const config = {
     '/((?!api/health|api/socket|_next/static|_next/image|favicon.ico|logo.svg).*)',
   ],
 };
+

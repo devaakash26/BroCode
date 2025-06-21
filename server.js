@@ -115,6 +115,9 @@ app.prepare().then(() => {
     adapter: process.env.REDIS_URL ? require("@socket.io/redis-adapter") : null
   });
   
+  // Make io instance available globally for API routes
+  global.io = io;
+  
   // Store active connections with expiry to prevent memory leaks
   class ConnectionManager {
     constructor(expiryMs = 3600000) { // 1 hour default
@@ -172,6 +175,7 @@ app.prepare().then(() => {
   // Create optimized connection managers
   const socketConnections = new ConnectionManager();
   const groupRooms = new Map(); // Track users in group rooms
+  const challengeRooms = new Map(); // Track users in challenge rooms
   
   // Periodic cleanup
   const cleanupInterval = setInterval(() => {
@@ -181,6 +185,13 @@ app.prepare().then(() => {
     for (const [groupId, members] of groupRooms.entries()) {
       if (members.size === 0) {
         groupRooms.delete(groupId);
+      }
+    }
+    
+    // Cleanup empty challenge rooms
+    for (const [challengeId, members] of challengeRooms.entries()) {
+      if (members.size === 0) {
+        challengeRooms.delete(challengeId);
       }
     }
   }, 300000); // Every 5 minutes
@@ -352,6 +363,53 @@ app.prepare().then(() => {
       console.log('Email verified event received:', data);
     });
     
+    // Handle joining a challenge room
+    socket.on('joinChallenge', async (challengeId) => {
+      if (!challengeId) return;
+      
+      const roomName = `challenge:${challengeId}`;
+      socket.join(roomName);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Socket ${socket.id} joined challenge room ${roomName}`);
+      }
+      
+      // Track room membership
+      if (!challengeRooms.has(challengeId)) {
+        challengeRooms.set(challengeId, new Set());
+      }
+      
+      // Find user ID for this socket
+      let userId = null;
+      let userName = 'Unknown';
+      
+      for (const [id, data] of socketConnections.entries()) {
+        if (data.socketId === socket.id) {
+          userId = id;
+          userName = data.userData?.name || 'Unknown';
+          break;
+        }
+      }
+      
+      if (userId) {
+        challengeRooms.get(challengeId).add(userId);
+        
+        // Notify other members about new participant
+        socket.to(roomName).emit('participantJoined', {
+          userId,
+          userName,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Send participant count to all users in the room
+        const participantCount = challengeRooms.get(challengeId).size;
+        io.to(roomName).emit('participantCountUpdate', {
+          challengeId,
+          count: participantCount
+        });
+      }
+    });
+    
     // Handle disconnection
     socket.on('disconnect', () => {
       if (process.env.NODE_ENV === 'development') {
@@ -387,6 +445,20 @@ app.prepare().then(() => {
             });
           }
         }
+        
+        // Remove user from all challenge rooms they were in
+        for (const [challengeId, members] of challengeRooms.entries()) {
+          if (members.has(disconnectedUserId)) {
+            members.delete(disconnectedUserId);
+            
+            // Notify room about participant leaving
+            const roomName = `challenge:${challengeId}`;
+            io.to(roomName).emit('participantCountUpdate', {
+              challengeId,
+              count: members.size
+            });
+          }
+        }
       }
     });
   });
@@ -407,14 +479,15 @@ app.prepare().then(() => {
     res.send('Server is working correctly');
   });
   
-  // Let Next.js handle everything else
+  // Attach io instance to the request object
+  expressApp.use((req, res, next) => {
+    req.io = io;
+    next();
+  });
+
+  // Handle all other requests with Next.js
   expressApp.all('*', (req, res) => {
-    try {
       return nextHandler(req, res);
-    } catch (error) {
-      console.error('Error handling request:', error);
-      res.status(500).send('Internal Server Error');
-    }
   });
   
   // Make socket connections accessible to API routes

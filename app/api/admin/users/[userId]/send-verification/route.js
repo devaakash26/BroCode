@@ -1,7 +1,7 @@
 import { prisma } from '@/app/lib/db';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { createRandomToken } from '@/app/lib/utils';
 import { sendVerificationEmail } from '@/app/lib/email';
 

@@ -2,12 +2,31 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { Send, RefreshCw, Clock } from 'lucide-react';
+import { Send, RefreshCw, Clock, Maximize2, MessageSquare, Users, X } from 'lucide-react';
 import Image from 'next/image';
 import useSocket from '@/app/hooks/useSocket';
 import { format } from 'date-fns';
 import TypingIndicator from '@/app/components/ui/typing-indicator';
 import { GroupChatSkeleton } from '@/components/ui/card-skeleton';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Safe format function to handle invalid dates
+const safeFormat = (timestamp, formatStr) => {
+  try {
+    // Check if timestamp is a valid date string or number
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      return '';
+    }
+    return format(date, formatStr);
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+};
 
 export default function GroupChat({ groupId }) {
   const { data: session } = useSession();
@@ -20,6 +39,10 @@ export default function GroupChat({ groupId }) {
   const typingTimeoutRef = useRef({});
   const messagesEndRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
+  const chatContainerRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showWarning, setShowWarning] = useState(true);
+  const [isChatOpen, setIsChatOpen] = useState(true);
   
   // Socket connection
   const { 
@@ -281,163 +304,217 @@ export default function GroupChat({ groupId }) {
     setIsSending(false);
   };
 
-  // Format timestamp
-  const formatMessageTime = (timestamp) => {
-    try {
-      return format(new Date(timestamp), 'h:mm a');
-    } catch (error) {
-      return '';
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      if (chatContainerRef.current.requestFullscreen) {
+        chatContainerRef.current.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
+    setIsFullscreen(!isFullscreen);
+    setShowWarning(false);
   };
-  
-  // Render message
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   const renderMessage = (message) => {
-    const isOwnMessage = message.senderId === session?.user?.id;
-    const isTempMessage = message.isTemp;
-    const hasFailedToSend = message.sendFailed;
-    
+    const isOwnMessage = message.userId === session?.user?.id;
     return (
-      <div 
-        key={message.id} 
-        className={`flex mb-4 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+      <motion.div
+        key={message.id}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className={`flex items-start space-x-2 mb-4 ${isOwnMessage ? 'flex-row-reverse space-x-reverse' : ''}`}
       >
-        {!isOwnMessage && (
-          <div className="flex-shrink-0 mr-2">
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200">
-              {message.senderImage ? (
-                <Image 
-                  src={message.senderImage} 
-                  alt={message.senderName} 
-                  width={32} 
-                  height={32}
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500 font-medium">
-                  {message.senderName?.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
-        <div 
-          className={`max-w-[75%] ${
-            isOwnMessage 
-              ? isTempMessage 
-                ? hasFailedToSend 
-                  ? 'bg-red-100 dark:bg-red-900/30 text-gray-800 dark:text-gray-200' 
-                  : 'bg-indigo-200 dark:bg-indigo-900/50 text-gray-800 dark:text-gray-200'
-                : 'bg-indigo-600 text-white'
-              : 'bg-gray-200 dark:bg-gray-700'
-          } ${
-            isOwnMessage ? 'rounded-tl-lg rounded-tr-none' : 'rounded-tr-lg rounded-tl-none'
-          } rounded-bl-lg rounded-br-lg px-4 py-2`}
-        >
-          {!isOwnMessage && (
-            <div className="font-medium text-xs text-gray-600 dark:text-gray-300 mb-1">
-              {message.senderName}
+        <div className="flex-shrink-0">
+          {message.userImage ? (
+            <Image
+              src={message.userImage}
+              alt={message.username}
+              width={40}
+              height={40}
+              className="rounded-full"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-400 to-pink-500 flex items-center justify-center text-white font-bold">
+              {message.username?.[0]?.toUpperCase()}
             </div>
           )}
-          <div className="break-words">{message.content}</div>
-          <div className="text-xs mt-1 opacity-70 text-right flex justify-end items-center">
-            {hasFailedToSend && (
-              <span className="text-red-500 text-xs mr-2">Failed to send</span>
-            )}
-            {isTempMessage && !hasFailedToSend && (
-              <span className="text-gray-500 text-xs mr-2">Sending...</span>
-            )}
-            {formatMessageTime(message.sentAt)}
-          </div>
         </div>
-      </div>
+        <div className={`flex flex-col max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {message.username}
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {safeFormat(message.timestamp || message.sentAt || new Date(), 'HH:mm')}
+            </span>
+          </div>
+          <motion.div
+            className={`rounded-lg px-4 py-2 ${
+              isOwnMessage
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground'
+            }`}
+            initial={{ scale: 0.95 }}
+            animate={{ scale: 1 }}
+            whileHover={{ scale: 1.02 }}
+          >
+            {message.content}
+          </motion.div>
+        </div>
+      </motion.div>
     );
   };
 
   return (
-    <div className="flex flex-col h-[500px] border border-gray-200 dark:border-gray-700 rounded-lg">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h3 className="font-medium">Group Chat</h3>
-        <div className="flex items-center space-x-2">
-          {isConnected ? (
-            <div className="flex items-center text-sm text-green-600 dark:text-green-400">
-              <div className="h-2 w-2 rounded-full bg-green-500 mr-1.5"></div>
-              <span>Live</span>
-            </div>
-          ) : (
-            <div className="flex items-center text-sm text-gray-500">
-              <Clock className="h-3.5 w-3.5 mr-1" />
-              <span>Offline</span>
-            </div>
-          )}
-          <button 
-            onClick={fetchMessages}
-            className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-md"
-            aria-label="Refresh messages"
-            title="Refresh messages"
+    <div ref={chatContainerRef} className="relative h-full w-full">
+      <AnimatePresence>
+        {showWarning && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
           >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      
-      {/* Messages */}
-      <div className="flex-1 p-4 overflow-y-auto">
-        {isLoading ? (
-          <GroupChatSkeleton />
-        ) : loadError ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
-            <p className="mb-2">Failed to load messages</p>
-            <button 
-              onClick={fetchMessages}
-              className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center"
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Try again
-            </button>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-            No messages yet. Be the first to say hello!
-          </div>
-        ) : (
-          <div>
-            {messages.map(renderMessage)}
-            {Object.values(typingUsers)
-              .filter(user => user.isTyping)
-              .map(user => (
-                <TypingIndicator key={user.id} user={user} />
-              ))}
-            <div ref={messagesEndRef} />
-          </div>
+            <Card className="p-8 text-center max-w-md mx-4">
+              <h3 className="text-2xl font-bold mb-4">⚠️ Fullscreen Recommended</h3>
+              <p className="mb-6 text-gray-400">
+                For the best chat experience, we recommend using fullscreen mode.
+                This will help you focus on the conversation and avoid distractions.
+              </p>
+              <div className="flex justify-center gap-4">
+                <Button onClick={toggleFullscreen} className="flex items-center gap-2">
+                  <Maximize2 className="w-4 h-4" />
+                  Enter Fullscreen
+                </Button>
+                <Button variant="ghost" onClick={() => setShowWarning(false)}>
+                  Continue Anyway
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
         )}
-      </div>
-      
-      {/* Input */}
-      <form onSubmit={handleSendMessage} className="border-t border-gray-200 dark:border-gray-700 p-3">
-        <div className="flex items-center">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={handleInputChange}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700"
-            disabled={isSending}
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim() || isSending}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      </AnimatePresence>
+
+      <motion.div
+        initial={false}
+        animate={{
+          width: isChatOpen ? '100%' : 'auto',
+          height: isChatOpen ? '100%' : 'auto',
+        }}
+        className={`fixed bottom-4 right-4 z-40 ${
+          isFullscreen ? 'inset-0 bottom-0 right-0' : ''
+        }`}
+      >
+        {!isChatOpen ? (
+          <Button
+            onClick={() => setIsChatOpen(true)}
+            size="lg"
+            className="rounded-full p-4 shadow-lg"
           >
-            {isSending ? (
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </button>
-        </div>
-      </form>
+            <MessageSquare className="w-6 h-6" />
+            <span className="ml-2">Open Chat</span>
+          </Button>
+        ) : (
+          <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto shadow-xl">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center space-x-2">
+                <Users className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-semibold">Group Chat</h2>
+                {isConnected && (
+                  <span className="flex items-center text-xs text-green-500">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-1" />
+                    Live
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleFullscreen}
+                  className="hover:bg-muted"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsChatOpen(false)}
+                  className="hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {isLoading ? (
+                <GroupChatSkeleton />
+              ) : loadError ? (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <p className="text-red-500 mb-2">Failed to load messages</p>
+                  <Button onClick={fetchMessages} variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try again
+                  </Button>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
+                  <p>No messages yet. Start the conversation!</p>
+                </div>
+              ) : (
+                <>
+                  {messages.map(renderMessage)}
+                  {Object.values(typingUsers)
+                    .filter(user => user.isTyping)
+                    .map(user => (
+                      <TypingIndicator key={user.id} user={user} />
+                    ))}
+                </>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <form onSubmit={handleSendMessage} className="p-4 border-t">
+              <div className="flex items-center space-x-2">
+                <Input
+                  type="text"
+                  value={inputValue}
+                  onChange={handleInputChange}
+                  placeholder="Type a message..."
+                  className="flex-1"
+                  disabled={isSending}
+                />
+                <Button type="submit" disabled={!inputValue.trim() || isSending}>
+                  {isSending ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </motion.div>
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        )}
+      </motion.div>
     </div>
   );
 } 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 import { prisma, disconnectPrisma } from '@/app/lib/db';
 
 export async function GET(request, { params }) {
@@ -78,8 +78,6 @@ export async function GET(request, { params }) {
       },
       { status: 500 }
     );
-  } finally {
-    await disconnectPrisma();
   }
 }
 
@@ -155,8 +153,6 @@ export async function PATCH(request, { params }) {
       { message: 'Error updating group details' },
       { status: 500 }
     );
-  } finally {
-    await disconnectPrisma();
   }
 }
 
@@ -222,7 +218,5 @@ export async function DELETE(request, { params }) {
       { message: 'Error deleting group' },
       { status: 500 }
     );
-  } finally {
-    await disconnectPrisma();
   }
 } 

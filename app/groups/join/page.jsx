@@ -85,8 +85,6 @@ export default function JoinGroupPage() {
   
   return (
     <div className="container mx-auto py-12 px-4 max-w-md">
-      <Toaster position="top-center" />
-      
       <div className="text-center mb-8">
         <div className="flex justify-center">
           <div className="bg-indigo-100 dark:bg-indigo-900/40 rounded-full p-4 mb-4">

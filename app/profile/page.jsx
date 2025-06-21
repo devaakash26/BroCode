@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/app/lib/db';
 import { notFound } from 'next/navigation';
 import { ProfileClientPage } from './client-page';

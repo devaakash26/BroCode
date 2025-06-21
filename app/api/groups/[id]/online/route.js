@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { authOptions } from '@/lib/auth-options';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 import { PrismaClient } from '@prisma/client';
 import redisClient, { redisHelpers } from '@/lib/redis';
 
-const prisma = new PrismaClient();
+const prismaClient = new PrismaClient();
 
 // GET /api/groups/[id]/online - Get online members count and IDs
 export async function GET(request, { params }) {
@@ -20,7 +21,7 @@ export async function GET(request, { params }) {
     const { id: groupId } = params;
 
     // Check if user is a member of the group
-    const membership = await prisma.userGroup.findUnique({
+    const membership = await prismaClient.userGroup.findUnique({
       where: {
         userId_groupId: {
           userId: session.user.id,
@@ -55,7 +56,7 @@ export async function GET(request, { params }) {
     }
     
     // Get current member count from database (for comparison/debugging)
-    const { _count } = await prisma.userGroup.aggregate({
+    const { _count } = await prismaClient.userGroup.aggregate({
       where: {
         groupId,
       },
@@ -63,7 +64,7 @@ export async function GET(request, { params }) {
     });
 
     // Update user's last active timestamp in the group
-    await prisma.userGroup.update({
+    await prismaClient.userGroup.update({
       where: {
         userId_groupId: {
           userId: session.user.id,

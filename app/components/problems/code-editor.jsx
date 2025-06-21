@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic';
 import { useState, useEffect, useRef } from 'react';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
+import { Button } from '@/components/ui/button';
 
 const defaultLanguages = [
   { id: 'cpp', name: 'C++', defaultCode: '// Write your C++ solution here\n\n' },
@@ -20,6 +21,7 @@ export default function CodeEditor({
   testCases = [],
   readOnly = false,
   challengeId = null,
+  isDisabled = false
 }) {
   const [language, setLanguage] = useState('cpp');
   const [code, setCode] = useState(initialCode || defaultLanguages[0].defaultCode);
@@ -34,6 +36,7 @@ export default function CodeEditor({
   const [compilationStatus, setCompilationStatus] = useState(null);
   const [testCaseStatus, setTestCaseStatus] = useState([]);
   const [lockedRanges, setLockedRanges] = useState([]);
+  const editorRef = useRef(null);
 
   // Reset code when language changes
   useEffect(() => {
@@ -630,236 +633,177 @@ export default function CodeEditor({
     );
   };
 
-  // Monaco editor options with support for locked regions
-  const editorOptions = {
-    readOnly: readOnly,
-    minimap: { enabled: false },
-    fontSize: 14,
-    lineNumbers: 'on',
-    roundedSelection: true,
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    tabSize: 2,
-    // Support for locked ranges
-    readOnlyEditableRanges: lockedRanges
+  // Handle editor mounting
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    
+    // Only apply restrictions in challenge mode
+    if (challengeId) {
+      // Prevent copy/paste/cut only in challenge mode
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
+        if (challengeId) {
+          toast.error('Copy is disabled in challenge mode');
+        } else {
+          // Allow copy in non-challenge mode
+          document.execCommand('copy');
+        }
+      });
+      
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
+        if (challengeId) {
+          toast.error('Paste is disabled in challenge mode');
+        } else {
+          // Allow paste in non-challenge mode
+          document.execCommand('paste');
+        }
+      });
+      
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
+        if (challengeId) {
+          toast.error('Cut is disabled in challenge mode');
+        } else {
+          // Allow cut in non-challenge mode
+          document.execCommand('cut');
+        }
+      });
+    }
   };
 
   return (
-    <div className="flex flex-col h-full relative">
-      <div className="flex flex-wrap gap-4 p-4 bg-gray-100 dark:bg-gray-800">
-        <div>
-          <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Language
-          </label>
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center space-x-2">
           <select
-            id="language"
             value={language}
-            onChange={handleLanguageChange}
-            disabled={readOnly || isRunning || isSubmitting}
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
+            onChange={(e) => setLanguage(e.target.value)}
+            className="bg-background border rounded-md px-2 py-1"
+            disabled={isDisabled}
           >
-            {defaultLanguages.map((lang) => (
-              <option key={lang.id} value={lang.id}>
-                {lang.name}
-              </option>
-            ))}
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="cpp">C++</option>
           </select>
         </div>
-
-        <div>
-          <label htmlFor="theme" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Theme
-          </label>
-          <select
-            id="theme"
-            value={theme}
-            onChange={handleThemeChange}
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600"
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={runCode}
+            variant="outline"
+            size="sm"
+            disabled={isSubmitting || isDisabled}
           >
-            <option value="vs-dark">Dark</option>
-            <option value="light">Light</option>
-          </select>
-        </div>
-
-        <div className="ml-auto flex items-end gap-2">
-          {!readOnly && (
-            <>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600 dark:hover:bg-gray-600 disabled:opacity-50"
-                onClick={resetCode}
-                disabled={isRunning || isSubmitting}
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
-                onClick={runCode}
-                disabled={isRunning || isSubmitting || readOnly}
-              >
-                {isRunning ? (
-                  <>
-                    <span className="animate-spin mr-1">⏳</span>
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Run Code
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600 disabled:opacity-50"
-                onClick={submitCode}
-                disabled={isRunning || isSubmitting || readOnly}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="animate-spin mr-1">⏳</span>
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Submit
-                  </>
-                )}
-              </button>
-            </>
-          )}
+            {isRunning ? (
+              <div className="flex items-center">
+                <span className="loading loading-spinner loading-sm mr-2"></span>
+                Running...
+              </div>
+            ) : (
+              <>
+                <Play className="w-4 h-4 mr-1" />
+                Run Code
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={submitCode}
+            size="sm"
+            disabled={isSubmitting || isDisabled}
+          >
+            {isSubmitting ? (
+              <div className="flex items-center">
+                <span className="loading loading-spinner loading-sm mr-2"></span>
+                Submitting...
+              </div>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-1" />
+                Submit
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* Progress bar for execution - only shown when running or submitting */}
-      {(isRunning || isSubmitting || executionProgress > 0) && (
-        <div className="h-1 w-full bg-gray-200 dark:bg-gray-700">
-          <div 
-            className="h-1 bg-indigo-600 transition-all duration-300 ease-out"
-            style={{ width: `${executionProgress}%` }}
-          ></div>
+      <div className="flex-1 relative">
+        <Editor
+          height="100%"
+          defaultLanguage={language}
+          defaultValue={initialCode}
+          theme={theme}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 14,
+            lineNumbers: 'on',
+            readOnly: isDisabled,
+            renderWhitespace: 'selection',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 2,
+            wordWrap: 'on',
+            wrappingStrategy: 'advanced',
+            padding: { top: 10, bottom: 10 },
+          }}
+          onMount={handleEditorDidMount}
+          onChange={handleEditorChange}
+        />
+      </div>
+
+      {/* Test Results */}
+      {results && (
+        <div className="border-t p-4 bg-background overflow-y-auto max-h-[200px]">
+          <div className="space-y-4">
+            {results.testResults.map((result, index) => (
+              <div
+                key={index}
+                className={`p-4 rounded-lg ${
+                  result.passed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium">Test Case {index + 1}</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      result.passed
+                        ? 'bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    }`}
+                  >
+                    {result.passed ? 'Passed' : 'Failed'}
+                  </span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Input:</span> {result.input}
+                  </div>
+                  <div>
+                    <span className="font-medium">Expected Output:</span> {result.expectedOutput}
+                  </div>
+                  <div>
+                    <span className="font-medium">Your Output:</span> {result.output}
+                  </div>
+                  {!result.passed && result.error && (
+                    <div className="text-red-600 dark:text-red-400">
+                      <span className="font-medium">Error:</span> {result.error}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex-grow border dark:border-gray-700 relative">
-        <Editor
-          height="100%"
-          language={getEditorLanguage()}
-          value={code}
-          theme={theme}
-          onChange={handleEditorChange}
-          options={editorOptions}
-        />
-        
-        {/* Execution Status Overlay - shown when running */}
-        {(isRunning || isSubmitting) && (
-          <div className="absolute bottom-4 right-4 bg-gray-900/80 text-white p-3 rounded-lg shadow-lg z-20 min-w-[200px]">
-            <div className="flex items-center mb-2">
-              <div className="animate-pulse mr-2 bg-indigo-500 h-2 w-2 rounded-full"></div>
-              <span className="font-medium">{isRunning ? 'Running Code' : 'Submitting Solution'}</span>
-            </div>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center">
-                <div className={`h-3 w-3 rounded-full mr-2 ${
-                  compilationStatus === 'running' ? 'bg-yellow-400 animate-pulse' :
-                  compilationStatus === 'completed' ? 'bg-green-500' :
-                  compilationStatus === 'failed' ? 'bg-red-500' : 'bg-gray-400'
-                }`}></div>
-                <span>Compiling code</span>
-              </div>
-              
-              {testCaseStatus.map((status, idx) => (
-                <div key={idx} className="flex items-center">
-                  <div className={`h-3 w-3 rounded-full mr-2 ${
-                    status === 'waiting' ? 'bg-gray-400' :
-                    status === 'running' ? 'bg-yellow-400 animate-pulse' :
-                    status === 'completed' ? 'bg-green-500' : 'bg-gray-400'
-                  }`}></div>
-                  <span>Running test case {idx + 1}</span>
-                </div>
-              ))}
-            </div>
+      {isDisabled && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center">
+            <Trophy className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            <h3 className="text-xl font-semibold mb-2">Challenge Ended</h3>
+            <p className="text-muted-foreground">
+              The challenge has ended. Check the leaderboard for final results!
+            </p>
           </div>
-        )}
-        
-        {/* Results Panel Toggle Button - Only show when results are available */}
-        {results && (
-          <button
-            type="button"
-            onClick={() => setIsPanelOpen(!isPanelOpen)}
-            className={`absolute top-1/2 transform -translate-y-1/2 ${isPanelOpen ? 'right-[calc(min(600px,_60%))]' : 'right-0'} 
-                       z-10 rounded-l-lg p-1.5 bg-indigo-600 text-white hover:bg-indigo-700 transition-all duration-300`}
-            aria-label={isPanelOpen ? 'Close results panel' : 'Open results panel'}
-          >
-            {isPanelOpen ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-          </button>
-        )}
-        
-        {/* Results Panel - Sliding from the right, only when results are available */}
-        {results && (
-          <div 
-            ref={resultsPanelRef}
-            className={`absolute top-0 right-0 h-full w-[60%] max-w-[600px] min-w-[300px] bg-white dark:bg-gray-800 
-                       border-l border-gray-200 dark:border-gray-700 shadow-xl z-[5] transform transition-transform duration-300 ease-in-out
-                       ${isPanelOpen ? 'translate-x-0' : 'translate-x-full'} overflow-hidden`}
-          >
-            <div className="flex flex-col h-full">
-              <div className="flex items-center border-b border-gray-200 dark:border-gray-700">
-                <button
-                  className={`flex-1 flex items-center justify-center px-4 py-3 ${
-                    activeTab === 'results' 
-                      ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 font-medium' 
-                      : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                  onClick={() => setActiveTab('results')}
-                >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Test Results
-                </button>
-                <button
-                  className={`flex-1 flex items-center justify-center px-4 py-3 ${
-                    activeTab === 'console' 
-                      ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400 font-medium' 
-                      : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
-                  }`}
-                  onClick={() => setActiveTab('console')}
-                >
-                  <Code className="h-4 w-4 mr-2" />
-                  Console Output
-                </button>
-              </div>
-              
-              <div className="overflow-y-auto p-4 flex-grow">
-                {activeTab === 'results' && (
-                  <>
-                    {renderResultsSummary()}
-                    
-                    <div className="space-y-1">
-                      {testCases.map((testCase, index) => (
-                        <div key={index}>
-                          {renderTestCaseResult(testCase, index)}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                
-                {activeTab === 'console' && (
-                  <div className="h-full">
-                    <div className="bg-gray-900 text-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto whitespace-pre-wrap h-full">
-                      {results.consoleOutput || 'No console output generated.'}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 } 

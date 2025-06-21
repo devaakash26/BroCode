@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { ArrowLeft, PlusCircle, Clock, Calendar, Trophy, Flag } from 'lucide-react';
-import { Toaster, toast } from 'react-hot-toast';
 import { ChallengeSkeleton } from '@/components/ui/card-skeleton';
+import { toast } from 'react-hot-toast';
 
 export default function GroupChallengesPage({ params }) {
   const { id: groupId } = params;
@@ -101,8 +101,6 @@ export default function GroupChallengesPage({ params }) {
   
   return (
     <div className="container mx-auto py-8 px-4">
-      <Toaster position="top-center" />
-      
       {/* Header with back button */}
       <div className="mb-6">
         <Link 

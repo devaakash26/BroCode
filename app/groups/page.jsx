@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/app/lib/db';
 import Link from 'next/link';
 import { Users, Plus, ChevronRight, AlertTriangle, RefreshCw, Search, Globe } from 'lucide-react';

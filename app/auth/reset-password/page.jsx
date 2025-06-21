@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
-import { Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -109,7 +108,6 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="container relative flex h-[calc(100vh-5rem)] flex-col items-center justify-center">
-      <Toaster position="top-center" />
       <div className="mx-auto max-w-sm space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Reset Password</h1>

@@ -1,13 +1,13 @@
-import nodemailer from 'nodemailer';
-
-// Create a transporter with Gmail SMTP
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+async function getTransporter() {
+  const nodemailer = (await import('nodemailer')).default;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+}
 
 // Email template for verification
 const  verificationEmailTemplate = ({ name, verificationLink }) => `
@@ -234,6 +234,7 @@ export async function sendVerificationEmail({ to, name, verificationLink }) {
   };
 
   try {
+    const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`Verification email sent to ${to}`);
     return { success: true };
@@ -253,6 +254,7 @@ export async function sendPasswordResetEmail({ to, name, resetLink }) {
   };
 
   try {
+    const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`Password reset email sent to ${to}`);
     return { success: true };
@@ -272,6 +274,7 @@ export async function sendWelcomeEmail({ to, name }) {
   };
 
   try {
+    const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`Welcome email sent to ${to}`);
     return { success: true };
@@ -291,6 +294,7 @@ export async function sendInvitationEmail({ to, inviterName, invitationLink, rol
   };
 
   try {
+    const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`Invitation email sent to ${to}`);
     return { success: true };
@@ -310,6 +314,7 @@ export async function sendEmail({ to, subject, html }) {
   };
 
   try {
+    const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
     console.log(`Email sent to ${to} with subject "${subject}"`);
     return { success: true };

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { 
   ArrowLeft, 
   Users, 
@@ -22,6 +22,9 @@ import {
   Camera,
   AlertTriangle
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function GroupSettingsPage() {
   const params = useParams();
@@ -49,6 +52,8 @@ export default function GroupSettingsPage() {
   
   const [expandedMemberId, setExpandedMemberId] = useState(null);
   const [isRemovingMember, setIsRemovingMember] = useState(false);
+  
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   
   const fetchGroupDetails = useCallback(async () => {
     try {
@@ -139,6 +144,7 @@ export default function GroupSettingsPage() {
         toast.success(data.message || 'Group information updated successfully');
         setGroup(data.group);
         setIsEditingBasic(false);
+        setShowSuccessAnimation(true);
       } else {
         toast.error(data.message || 'Failed to update group');
       }
@@ -201,8 +207,27 @@ export default function GroupSettingsPage() {
   }
 
   return (
-    <>
-      <Toaster position="top-center" reverseOrder={false} />
+    <div className="space-y-6">
+      <AnimatePresence>
+        {showSuccessAnimation && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center"
+          >
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Group information updated successfully!</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Your changes have been saved.
+              </p>
+              <div className="mt-4 flex justify-end space-x-2">
+                <button onClick={() => setShowSuccessAnimation(false)}>Close</button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="flex items-center mb-6">
@@ -313,7 +338,7 @@ export default function GroupSettingsPage() {
       </div>
     </div>
       )}
-    </>
+    </div>
   );
 }
 

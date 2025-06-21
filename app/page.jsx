@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { ArrowRight, Code, Trophy, Users, Zap, BrainCircuit, UsersRound, Star, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';

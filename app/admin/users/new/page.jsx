@@ -9,7 +9,7 @@ import {
   XCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { toast, Toaster } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 export default function InviteUserPage() {
   const [email, setEmail] = useState('');
@@ -60,8 +60,6 @@ export default function InviteUserPage() {
   
   return (
     <div className="space-y-6">
-      <Toaster position="top-center" />
-      
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link 

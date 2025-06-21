@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // Try to connect to the socket server
-    const response = await fetch('http://localhost:3001/api/socket', {
+    const response = await fetch('http://localhost:3000/socket.io', {
       method: 'GET',
       headers: {
         'Accept': 'application/json'

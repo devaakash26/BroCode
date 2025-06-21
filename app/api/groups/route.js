@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/app/lib/db';
 import { nanoid } from 'nanoid';
 
@@ -78,16 +78,32 @@ export async function GET(request) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const skip = (page - 1) * limit;
 
-    // Get public groups that match the search query
-    const groups = await prisma.group.findMany({
-      where: {
-        isActive: true,
-        visibility: 'PUBLIC', // Only include PUBLIC groups
-        name: {
-          contains: query,
-          mode: 'insensitive',
-        },
+    const whereClause = {
+      isActive: true,
+      name: {
+        contains: query,
+        mode: 'insensitive',
       },
+      OR: [
+        {
+          visibility: 'PUBLIC',
+        },
+        {
+          visibility: {
+            in: ['PRIVATE', 'UNLISTED'],
+          },
+          members: {
+            some: {
+              userId: session.user.id,
+            },
+          },
+        },
+      ],
+    };
+
+    // Get groups that match the search query and visibility rules
+    const groups = await prisma.group.findMany({
+      where: whereClause,
       include: {
         _count: {
           select: {
@@ -107,14 +123,7 @@ export async function GET(request) {
 
     // Get total count for pagination
     const totalCount = await prisma.group.count({
-      where: {
-        isActive: true,
-        visibility: 'PUBLIC', // Only count PUBLIC groups
-        name: {
-          contains: query,
-          mode: 'insensitive',
-        },
-      },
+      where: whereClause,
     });
 
     return NextResponse.json({

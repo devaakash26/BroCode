@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createRandomToken } from '@/app/lib/utils';
 import { sendVerificationEmail } from '@/app/lib/email';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 
 export async function GET(request) {
   try {

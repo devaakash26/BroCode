@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
+import { authOptions } from '@/lib/auth-options';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/app/lib/db';
 import redisClient, { redisHelpers } from '@/lib/redis';
-
-const prisma = new PrismaClient();
 
 // GET /api/groups/[id]/messages - Get messages for a group
 export async function GET(request, { params }) {

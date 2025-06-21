@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { prisma } from '@/app/lib/db';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import Link from 'next/link';
 import Image from 'next/image';
 import SearchForm from '@/app/components/SearchForm';
