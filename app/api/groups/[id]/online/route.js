@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authOptions } from '@/lib/auth-options';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/db';
+import { prisma } from '@/app/lib/db';
 import { PrismaClient } from '@prisma/client';
 import redisClient, { redisHelpers } from '@/lib/redis';
 

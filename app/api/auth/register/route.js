@@ -1,5 +1,5 @@
 import { prisma } from '@/app/lib/db';
-import { hash } from 'bcrypt';
+import {hash} from "bcryptjs"
 import { NextResponse } from 'next/server';
 import { createRandomToken } from '@/app/lib/utils';
 import { sendVerificationEmail, sendWelcomeEmail } from '@/app/lib/email';
