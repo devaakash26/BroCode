@@ -7,6 +7,8 @@ import Footer from './components/footer';
 import VerificationAlert from './components/VerificationAlert';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { ProblemDrawerProvider } from './context/ProblemDrawerContext';
+import ProblemListDrawer from './components/problems/ProblemListDrawer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -15,7 +17,7 @@ export default function ClientLayout({ children }) {
   const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
 
-  // Check if we're on an admin page
+  const isProblemPage = pathname.startsWith('/problems/');
   const isAdminPage = pathname.startsWith('/admin');
 
   // Load sidebar state from local storage on mount
@@ -49,45 +51,45 @@ export default function ClientLayout({ children }) {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar - only visible on desktop and when not on admin pages */}
-      {!isMobile && !isAdminPage && (
-        <div className="fixed lg:static z-50 lg:z-0 transition-all duration-300 translate-x-0">
-          <SidebarNavigation 
-            collapsed={sidebarCollapsed} 
-            setCollapsed={handleToggleSidebar} 
-            className="h-screen"
-          />
-        </div>
-      )}
-      
-      {/* Main content */}
-      <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage ? '' : 'w-full'}`}>
-        {!isAdminPage && (
-          <>
-            <Navbar 
-              sidebarCollapsed={sidebarCollapsed} 
-              setSidebarCollapsed={handleToggleSidebar}
-              isMobile={isMobile}
+    <ProblemDrawerProvider>
+      <div className="flex h-screen overflow-hidden">
+        {!isMobile && !isAdminPage && !isProblemPage && (
+          <div className="fixed lg:static z-50 lg:z-0 transition-all duration-300 translate-x-0">
+            <SidebarNavigation 
+              collapsed={sidebarCollapsed} 
+              setCollapsed={handleToggleSidebar} 
+              className="h-screen"
             />
-            <div className="px-4 md:px-6 lg:px-8">
-              <VerificationAlert />
-            </div>
-          </>
+          </div>
         )}
-        <main className={`flex-1 p-0 ${isMobile && !isAdminPage ? 'pb-20' : ''}`}>
-          {children}
-        </main>
-        {!isMobile && !isAdminPage && <Footer />}
-      </div>
+        
+        <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage && !isProblemPage ? '' : 'w-full'}`}>
+          {!isAdminPage && (
+            <>
+              <Navbar 
+                sidebarCollapsed={sidebarCollapsed} 
+                setSidebarCollapsed={handleToggleSidebar}
+                isMobile={isMobile}
+              />
+              <div className="px-4 md:px-6 lg:px-8">
+                <VerificationAlert />
+              </div>
+            </>
+          )}
+          <main className={`flex-1 p-0 ${isMobile && !isAdminPage ? 'pb-20' : ''}`}>
+            {children}
+          </main>
+          {!isMobile && !isAdminPage && <Footer />}
+        </div>
 
-      {/* Mobile bottom navigation - appears on mobile devices and when not on admin pages */}
-      {isMobile && !isAdminPage && (
-        <SidebarNavigation 
-          collapsed={true}
-          setCollapsed={() => {}}
-        />
-      )}
-    </div>
+        {isMobile && !isAdminPage && (
+          <SidebarNavigation 
+            collapsed={true}
+            setCollapsed={() => {}}
+          />
+        )}
+        <ProblemListDrawer />
+      </div>
+    </ProblemDrawerProvider>
   );
 } 

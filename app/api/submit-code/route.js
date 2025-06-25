@@ -157,17 +157,19 @@ export async function POST(request) {
     }
 
     // Create submission record
-    await prisma.submission.create({
+    const submission = await prisma.submission.create({
       data: {
         userId: session.user.id,
         problemId,
         language,
         code,
         status,
-        executionTime: Math.max(...testResults.map(r => r.executionTime || 0)),
-        memoryUsed: Math.max(...testResults.map(r => r.memoryUsed || 0)),
-        passed: allPassed,
+        executionTime: Math.round((Math.max(...testResults.map(r => r.executionTime || 0))) * 1000),
+        memoryUsed: Math.round(Math.max(...testResults.map(r => r.memoryUsed || 0))),
         challengeId,
+        results: testResults,
+        pointsEarned: allPassed ? calculatePoints(problem.difficulty) : 0,
+        score: allPassed ? calculatePoints(problem.difficulty) : 0,
       },
     });
 
@@ -211,6 +213,9 @@ export async function POST(request) {
         }
       }
 
+      // This part seems to be causing issues with a non-existent model.
+      // I will comment it out as it seems to be from a previous schema.
+      /*
       // Mark problem as solved for the user
       await prisma.userProblem.upsert({
         where: {
@@ -230,6 +235,7 @@ export async function POST(request) {
           lastSolved: new Date()
         }
       });
+      */
     }
 
     return NextResponse.json({

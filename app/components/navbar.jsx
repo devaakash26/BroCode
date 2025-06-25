@@ -4,10 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { NavLink } from './nav-link';
 import { useSession, signOut } from 'next-auth/react';
-import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen } from 'lucide-react';
+import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List } from 'lucide-react';
 import ThemeToggle from './theme-toggle';
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { usePathname } from 'next/navigation';
+import { useProblemDrawer } from '@/app/context/ProblemDrawerContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,10 @@ export default function Navbar({
 }) {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const { openDrawer } = useProblemDrawer();
+
+  const isProblemPage = pathname.startsWith('/problems/') && pathname.length > '/problems/'.length;
   
   const mainNavItems = [
     { name: 'Problems', href: '/problems', icon: <Code className="h-4 w-4 mr-2" /> },
@@ -37,7 +43,7 @@ export default function Navbar({
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             {/* Desktop sidebar toggle */}
-            {!isMobile && (
+            {!isMobile && !isProblemPage && (
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                 type="button"
@@ -45,6 +51,18 @@ export default function Navbar({
               >
                 <span className="sr-only">Toggle sidebar</span>
                 <PanelLeft className="block h-5 w-5" aria-hidden="true" />
+              </button>
+            )}
+            
+            {/* Problem List Toggle */}
+            {isProblemPage && (
+              <button
+                onClick={openDrawer}
+                type="button"
+                className="hidden lg:inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 mr-2"
+              >
+                <List className="block h-5 w-5" aria-hidden="true" />
+                <span className="ml-2">Problem List</span>
               </button>
             )}
             

@@ -1,11 +1,22 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useRef } from 'react';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
-import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code } from 'lucide-react';
+import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code, X, Trophy } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 const defaultLanguages = [
   { id: 'cpp', name: 'C++', defaultCode: '// Write your C++ solution here\n\n' },
@@ -23,8 +34,10 @@ export default function CodeEditor({
   challengeId = null,
   isDisabled = false
 }) {
+  const { data: session } = useSession();
+  const router = useRouter();
   const [language, setLanguage] = useState('cpp');
-  const [code, setCode] = useState(initialCode || defaultLanguages[0].defaultCode);
+  const [code, setCode] = useState(initialCode || defaultLanguages.find(lang => lang.id === 'cpp')?.defaultCode || '');
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [results, setResults] = useState(null);
@@ -37,16 +50,23 @@ export default function CodeEditor({
   const [testCaseStatus, setTestCaseStatus] = useState([]);
   const [lockedRanges, setLockedRanges] = useState([]);
   const editorRef = useRef(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const isInitialMount = useRef(true);
 
-  // Reset code when language changes
+  // When language changes, update the code to the new boilerplate.
   useEffect(() => {
-    if (!initialCode) {
-      const selectedLang = defaultLanguages.find(lang => lang.id === language);
-      setCode(selectedLang?.defaultCode || '');
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
     }
-    // Identify locked ranges in the code when language changes
+    const selectedLang = defaultLanguages.find(lang => lang.id === language);
+    setCode(selectedLang?.defaultCode || '');
+  }, [language]);
+
+  // Re-identify locked ranges whenever the code changes.
+  useEffect(() => {
     identifyLockedRanges();
-  }, [language, initialCode]);
+  }, [code]);
 
   // Auto-open panel when results are available (and close it when results are cleared)
   useEffect(() => {
@@ -190,6 +210,11 @@ export default function CodeEditor({
   };
 
   const runCode = async () => {
+    if (!session) {
+      toast.error("Please sign in to run your code.");
+      router.push('/auth/signin');
+      return;
+    }
     if (!code.trim()) {
       toast.error('Please write some code first');
       return;
@@ -254,7 +279,7 @@ export default function CodeEditor({
       await new Promise(resolve => setTimeout(resolve, 500));
       setExecutionProgress(100);
 
-      setResults(data);
+      setResults({...data, isSubmission: false});
       
       if (data.status === 'ACCEPTED') {
         toast.success('All test cases passed!');
@@ -268,7 +293,11 @@ export default function CodeEditor({
     } catch (error) {
       console.error('Error running code:', error);
       toast.error(error.message || 'Error running code');
-      setResults(null); // Clear results on error
+      setResults({
+        status: 'CLIENT_ERROR',
+        statusMessage: error.message || 'An error occurred while running the code.',
+        testResults: []
+      });
       setExecutionProgress(0);
     } finally {
       setIsRunning(false);
@@ -276,6 +305,11 @@ export default function CodeEditor({
   };
 
   const submitCode = async () => {
+    if (!session) {
+      toast.error("Please sign in to submit your solution.");
+      router.push('/auth/signin');
+      return;
+    }
     if (!code.trim()) {
       toast.error('Please write some code first');
       return;
@@ -340,7 +374,7 @@ export default function CodeEditor({
       await new Promise(resolve => setTimeout(resolve, 500));
       setExecutionProgress(100);
 
-      setResults(data);
+      setResults({...data, isSubmission: true});
       
       if (data.status === 'ACCEPTED') {
         toast.success('All test cases passed! Solution submitted successfully.');
@@ -359,7 +393,11 @@ export default function CodeEditor({
     } catch (error) {
       console.error('Error submitting code:', error);
       toast.error(error.message || 'Error submitting code');
-      setResults(null); // Clear results on error
+      setResults({
+        status: 'CLIENT_ERROR',
+        statusMessage: error.message || 'An error occurred while submitting the code.',
+        testResults: []
+      });
       setExecutionProgress(0);
     } finally {
       setIsSubmitting(false);
@@ -421,14 +459,12 @@ export default function CodeEditor({
     return null; // No issues found
   };
 
-  const resetCode = () => {
-    const confirmed = window.confirm('Are you sure you want to reset your code?');
-    if (confirmed) {
-      const selectedLang = defaultLanguages.find(lang => lang.id === language);
-      setCode(initialCode || selectedLang?.defaultCode || '');
-      setResults(null);
-      toast.success('Code reset');
-    }
+  const handleResetConfirm = () => {
+    const selectedLang = defaultLanguages.find(lang => lang.id === language);
+    setCode(initialCode || selectedLang?.defaultCode || '');
+    setResults(null);
+    toast.success('Code reset');
+    setIsResetDialogOpen(false);
   };
 
   const getEditorLanguage = () => {
@@ -443,7 +479,7 @@ export default function CodeEditor({
   };
 
   const renderTestCaseResult = (testCase, index) => {
-    if (!results) return null;
+    if (!results || !testCase) return null;
     
     const testResult = results.testResults?.[index];
     
@@ -562,20 +598,21 @@ export default function CodeEditor({
     
     const totalTests = results.testResults ? results.testResults.length : 0;
     const passedTests = results.testResults ? results.testResults.filter(t => t.passed).length : 0;
+    const isSuccess = passedTests === totalTests && totalTests > 0;
 
     return (
       <div className={`mb-6 p-4 rounded-lg ${
-        passedTests === totalTests 
+        isSuccess
           ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-          : results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR'
+          : results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' || results.status === 'CLIENT_ERROR'
             ? 'bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800'
             : 'bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
       }`}>
         <div className="flex items-center justify-between">
           <h3 className="font-semibold flex items-center gap-2">
-            {passedTests === totalTests ? (
+            {isSuccess ? (
               <CheckCircle className="h-5 w-5 text-green-500" />
-            ) : results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' ? (
+            ) : results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' || results.status === 'CLIENT_ERROR' ? (
               <AlertCircle className="h-5 w-5 text-red-500" />
             ) : (
               <AlertCircle className="h-5 w-5 text-yellow-500" />
@@ -584,17 +621,19 @@ export default function CodeEditor({
               ? 'Compile Error' 
               : results.status === 'QUALITY_ERROR' 
                 ? 'Code Quality Error' 
-                : 'Test Summary'}
+                : results.status === 'CLIENT_ERROR'
+                  ? 'Error'
+                  : 'Test Summary'}
           </h3>
           
-          {results.status !== 'COMPILE_ERROR' && results.status !== 'QUALITY_ERROR' && (
+          {results.status !== 'COMPILE_ERROR' && results.status !== 'QUALITY_ERROR' && results.status !== 'CLIENT_ERROR' && (
             <div className="text-sm">
               <span className="font-medium">{passedTests}/{totalTests}</span> tests passed
             </div>
           )}
         </div>
         
-        {(results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR') ? (
+        {(results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' || results.status === 'CLIENT_ERROR') ? (
           <div className="mt-2 text-red-600 dark:text-red-400">
             <pre className="mt-1 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm overflow-x-auto whitespace-pre-wrap">
               {results.compileError || results.statusMessage}
@@ -684,6 +723,32 @@ export default function CodeEditor({
             <option value="java">Java</option>
             <option value="cpp">C++</option>
           </select>
+
+          <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Reset code"
+                disabled={isDisabled}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Reset Code</DialogTitle>
+                <DialogDescription>
+                  Are you sure you want to reset your code? This action cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsResetDialogOpen(false)}>Cancel</Button>
+                <Button variant="destructive" onClick={handleResetConfirm}>Reset</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -727,8 +792,8 @@ export default function CodeEditor({
       <div className="flex-1 relative">
         <Editor
           height="100%"
-          defaultLanguage={language}
-          defaultValue={initialCode}
+          language={getEditorLanguage()}
+          value={code}
           theme={theme}
           options={{
             minimap: { enabled: false },
@@ -748,50 +813,62 @@ export default function CodeEditor({
         />
       </div>
 
-      {/* Test Results */}
-      {results && (
-        <div className="border-t p-4 bg-background overflow-y-auto max-h-[200px]">
-          <div className="space-y-4">
-            {results.testResults.map((result, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded-lg ${
-                  result.passed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium">Test Case {index + 1}</span>
-                  <span
-                    className={`px-2 py-1 rounded text-sm ${
-                      result.passed
-                        ? 'bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}
-                  >
-                    {result.passed ? 'Passed' : 'Failed'}
-                  </span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium">Input:</span> {result.input}
-                  </div>
-                  <div>
-                    <span className="font-medium">Expected Output:</span> {result.expectedOutput}
-                  </div>
-                  <div>
-                    <span className="font-medium">Your Output:</span> {result.output}
-                  </div>
-                  {!result.passed && result.error && (
-                    <div className="text-red-600 dark:text-red-400">
-                      <span className="font-medium">Error:</span> {result.error}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Results Panel */}
+      <div
+        ref={resultsPanelRef}
+        className={`absolute bottom-0 left-0 right-0 bg-background border-t transform transition-transform duration-300 ease-in-out ${
+          isPanelOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
+        style={{ maxHeight: '50vh', zIndex: 40 }}
+      >
+        <button
+          onClick={() => setIsPanelOpen(false)}
+          className="absolute top-2 right-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 z-50"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="flex border-b">
+          <button
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === 'results' ? 'border-b-2 border-b-primary' : ''
+            }`}
+            onClick={() => setActiveTab('results')}
+          >
+            Results
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === 'console' ? 'border-b-2 border-b-primary' : ''
+            }`}
+            onClick={() => setActiveTab('console')}
+          >
+            Console
+          </button>
         </div>
-      )}
+        <div className="p-4 overflow-y-auto" style={{maxHeight: 'calc(50vh - 41px)'}}>
+          {activeTab === 'results' && (
+            <div>
+              {renderResultsSummary()}
+              <div className="space-y-4">
+                {results?.testResults?.map((result, index) => {
+                  const currentTestCases = results.isSubmission 
+                    ? testCases 
+                    : testCases.filter(tc => tc.isExample);
+                  return renderTestCaseResult(currentTestCases[index], index);
+                })}
+              </div>
+            </div>
+          )}
+          {activeTab === 'console' && (
+            <div>
+              <h3 className="font-semibold mb-2">Console Output</h3>
+              <pre className="bg-gray-100 dark:bg-gray-800 rounded p-4 text-sm whitespace-pre-wrap">
+                {results?.consoleOutput || 'No console output for this run.'}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
 
       {isDisabled && (
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
