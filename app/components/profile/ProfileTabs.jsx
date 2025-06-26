@@ -1,9 +1,10 @@
 'use client';
 
-import { Shield, User, Bell } from 'lucide-react';
+import { Shield, User, Bell, MessageSquare } from 'lucide-react';
 
 const tabs = [
   { name: 'overview', label: 'Overview', icon: <User className="h-5 w-5 mr-2" /> },
+  { name: 'queries', label: 'My Queries', icon: <MessageSquare className="h-5 w-5 mr-2" /> },
   { name: 'settings', label: 'Account Settings', icon: <Bell className="h-5 w-5 mr-2" /> },
   { name: 'danger', label: 'Danger Zone', icon: <Shield className="h-5 w-5 mr-2" /> },
 ];

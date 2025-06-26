@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { NavLink } from './nav-link';
 import { useSession, signOut } from 'next-auth/react';
-import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List } from 'lucide-react';
+import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List, HelpCircle } from 'lucide-react';
 import ThemeToggle from './theme-toggle';
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
@@ -111,6 +111,12 @@ export default function Navbar({
                       Profile
                     </NavLink>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <NavLink href="/help" className="flex w-full cursor-pointer">
+                      <HelpCircle className="mr-2 h-4 w-4" />
+                      Help
+                    </NavLink>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -192,6 +198,14 @@ export default function Navbar({
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
+                </NavLink>
+                <NavLink
+                  href="/help"
+                  className="flex items-center px-4 py-2 text-base font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <HelpCircle className="h-4 w-4 mr-2" />
+                  Help
                 </NavLink>
                 <button
                   onClick={() => {

@@ -41,7 +41,6 @@ export default function GroupChat({ groupId }) {
   const loadingTimeoutRef = useRef(null);
   const chatContainerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showWarning, setShowWarning] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(true);
   
   // Socket connection
@@ -315,7 +314,6 @@ export default function GroupChat({ groupId }) {
       }
     }
     setIsFullscreen(!isFullscreen);
-    setShowWarning(false);
   };
 
   useEffect(() => {
@@ -377,144 +375,81 @@ export default function GroupChat({ groupId }) {
     );
   };
 
+  const filteredTypingUsers = Object.values(typingUsers)
+    .filter(user => user.isTyping && user.id !== session?.user?.id);
+
+  if (!isChatOpen) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button onClick={() => setIsChatOpen(true)} className="rounded-full h-16 w-16 shadow-lg">
+          <MessageSquare />
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div ref={chatContainerRef} className="relative h-full w-full">
-      <AnimatePresence>
-        {showWarning && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80"
-          >
-            <Card className="p-8 text-center max-w-md mx-4">
-              <h3 className="text-2xl font-bold mb-4">⚠️ Fullscreen Recommended</h3>
-              <p className="mb-6 text-gray-400">
-                For the best chat experience, we recommend using fullscreen mode.
-                This will help you focus on the conversation and avoid distractions.
-              </p>
-              <div className="flex justify-center gap-4">
-                <Button onClick={toggleFullscreen} className="flex items-center gap-2">
-                  <Maximize2 className="w-4 h-4" />
-                  Enter Fullscreen
-                </Button>
-                <Button variant="ghost" onClick={() => setShowWarning(false)}>
-                  Continue Anyway
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div ref={chatContainerRef} className={`fixed bottom-0 right-0 z-40 transition-all duration-300 ${isChatOpen ? 'w-full md:w-96 h-full md:h-[600px]' : 'w-0 h-0'}`}>
+      <Card className="h-full w-full flex flex-col rounded-t-lg shadow-xl bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-sm">
+        <header className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
+          <div className="flex items-center">
+            <Users className="w-5 h-5 mr-2 text-indigo-500" />
+            <h2 className="font-semibold text-gray-800 dark:text-gray-200">Group Chat</h2>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+              {isFullscreen ? <X className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(false)} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </header>
 
-      <motion.div
-        initial={false}
-        animate={{
-          width: isChatOpen ? '100%' : 'auto',
-          height: isChatOpen ? '100%' : 'auto',
-        }}
-        className={`fixed bottom-4 right-4 z-40 ${
-          isFullscreen ? 'inset-0 bottom-0 right-0' : ''
-        }`}
-      >
-        {!isChatOpen ? (
-          <Button
-            onClick={() => setIsChatOpen(true)}
-            size="lg"
-            className="rounded-full p-4 shadow-lg"
-          >
-            <MessageSquare className="w-6 h-6" />
-            <span className="ml-2">Open Chat</span>
-          </Button>
-        ) : (
-          <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto shadow-xl">
-            <div className="flex items-center justify-between p-4 border-b">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-semibold">Group Chat</h2>
-                {isConnected && (
-                  <span className="flex items-center text-xs text-green-500">
-                    <span className="w-2 h-2 bg-green-500 rounded-full mr-1" />
-                    Live
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleFullscreen}
-                  className="hover:bg-muted"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsChatOpen(false)}
-                  className="hover:bg-muted"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {isLoading ? (
+            <GroupChatSkeleton />
+          ) : loadError ? (
+            <div className="text-center py-10">
+              <p className="text-red-500 mb-4">Failed to load messages.</p>
+              <Button onClick={fetchMessages}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
             </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {isLoading ? (
-                <GroupChatSkeleton />
-              ) : loadError ? (
-                <div className="flex flex-col items-center justify-center h-full">
-                  <p className="text-red-500 mb-2">Failed to load messages</p>
-                  <Button onClick={fetchMessages} variant="outline" size="sm">
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Try again
-                  </Button>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
-                  <p>No messages yet. Start the conversation!</p>
-                </div>
-              ) : (
-                <>
-                  {messages.map(renderMessage)}
-                  {Object.values(typingUsers)
-                    .filter(user => user.isTyping)
-                    .map(user => (
-                      <TypingIndicator key={user.id} user={user} />
-                    ))}
-                </>
-              )}
+          ) : (
+            <>
+              {messages.map(renderMessage)}
               <div ref={messagesEndRef} />
-            </div>
+            </>
+          )}
+        </div>
 
-            <form onSubmit={handleSendMessage} className="p-4 border-t">
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="text"
-                  value={inputValue}
-                  onChange={handleInputChange}
-                  placeholder="Type a message..."
-                  className="flex-1"
-                  disabled={isSending}
-                />
-                <Button type="submit" disabled={!inputValue.trim() || isSending}>
-                  {isSending ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </motion.div>
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            </form>
-          </Card>
+        {/* Typing Indicator */}
+        {filteredTypingUsers.length > 0 && (
+          <div className="px-4 pb-2">
+            <TypingIndicator users={filteredTypingUsers} />
+          </div>
         )}
-      </motion.div>
+
+        {/* Message Input */}
+        <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50">
+          <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
+            <Input
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              placeholder="Type a message..."
+              disabled={isSending || !isConnected}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={isSending || !isConnected}>
+              {isSending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </form>
+        </div>
+      </Card>
     </div>
   );
 } 

@@ -64,7 +64,7 @@ export default function ChallengeInterface({
   const [isChallengeEnded, setIsChallengeEnded] = useState(false);
   const timerRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
+  const [hasStarted, setHasStarted] = useState(true);
   const [warningCount, setWarningCount] = useState(0);
   const [lastSubmission, setLastSubmission] = useState(null);
   const [participantCount, setParticipantCount] = useState(0);
@@ -90,29 +90,9 @@ export default function ChallengeInterface({
     }
   };
 
-  // Start challenge in fullscreen
-  const startChallenge = async () => {
-    try {
-      if (containerRef.current) {
-        await containerRef.current.requestFullscreen();
-        setHasStarted(true);
-        return true;
-      }
-    } catch (error) {
-      console.error('Error entering fullscreen:', error);
-      toast.error('Failed to enter fullscreen mode. Please try again.');
-      return false;
-    }
-  };
-
   // Exit challenge and fullscreen
   const exitChallenge = async () => {
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-      }
-      setHasStarted(false);
-      setWarningCount(0);
       router.push(`/groups/${groupId}/challenges/${challengeId}`);
     } catch (error) {
       console.error('Error exiting fullscreen:', error);
@@ -180,41 +160,6 @@ export default function ChallengeInterface({
       }
     };
   }, [challenge?.startTime, challenge?.endTime, hasStarted, exitChallenge, groupId, router]);
-
-  // Custom styles for fullscreen mode
-  const fullscreenStyles = hasStarted ? {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    background: 'var(--background)',
-    overflow: 'hidden'
-  } : {};
-
-  // Handle fullscreen change with warnings
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const newIsFullscreen = document.fullscreenElement !== null;
-      setIsFullscreen(newIsFullscreen);
-      
-      // Only handle warnings if challenge has started
-      if (hasStarted && !newIsFullscreen) {
-        const newWarningCount = warningCount + 1;
-        setWarningCount(newWarningCount);
-        
-        if (newWarningCount >= 3) {
-          handleDisqualify();
-        } else {
-          toast.error(`Warning ${newWarningCount}/3: Please stay in fullscreen mode! You will be disqualified after 3 warnings.`);
-        }
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [hasStarted, warningCount]);
 
   // Socket connection
   const { 
@@ -506,261 +451,257 @@ export default function ChallengeInterface({
     }
   };
 
+  if (isChallengeEnded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+        <Trophy className="w-16 h-16 text-yellow-400 mb-4" />
+        <h2 className="text-3xl font-bold mb-2">Challenge Over!</h2>
+        <p className="text-lg text-gray-400 mb-8">Great job! The challenge has ended. Hope you enjoyed it!</p>
+        <Button onClick={() => router.push(`/groups/${groupId}`)}>Back to Group</Button>
+      </div>
+    );
+  }
+  
+  if (isJoinWindowClosed) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+        <h2 className="text-3xl font-bold mb-2">Join Window Closed</h2>
+        <p className="text-lg text-gray-400 mb-8">The 10-minute window to join this challenge has passed.</p>
+        <Button onClick={() => router.push(`/groups/${groupId}`)}>Back to Group</Button>
+      </div>
+    );
+  }
+  
   return (
-    <div ref={containerRef} style={fullscreenStyles} className="min-h-screen bg-background">
-      {!hasStarted ? (
-        <div className="flex flex-col items-center justify-center min-h-screen">
-          <h1 className="text-2xl font-bold mb-4">Ready to start the challenge?</h1>
-          {isJoinWindowClosed ? (
-            <p className="text-destructive mb-8 text-center max-w-md">
-              The join window for this challenge has expired (10 minutes after start time).
-            </p>
-          ) : (
-            <>
-              <p className="text-muted-foreground mb-8 text-center max-w-md">
-                The challenge will begin in fullscreen mode. Exiting fullscreen will result in warnings,
-                and three warnings will lead to disqualification.
-              </p>
-              <Button
-                onClick={startChallenge}
-                className="flex items-center space-x-2"
-                size="lg"
-              >
-                <Play className="w-5 h-5" />
-                <span>Start Challenge</span>
-              </Button>
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col h-screen">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-background">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={exitChallenge}
-                className="p-2 hover:bg-accent rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <h1 className="text-xl font-semibold">Challenge Mode</h1>
-              {participantCount > 0 && (
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Users className="w-4 h-4 mr-1" />
-                  {participantCount} participant{participantCount !== 1 ? 's' : ''}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Timer display */}
-              {timeRemaining && (
-                <div className={`font-mono text-lg ${timeRemaining.hours === 0 && timeRemaining.minutes < 10 ? 'text-destructive' : ''}`}>
-                  {String(timeRemaining.hours).padStart(2, '0')}:
-                  {String(timeRemaining.minutes).padStart(2, '0')}:
-                  {String(timeRemaining.seconds).padStart(2, '0')}
-                </div>
-              )}
-              <button
-                onClick={toggleFullscreen}
-                className={`p-2 rounded-lg transition-colors ${
-                  isFullscreen ? 'bg-accent' : 'hover:bg-accent'
-                }`}
-              >
-                {isFullscreen ? (
-                  <Minimize2 className="w-5 h-5" />
-                ) : (
-                  <Maximize2 className="w-5 h-5" />
-                )}
-              </button>
-              <button
-                onClick={() => setShowExitWarning(true)}
-                className={`p-2 rounded-lg transition-colors ${
-                  showExitWarning ? 'bg-accent' : 'hover:bg-accent'
-                }`}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1 flex overflow-hidden">
-            {/* Problem/Leaderboard section */}
-            <div className={`flex-1 ${isChatOpen ? 'mr-80' : ''} transition-all duration-300`}>
-              {activeTab === 'problem' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 h-full">
-                  {/* Problem description */}
-                  <div className="bg-background overflow-y-auto border-r">
-                    <div className="p-6">
-                      <h2 className="text-2xl font-bold mb-4">{currentProblem?.title}</h2>
-                      <div className="prose dark:prose-invert max-w-none">
-                        <div dangerouslySetInnerHTML={{ __html: currentProblem?.description || '' }} />
-                      </div>
-                      
-                      {/* Examples section */}
-                      {currentProblem?.examples && currentProblem.examples.length > 0 && (
-                        <div className="mt-6">
-                          <h3 className="text-lg font-semibold mb-3">Examples</h3>
-                          {currentProblem.examples.map((example, idx) => (
-                            <div key={idx} className="mb-4 p-4 bg-accent/50 rounded-lg">
-                              <div className="mb-2">
-                                <span className="font-medium">Input:</span> {example.input}
-                              </div>
-                              <div className="mb-2">
-                                <span className="font-medium">Output:</span> {example.output}
-                              </div>
-                              {example.explanation && (
-                                <div>
-                                  <span className="font-medium">Explanation:</span> {example.explanation}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Code editor */}
-                  <div className="bg-background h-full">
-                    <CodeEditor 
-                      problemId={currentProblem?.id}
-                      initialCode={currentProblem?.templateCode?.[language] || ''}
-                      testCases={currentProblem?.testCases || []}
-                      onSubmit={handleSubmitResult}
-                      challengeId={challengeId}
-                      isDisabled={isChallengeEnded}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="p-6 overflow-y-auto">
-                  <h2 className="text-2xl font-bold mb-6 flex items-center">
-                    <Trophy className="w-6 h-6 text-yellow-500 mr-2" />
-                    Leaderboard
-                    {isChallengeEnded && <span className="ml-2 text-sm text-muted-foreground">(Final)</span>}
-                  </h2>
-                  
-                  {isLeaderboardLoading ? (
-                    <LeaderboardSkeleton />
-                  ) : leaderboard.length > 0 ? (
-                    <div className="space-y-6">
-                      {/* Last submission notification */}
-                      {lastSubmission && !isChallengeEnded && (
-                        <div className="bg-accent/50 p-4 rounded-lg mb-4 animate-fade-in">
-                          <p className="text-sm">
-                            Last submission: <span className="font-medium">{lastSubmission.userName || 'Someone'}</span> solved a problem for <span className="font-medium">{lastSubmission.points} points</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(lastSubmission.timestamp).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Leaderboard table */}
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left py-3 px-4">Rank</th>
-                              <th className="text-left py-3 px-4">Participant</th>
-                              <th className="text-left py-3 px-4">Problems Solved</th>
-                              <th className="text-left py-3 px-4">Score</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {leaderboard.map((entry, index) => (
-                              <tr 
-                                key={entry.userId} 
-                                className={`border-b ${
-                                  entry.userId === user.id ? 'bg-accent/50' : ''
-                                } ${
-                                  !isChallengeEnded && lastSubmission?.userId === entry.userId ? 'animate-highlight' : ''
-                                }`}
-                              >
-                                <td className="py-3 px-4">{index + 1}</td>
-                                <td className="py-3 px-4 flex items-center">
-                                  {entry.user.image ? (
-                                    <Image
-                                      src={entry.user.image}
-                                      alt={entry.user.name}
-                                      width={32}
-                                      height={32}
-                                      className="rounded-full mr-2"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center mr-2">
-                                      <User className="w-4 h-4" />
-                                    </div>
-                                  )}
-                                  <span>{entry.user.name}</span>
-                                </td>
-                                <td className="py-3 px-4">{entry.problemsSolved}</td>
-                                <td className="py-3 px-4">{entry.score}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Trophy className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">No submissions yet</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Chat sidebar */}
-            {hasStarted && !isChallengeEnded && (
-              <div
-                className={`fixed right-0 top-0 bottom-0 w-80 bg-background border-l transform transition-transform duration-300 ${
-                  isChatOpen ? 'translate-x-0' : 'translate-x-full'
-                }`}
-              >
-                <div className="flex flex-col h-full">
-                  <div className="p-4 border-b">
-                    <h3 className="font-semibold">Chat</h3>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-4">
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`mb-4 flex ${message.userId === user.id ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-lg p-3 ${
-                            message.userId === user.id
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-accent'
-                          }`}
-                        >
-                          {message.content}
-                        </div>
-                      </div>
-                    ))}
-                    <div ref={chatEndRef} />
-                  </div>
-                  <form onSubmit={sendMessage} className="p-4 border-t">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={handleInputChange}
-                        placeholder="Type a message..."
-                        className="flex-1 bg-accent/50 rounded-lg px-3 py-2"
-                      />
-                      <Button type="submit">Send</Button>
-                    </div>
-                  </form>
-                </div>
+    <div ref={containerRef} className="min-h-screen bg-background">
+      <div className="flex flex-col h-screen">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-background">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={exitChallenge}
+              className="p-2 hover:bg-accent rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-semibold">Challenge Mode</h1>
+            {participantCount > 0 && (
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Users className="w-4 h-4 mr-1" />
+                {participantCount} participant{participantCount !== 1 ? 's' : ''}
               </div>
             )}
           </div>
+          <div className="flex items-center space-x-4">
+            {/* Timer display */}
+            {timeRemaining && (
+              <div className={`font-mono text-lg ${timeRemaining.hours === 0 && timeRemaining.minutes < 10 ? 'text-destructive' : ''}`}>
+                {String(timeRemaining.hours).padStart(2, '0')}:
+                {String(timeRemaining.minutes).padStart(2, '0')}:
+                {String(timeRemaining.seconds).padStart(2, '0')}
+              </div>
+            )}
+            <button
+              onClick={toggleFullscreen}
+              className={`p-2 rounded-lg transition-colors ${
+                isFullscreen ? 'bg-accent' : 'hover:bg-accent'
+              }`}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5" />
+              ) : (
+                <Maximize2 className="w-5 h-5" />
+              )}
+            </button>
+            <button
+              onClick={() => setShowExitWarning(true)}
+              className={`p-2 rounded-lg transition-colors ${
+                showExitWarning ? 'bg-accent' : 'hover:bg-accent'
+              }`}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Main content */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Problem/Leaderboard section */}
+          <div className={`flex-1 ${isChatOpen ? 'mr-80' : ''} transition-all duration-300`}>
+            {activeTab === 'problem' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 h-full">
+                {/* Problem description */}
+                <div className="bg-background overflow-y-auto border-r">
+                  <div className="p-6">
+                    <h2 className="text-2xl font-bold mb-4">{currentProblem?.title}</h2>
+                    <div className="prose dark:prose-invert max-w-none">
+                      <div dangerouslySetInnerHTML={{ __html: currentProblem?.description || '' }} />
+                    </div>
+                    
+                    {/* Examples section */}
+                    {currentProblem?.examples && currentProblem.examples.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-lg font-semibold mb-3">Examples</h3>
+                        {currentProblem.examples.map((example, idx) => (
+                          <div key={idx} className="mb-4 p-4 bg-accent/50 rounded-lg">
+                            <div className="mb-2">
+                              <span className="font-medium">Input:</span> {example.input}
+                            </div>
+                            <div className="mb-2">
+                              <span className="font-medium">Output:</span> {example.output}
+                            </div>
+                            {example.explanation && (
+                              <div>
+                                <span className="font-medium">Explanation:</span> {example.explanation}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Code editor */}
+                <div className="bg-background h-full">
+                  <CodeEditor 
+                    problemId={currentProblem?.id}
+                    initialCode={currentProblem?.templateCode?.[language] || ''}
+                    testCases={currentProblem?.testCases || []}
+                    onSubmit={handleSubmitResult}
+                    challengeId={challengeId}
+                    isDisabled={isChallengeEnded}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 overflow-y-auto">
+                <h2 className="text-2xl font-bold mb-6 flex items-center">
+                  <Trophy className="w-6 h-6 text-yellow-500 mr-2" />
+                  Leaderboard
+                  {isChallengeEnded && <span className="ml-2 text-sm text-muted-foreground">(Final)</span>}
+                </h2>
+                
+                {isLeaderboardLoading ? (
+                  <LeaderboardSkeleton />
+                ) : leaderboard.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Last submission notification */}
+                    {lastSubmission && !isChallengeEnded && (
+                      <div className="bg-accent/50 p-4 rounded-lg mb-4 animate-fade-in">
+                        <p className="text-sm">
+                          Last submission: <span className="font-medium">{lastSubmission.userName || 'Someone'}</span> solved a problem for <span className="font-medium">{lastSubmission.points} points</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(lastSubmission.timestamp).toLocaleTimeString()}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Leaderboard table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left py-3 px-4">Rank</th>
+                            <th className="text-left py-3 px-4">Participant</th>
+                            <th className="text-left py-3 px-4">Problems Solved</th>
+                            <th className="text-left py-3 px-4">Score</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leaderboard.map((entry, index) => (
+                            <tr 
+                              key={entry.userId} 
+                              className={`border-b ${
+                                entry.userId === user.id ? 'bg-accent/50' : ''
+                              } ${
+                                !isChallengeEnded && lastSubmission?.userId === entry.userId ? 'animate-highlight' : ''
+                              }`}
+                            >
+                              <td className="py-3 px-4">{index + 1}</td>
+                              <td className="py-3 px-4 flex items-center">
+                                {entry.user.image ? (
+                                  <Image
+                                    src={entry.user.image}
+                                    alt={entry.user.name}
+                                    width={32}
+                                    height={32}
+                                    className="rounded-full mr-2"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center mr-2">
+                                    <User className="w-4 h-4" />
+                                  </div>
+                                )}
+                                <span>{entry.user.name}</span>
+                              </td>
+                              <td className="py-3 px-4">{entry.problemsSolved}</td>
+                              <td className="py-3 px-4">{entry.score}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Trophy className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No submissions yet</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Chat sidebar */}
+          {hasStarted && !isChallengeEnded && (
+            <div
+              className={`fixed right-0 top-0 bottom-0 w-80 bg-background border-l transform transition-transform duration-300 ${
+                isChatOpen ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            >
+              <div className="flex flex-col h-full">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Chat</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  {messages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`mb-4 flex ${message.userId === user.id ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          message.userId === user.id
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-accent'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <form onSubmit={sendMessage} className="p-4 border-t">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={handleInputChange}
+                      placeholder="Type a message..."
+                      className="flex-1 bg-accent/50 rounded-lg px-3 py-2"
+                    />
+                    <Button type="submit">Send</Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Fullscreen Warning */}
       <AnimatePresence>

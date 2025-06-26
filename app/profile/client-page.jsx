@@ -11,6 +11,7 @@ import ContributionGraph from '../components/profile/ContributionGraph';
 import RecentActivity from '../components/profile/RecentActivity';
 import LeetCodeStats from '../components/profile/LeetCodeStats';
 import { User } from 'lucide-react';
+import UserQueriesPage from './queries/page';
 
 export function ProfileClientPage({ user: initialUser }) {
   const { data: session, update } = useSession();
@@ -82,6 +83,9 @@ export function ProfileClientPage({ user: initialUser }) {
                     </div>
                   </div>
                 </div>
+              )}
+              {activeTab === 'queries' && (
+                <UserQueriesPage />
               )}
               {activeTab === 'settings' && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">

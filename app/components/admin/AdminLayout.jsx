@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Settings, BookOpen, Folder } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, BookOpen, Folder, MessageSquare } from 'lucide-react';
 import ThemeToggle from '@/app/components/theme-toggle';
 
 const sidebarLinks = [
@@ -10,6 +10,7 @@ const sidebarLinks = [
   { name: 'Problems', href: '/admin/problems', icon: BookOpen },
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Groups', href: '/admin/groups', icon: Folder },
+  { name: 'Help Queries', href: '/admin/queries', icon: MessageSquare },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
