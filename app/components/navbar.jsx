@@ -33,6 +33,7 @@ export default function Navbar({
   
   const mainNavItems = [
     { name: 'Problems', href: '/problems', icon: <Code className="h-4 w-4 mr-2" /> },
+    { name: 'Submissions', href: '/submissions', icon: <List className="h-4 w-4 mr-2" /> },
     { name: 'Groups', href: '/groups', icon: <Users className="h-4 w-4 mr-2" /> },
     { name: 'Leaderboard', href: '/leaderboard', icon: <BookOpen className="h-4 w-4 mr-2" /> },
   ];
@@ -198,14 +199,6 @@ export default function Navbar({
                 >
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
-                </NavLink>
-                <NavLink
-                  href="/help"
-                  className="flex items-center px-4 py-2 text-base font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <HelpCircle className="h-4 w-4 mr-2" />
-                  Help
                 </NavLink>
                 <button
                   onClick={() => {

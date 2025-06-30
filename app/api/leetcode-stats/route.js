@@ -23,6 +23,13 @@ export async function GET(request) {
     if (!response.ok) {
         const errorData = await response.text();
         console.error(`LeetCode API error for ${username}:`, errorData);
+        // Check if the response is HTML, which indicates a service error page
+        if (errorData.trim().startsWith('<!DOCTYPE html>')) {
+            return NextResponse.json(
+                { success: false, message: 'The LeetCode stats service is currently unavailable. Please try again later.' },
+                { status: 503 } // Service Unavailable
+            );
+        }
         return NextResponse.json(
             { success: false, message: 'Failed to fetch LeetCode stats.' },
             { status: response.status }

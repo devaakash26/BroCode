@@ -19,11 +19,11 @@ const ContributionGraph = ({ data }) => {
 
   const getColor = (count) => {
     if (theme === 'dark') {
-      if (count === 0) return 'bg-gray-800';
-      if (count < 2) return 'bg-green-900';
-      if (count < 5) return 'bg-green-800';
-      if (count < 10) return 'bg-green-600';
-      return 'bg-green-500';
+      if (count === 0) return 'bg-gray-700';
+      if (count < 2) return 'bg-green-700';
+      if (count < 5) return 'bg-green-600';
+      if (count < 10) return 'bg-green-500';
+      return 'bg-green-400';
     }
     if (count === 0) return 'bg-gray-100';
     if (count < 2) return 'bg-green-200';
@@ -52,10 +52,11 @@ const ContributionGraph = ({ data }) => {
         </div>
         <div className="flex justify-end items-center mt-2 text-xs text-gray-500 dark:text-gray-400">
           Less
-          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-gray-100 dark:bg-gray-800 mx-1 border border-gray-200 dark:border-gray-700" />
-          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-200 dark:bg-green-900 mx-1" />
-          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-400 dark:bg-green-700 mx-1" />
-          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-600 dark:bg-green-500 mx-1" />
+          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-gray-100 dark:bg-gray-700 mx-1 border border-gray-200 dark:border-gray-700" />
+          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-200 dark:bg-green-700 mx-1" />
+          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-400 dark:bg-green-600 mx-1" />
+          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-500 dark:bg-green-500 mx-1" />
+          <div className="w-3 h-3 md:w-4 md:h-4 rounded-sm bg-green-600 dark:bg-green-400 mx-1" />
           More
         </div>
       </div>
