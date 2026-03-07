@@ -2,11 +2,12 @@
   "name": "neetcode",
   "version": 2,
   "env": {
-    "NEXTAUTH_URL": "https://neetcode.vercel.app",
-    "NEXTAUTH_URL_INTERNAL": "https://neetcode.vercel.app",
-    "NEXT_PUBLIC_URL": "https://neetcode.vercel.app",
+    "NEXTAUTH_URL": "https://brocode-ai.vercel.app",
+    "NEXTAUTH_URL_INTERNAL": "https://brocode-ai.vercel.app",
+    "NEXT_PUBLIC_URL": "https://brocode-ai.vercel.app",
+    "NEXT_PUBLIC_APP_URL": "https://brocode-ai.vercel.app",
     "NEXT_PUBLIC_PROTOCOL": "https",
-    "NEXT_PUBLIC_SOCKET_URL": "https://your-socket-server.railway.app"
+    "NEXT_PUBLIC_SOCKET_URL": "https://brocode-production-9be3.up.railway.app"
   },
   "regions": ["iad1"],
   "functions": {
