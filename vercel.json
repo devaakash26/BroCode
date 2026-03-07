@@ -7,7 +7,9 @@
     "NEXT_PUBLIC_URL": "https://brocode-ai.vercel.app",
     "NEXT_PUBLIC_APP_URL": "https://brocode-ai.vercel.app",
     "NEXT_PUBLIC_PROTOCOL": "https",
-    "NEXT_PUBLIC_SOCKET_URL": "https://brocode-production-9be3.up.railway.app"
+    "NEXT_PUBLIC_SOCKET_URL": "https://brocode-yz66.onrender.com",
+    "WHATSAPP_PHONE_ID": "957092127495614",
+    "WHATSAPP_NOTIFY_NUMBER": "917599579985"
   },
   "regions": ["iad1"],
   "functions": {
