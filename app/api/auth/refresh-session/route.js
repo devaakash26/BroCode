@@ -7,26 +7,26 @@ export async function GET(request) {
   try {
     // Get the current session
     const session = await getServerSession(authOptions);
-    
+
     if (!session || !session.user) {
       return NextResponse.json(
         { success: false, message: "Not authenticated" },
-        { status: 401 }
+        { status: 401 },
       );
     }
-    
+
     // Get fresh user data from the database
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
+      where: { email: session.user.email },
     });
-    
+
     if (!user) {
       return NextResponse.json(
         { success: false, message: "User not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
-    
+
     // Return the updated user data
     return NextResponse.json({
       success: true,
@@ -35,14 +35,14 @@ export async function GET(request) {
         name: user.name,
         email: user.email,
         emailVerified: user.emailVerified,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
   } catch (error) {
     console.error("Session refresh error:", error);
     return NextResponse.json(
       { success: false, message: "Error refreshing session" },
-      { status: 500 }
+      { status: 500 },
     );
   }
-} 
+}

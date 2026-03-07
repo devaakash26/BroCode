@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/app/lib/db';
-import { sendEmail } from '@/app/lib/email';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/app/lib/db";
+import { sendEmail } from "@/app/lib/email";
 
 async function notifyAdmin(group, newUser) {
   try {
@@ -10,7 +10,7 @@ async function notifyAdmin(group, newUser) {
       where: { id: group.id },
       include: {
         members: {
-          where: { role: 'ADMIN' },
+          where: { role: "ADMIN" },
           include: {
             user: true,
           },
@@ -25,7 +25,7 @@ async function notifyAdmin(group, newUser) {
           to: admin.email,
           subject: `New member in your group "${groupWithAdmin.name}"`,
           html: `
-            <p>Hi ${groupWithAdmin.admin.name || 'Admin'},</p>
+            <p>Hi ${groupWithAdmin.admin.name || "Admin"},</p>
             <p>A new member, ${newUser.name}, has joined your group "${groupWithAdmin.name}".</p>
             <p>You are receiving this email because you are the admin of the "${groupWithAdmin.name}" group on BroCode.</p>
           `,
@@ -33,35 +33,32 @@ async function notifyAdmin(group, newUser) {
       }
     }
   } catch (emailError) {
-    console.error('Failed to send new member notification email:', emailError);
+    console.error("Failed to send new member notification email:", emailError);
   }
 }
 
 export async function POST(request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     // Try to get invite code from body
     const requestData = await request.json().catch(() => ({}));
     let inviteCode = requestData.inviteCode;
-    
+
     // If not in body, try to get from URL query parameters
     if (!inviteCode) {
       const url = new URL(request.url);
-      inviteCode = url.searchParams.get('code');
+      inviteCode = url.searchParams.get("code");
     }
 
     if (!inviteCode) {
       return NextResponse.json(
-        { message: 'Invite code is required' },
-        { status: 400 }
+        { message: "Invite code is required" },
+        { status: 400 },
       );
     }
 
@@ -75,8 +72,8 @@ export async function POST(request) {
 
     if (!group) {
       return NextResponse.json(
-        { message: 'Invalid invite code or group not found' },
-        { status: 404 }
+        { message: "Invalid invite code or group not found" },
+        { status: 404 },
       );
     }
 
@@ -90,9 +87,25 @@ export async function POST(request) {
 
     if (existingMembership) {
       return NextResponse.json(
-        { message: 'You are already a member of this group', groupId: group.id },
-        { status: 200 }
+        {
+          message: "You are already a member of this group",
+          groupId: group.id,
+        },
+        { status: 200 },
       );
+    }
+
+    // Check member limit
+    if (group.memberLimit) {
+      const currentCount = await prisma.userGroup.count({
+        where: { groupId: group.id },
+      });
+      if (currentCount >= group.memberLimit) {
+        return NextResponse.json(
+          { message: "This group has reached its member limit" },
+          { status: 400 },
+        );
+      }
     }
 
     // Add the user to the group
@@ -100,7 +113,7 @@ export async function POST(request) {
       data: {
         userId: session.user.id,
         groupId: group.id,
-        role: 'MEMBER', // Default role is MEMBER
+        role: "MEMBER", // Default role is MEMBER
       },
     });
 
@@ -108,14 +121,14 @@ export async function POST(request) {
     await notifyAdmin(group, session.user);
 
     return NextResponse.json({
-      message: 'Successfully joined the group',
+      message: "Successfully joined the group",
       groupId: group.id,
     });
   } catch (error) {
-    console.error('Error joining group:', error);
+    console.error("Error joining group:", error);
     return NextResponse.json(
-      { message: 'Error joining group', error: error.message },
-      { status: 500 }
+      { message: "Error joining group", error: error.message },
+      { status: 500 },
     );
   }
 }
@@ -124,24 +137,24 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
       // For GET requests, redirect to login instead of returning JSON error
       const url = new URL(request.url);
-      const code = url.searchParams.get('code');
+      const code = url.searchParams.get("code");
       return NextResponse.redirect(
-        `/auth/signin?callbackUrl=${encodeURIComponent(`/groups/join?code=${code}`)}`
+        `/auth/signin?callbackUrl=${encodeURIComponent(`/groups/join?code=${code}`)}`,
       );
     }
 
     // Get invite code from URL
     const url = new URL(request.url);
-    const inviteCode = url.searchParams.get('code');
+    const inviteCode = url.searchParams.get("code");
 
     if (!inviteCode) {
       return NextResponse.json(
-        { message: 'Invite code is required' },
-        { status: 400 }
+        { message: "Invite code is required" },
+        { status: 400 },
       );
     }
 
@@ -155,8 +168,8 @@ export async function GET(request) {
 
     if (!group) {
       return NextResponse.json(
-        { message: 'Invalid invite code or group not found' },
-        { status: 404 }
+        { message: "Invalid invite code or group not found" },
+        { status: 404 },
       );
     }
 
@@ -178,7 +191,7 @@ export async function GET(request) {
       data: {
         userId: session.user.id,
         groupId: group.id,
-        role: 'MEMBER', // Default role is MEMBER
+        role: "MEMBER", // Default role is MEMBER
       },
     });
 
@@ -188,10 +201,10 @@ export async function GET(request) {
     // Redirect to the group page
     return NextResponse.redirect(`/groups/${group.id}`);
   } catch (error) {
-    console.error('Error joining group via GET:', error);
+    console.error("Error joining group via GET:", error);
     return NextResponse.json(
-      { message: 'Error joining group', error: error.message },
-      { status: 500 }
+      { message: "Error joining group", error: error.message },
+      { status: 500 },
     );
   }
-} 
+}

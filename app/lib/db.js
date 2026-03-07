@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 // This prevents multiple prisma instances in development
 const globalForPrisma = global;
@@ -7,8 +7,8 @@ const globalForPrisma = global;
 const createPrismaClient = () => {
   try {
     const client = new PrismaClient({
-      log: ['error'],
-      errorFormat: 'pretty',
+      log: ["error"],
+      errorFormat: "pretty",
     });
 
     // Add middleware for error handling
@@ -16,14 +16,17 @@ const createPrismaClient = () => {
       try {
         return await next(params);
       } catch (error) {
-        console.error(`Database error in ${params.model}.${params.action}:`, error);
+        console.error(
+          `Database error in ${params.model}.${params.action}:`,
+          error,
+        );
         throw error;
       }
     });
 
     return client;
   } catch (error) {
-    console.error('Error creating Prisma client:', error);
+    console.error("Error creating Prisma client:", error);
     throw error;
   }
 };
@@ -32,14 +35,14 @@ const createPrismaClient = () => {
 const prisma = globalForPrisma.prisma || createPrismaClient();
 
 // Only assign to global in development to prevent memory leaks
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 // Function to safely disconnect Prisma
 const disconnectPrisma = async () => {
   try {
     await prisma.$disconnect();
   } catch (error) {
-    console.error('Error disconnecting from database:', error);
+    console.error("Error disconnecting from database:", error);
   }
 };
 
@@ -49,14 +52,19 @@ const checkDatabaseConnection = async () => {
     await prisma.$queryRaw`SELECT 1`;
     return { isConnected: true, error: null };
   } catch (error) {
-    console.error('Database connection check failed:', error);
+    console.error("Database connection check failed:", error);
     return { isConnected: false, error: error.message };
   }
 };
 
 // Function to check if using fallback mode
 const isUsingFallbackMode = () => {
-  return process.env.DATABASE_URL?.includes('pooler.supabase.com') || false;
+  return process.env.DATABASE_URL?.includes("pooler.supabase.com") || false;
 };
 
-export { prisma, disconnectPrisma, checkDatabaseConnection, isUsingFallbackMode }; 
+export {
+  prisma,
+  disconnectPrisma,
+  checkDatabaseConnection,
+  isUsingFallbackMode,
+};
