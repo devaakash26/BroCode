@@ -1,8 +1,8 @@
-import { prisma } from '@/app/lib/db';
-import {hash} from "bcryptjs"
-import { NextResponse } from 'next/server';
-import { createRandomToken } from '@/app/lib/utils';
-import { sendVerificationEmail, sendWelcomeEmail } from '@/app/lib/email';
+import { prisma } from "@/app/lib/db";
+import { hash } from "bcryptjs";
+import { NextResponse } from "next/server";
+import { createRandomToken, notifyWhatsApp } from "@/app/lib/utils";
+import { sendVerificationEmail, sendWelcomeEmail } from "@/app/lib/email";
 
 export async function POST(request) {
   try {
@@ -11,8 +11,8 @@ export async function POST(request) {
     // Basic validation
     if (!name || !email || !password) {
       return NextResponse.json(
-        { message: 'Missing required fields' },
-        { status: 400 }
+        { message: "Missing required fields" },
+        { status: 400 },
       );
     }
 
@@ -25,8 +25,8 @@ export async function POST(request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { message: 'User with this email already exists' },
-        { status: 409 }
+        { message: "User with this email already exists" },
+        { status: 409 },
       );
     }
 
@@ -39,7 +39,7 @@ export async function POST(request) {
         name,
         email,
         password: hashedPassword,
-        role: 'USER', // Default role
+        role: "USER", // Default role
       },
     });
 
@@ -68,18 +68,21 @@ export async function POST(request) {
       name: name,
     });
 
+    // Notify via WhatsApp
+    notifyWhatsApp(name, email);
+
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
     return NextResponse.json(
-      { message: 'User registered successfully', user: userWithoutPassword },
-      { status: 201 }
+      { message: "User registered successfully", user: userWithoutPassword },
+      { status: 201 },
     );
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error("Registration error:", error);
     return NextResponse.json(
-      { message: 'Error registering user' },
-      { status: 500 }
+      { message: "Error registering user" },
+      { status: 500 },
     );
   }
-} 
+}
