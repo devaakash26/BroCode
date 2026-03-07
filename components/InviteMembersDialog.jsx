@@ -23,13 +23,14 @@ export default function InviteMembersDialog({ group, className }) {
   const [emailText, setEmailText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [inviteData, setInviteData] = useState({
-    inviteLink: group?.inviteLink || null,
+    inviteLink: null,
     inviteCode: group?.inviteCode || null
   });
 
-  // Fetch invite link and code when dialog opens if not available
+  // Always fetch fresh invite data from the server when dialog opens
+  // (never trust the stale inviteLink stored on the group prop)
   useEffect(() => {
-    if (open && (!inviteData.inviteLink || !inviteData.inviteCode)) {
+    if (open) {
       fetchInviteData();
     }
   }, [open]);

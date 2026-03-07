@@ -26,10 +26,7 @@ export async function POST(request) {
     const inviteCode = nanoid(8);
 
     // Create the full invite link using origin from the request
-    const origin =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      request.headers.get("origin") ||
-      "http://localhost:3000";
+    const origin = process.env.NEXT_PUBLIC_APP_URL;
     const inviteLink = `${origin}/groups/join?code=${inviteCode}`;
 
     // Create the group

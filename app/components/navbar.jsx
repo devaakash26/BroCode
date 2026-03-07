@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { NavLink } from './nav-link';
 import { useSession, signOut } from 'next-auth/react';
-import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List, HelpCircle } from 'lucide-react';
+import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List, HelpCircle, ShieldCheck } from 'lucide-react';
 import ThemeToggle from './theme-toggle';
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
@@ -118,6 +118,17 @@ export default function Navbar({
                       Help
                     </NavLink>
                   </DropdownMenuItem>
+                  {session.user.role === 'PLATFORM_ADMIN' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <NavLink href="/admin" className="flex w-full cursor-pointer text-indigo-600 dark:text-indigo-400 font-medium">
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                          Admin Portal
+                        </NavLink>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />

@@ -83,7 +83,7 @@ export async function POST(request) {
     const inviteCode = nanoid(8);
 
     // Create the base URL for invite links
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
 
     // Create the invite link
     const inviteLink = `${baseUrl}/groups/join?code=${inviteCode}`;
