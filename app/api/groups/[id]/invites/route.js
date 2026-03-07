@@ -43,7 +43,7 @@ export async function POST(request, { params }) {
     const inviteCode = nanoid(8);
 
     // Create the base URL for invite links
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     const inviteLink = `${baseUrl}/groups/join?code=${inviteCode}`;
 
     // Update the group with the new invite code and link
@@ -55,8 +55,7 @@ export async function POST(request, { params }) {
       },
     });
 
-    const freshBaseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const freshBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
     const freshInviteLink = `${freshBaseUrl}/groups/join?code=${updatedGroup.inviteCode}`;
 
     return NextResponse.json({
@@ -112,7 +111,7 @@ export async function GET(request, { params }) {
     }
 
     // Always reconstruct from the env var so stale DB values (e.g. localhost) are never used
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     const inviteLink = group.inviteCode
       ? `${baseUrl}/groups/join?code=${group.inviteCode}`
       : null;
