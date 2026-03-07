@@ -5,7 +5,8 @@
     "NEXTAUTH_URL": "https://neetcode.vercel.app",
     "NEXTAUTH_URL_INTERNAL": "https://neetcode.vercel.app",
     "NEXT_PUBLIC_URL": "https://neetcode.vercel.app",
-    "NEXT_PUBLIC_PROTOCOL": "https"
+    "NEXT_PUBLIC_PROTOCOL": "https",
+    "NEXT_PUBLIC_SOCKET_URL": "https://your-socket-server.railway.app"
   },
   "regions": ["iad1"],
   "functions": {
