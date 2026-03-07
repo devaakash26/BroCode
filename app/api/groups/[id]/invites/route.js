@@ -61,9 +61,12 @@ export async function POST(request, { params }) {
       },
     });
 
+    const freshBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const freshInviteLink = `${freshBaseUrl}/groups/join?code=${updatedGroup.inviteCode}`;
+
     return NextResponse.json({
       inviteCode: updatedGroup.inviteCode,
-      inviteLink: updatedGroup.inviteLink,
+      inviteLink: freshInviteLink,
       message: 'Invite link refreshed successfully'
     });
   } catch (error) {
@@ -118,13 +121,14 @@ export async function GET(request, { params }) {
       );
     }
 
-    // If inviteLink is missing but we have inviteCode, generate it
-    let inviteLink = group.inviteLink;
-    if (!inviteLink && group.inviteCode) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-      inviteLink = `${baseUrl}/groups/join?code=${group.inviteCode}`;
-      
-      // Save the generated invite link
+    // Always reconstruct from the env var so stale DB values (e.g. localhost) are never used
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const inviteLink = group.inviteCode
+      ? `${baseUrl}/groups/join?code=${group.inviteCode}`
+      : null;
+
+    // Persist the corrected link so other queries stay consistent
+    if (group.inviteCode && group.inviteLink !== inviteLink) {
       await prisma.group.update({
         where: { id },
         data: { inviteLink },
@@ -133,7 +137,7 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({
       inviteCode: group.inviteCode,
-      inviteLink: inviteLink,
+      inviteLink,
     });
   } catch (error) {
     console.error('Error fetching invite info:', error);
