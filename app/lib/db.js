@@ -9,11 +9,6 @@ const createPrismaClient = () => {
     const client = new PrismaClient({
       log: ['error'],
       errorFormat: 'pretty',
-      datasources: {
-        db: {
-          url: process.env.DATABASE_URL,
-        },
-      },
     });
 
     // Add middleware for error handling
