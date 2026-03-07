@@ -1,6 +1,9 @@
 [build]
 builder = "nixpacks"
 
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["nodejs_22"]
+
 [deploy]
 startCommand = "node socket-server.js"
 restartPolicyType = "on_failure"
