@@ -1,391 +1,359 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowLeft, Calendar, Clock, Trophy, UserCheck, Flag, BarChart, User } from 'lucide-react';
-import { Toaster, toast } from 'react-hot-toast';
+import {
+  ArrowLeft, Clock, Trophy, Users, Shield, Play, Lock,
+  ChevronRight, BarChart3, AlertTriangle, Loader2,
+} from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+const DIFF = {
+  EASY:   { label: 'Easy',   cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  MEDIUM: { label: 'Medium', cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  HARD:   { label: 'Hard',   cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400' },
+};
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function Countdown({ target, label, onReach }) {
+  const [left, setLeft] = useState(null);
+  useEffect(() => {
+    const tick = () => {
+      const ms = new Date(target) - Date.now();
+      if (ms <= 0) { setLeft(null); onReach?.(); return; }
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      setLeft({ h, m, s });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [target, onReach]);
+
+  if (!left) return null;
+  return (
+    <div className="text-center">
+      <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2 uppercase tracking-wider font-medium">{label}</p>
+      <div className="flex items-center justify-center gap-1.5">
+        {[
+          { v: left.h, l: 'h' },
+          { v: left.m, l: 'm' },
+          { v: left.s, l: 's' },
+        ].map(({ v, l }) => (
+          <div key={l} className="flex items-baseline gap-0.5">
+            <span className="text-3xl sm:text-4xl font-mono font-bold text-zinc-900 dark:text-zinc-50 tabular-nums">
+              {pad(v)}
+            </span>
+            <span className="text-xs text-zinc-400">{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ChallengeDetailsPage({ params }) {
   const { id: groupId, challengeId } = params;
   const { data: session, status: authStatus } = useSession();
   const router = useRouter();
-  
+
   const [challenge, setChallenge] = useState(null);
   const [group, setGroup] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('problems'); // 'problems', 'leaderboard', 'details'
-  
-  // Add state for leaderboard data
+  const [loading, setLoading] = useState(true);
+  const [joining, setJoining] = useState(false);
+  const [tab, setTab] = useState('problems');
+
   const [leaderboard, setLeaderboard] = useState([]);
-  const [leaderboardStatus, setLeaderboardStatus] = useState({ hasStarted: false, hasEnded: false });
-  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
-  
-  // Fetch challenge and group data
+  const [lbLoading, setLbLoading] = useState(false);
+
+  // Compute challenge timing — plain variable so it re-evaluates each render (driven by setTick)
+  const timing = (() => {
+    if (!challenge) return null;
+    const now = Date.now();
+    const start = new Date(challenge.startTime).getTime();
+    const end = new Date(challenge.endTime).getTime();
+    const lateMs = (challenge.lateEntryMinutes || 5) * 60000;
+    const entryDeadline = start + lateMs;
+    if (now < start) return { phase: 'upcoming', start, end, entryDeadline };
+    if (now <= entryDeadline) return { phase: 'entry-open', start, end, entryDeadline };
+    if (now <= end) return { phase: 'active', start, end, entryDeadline };
+    return { phase: 'ended', start, end, entryDeadline };
+  })();
+
+  // Refresh timing phase every second
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     if (authStatus === 'loading') return;
-    
-    const fetchData = async () => {
-      try {
-        // Fetch group info
-        const groupResponse = await fetch(`/api/groups/${groupId}`);
-        if (!groupResponse.ok) {
-          throw new Error('Failed to fetch group');
-        }
-        const groupData = await groupResponse.json();
-        setGroup(groupData.group);
-        
-        // Fetch challenge details from actual API endpoint
-        const challengeResponse = await fetch(`/api/groups/${groupId}/challenges/${challengeId}`);
-        if (!challengeResponse.ok) {
-          throw new Error('Failed to fetch challenge details');
-        }
-        const challengeData = await challengeResponse.json();
-        setChallenge(challengeData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        toast.error('Failed to load challenge details');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [groupId, challengeId, authStatus]);
-  
-  // Redirect if not authenticated
-  useEffect(() => {
     if (authStatus === 'unauthenticated') {
       router.push(`/auth/signin?callbackUrl=/groups/${groupId}/challenges/${challengeId}`);
+      return;
     }
-  }, [authStatus, router, groupId, challengeId]);
-  
-  // Add function to fetch leaderboard data
-  const fetchLeaderboard = async () => {
-    if (!challengeId || !groupId) return;
-    
-    setIsLeaderboardLoading(true);
+    (async () => {
+      try {
+        const [gRes, cRes] = await Promise.all([
+          fetch(`/api/groups/${groupId}`),
+          fetch(`/api/groups/${groupId}/challenges/${challengeId}`),
+        ]);
+        if (gRes.ok) { const d = await gRes.json(); setGroup(d.group); }
+        if (cRes.ok) { setChallenge(await cRes.json()); }
+        else throw new Error('Not found');
+      } catch { toast.error('Failed to load challenge'); }
+      finally { setLoading(false); }
+    })();
+  }, [groupId, challengeId, authStatus, router]);
+
+  // Fetch leaderboard
+  const fetchLb = useCallback(async () => {
+    setLbLoading(true);
     try {
-      const response = await fetch(`/api/groups/${groupId}/challenges/${challengeId}/leaderboard`);
-      if (response.ok) {
-        const data = await response.json();
-        setLeaderboard(data.leaderboard);
-        setLeaderboardStatus(data.status);
-      } else {
-        console.error('Failed to fetch leaderboard');
+      const r = await fetch(`/api/groups/${groupId}/challenges/${challengeId}/leaderboard`);
+      if (r.ok) { const d = await r.json(); setLeaderboard(d.leaderboard || []); }
+    } catch {}
+    finally { setLbLoading(false); }
+  }, [groupId, challengeId]);
+
+  useEffect(() => { if (tab === 'leaderboard') fetchLb(); }, [tab, fetchLb]);
+
+  // Join / enter challenge
+  const handleEnter = async () => {
+    if (!timing) return;
+    if (timing.phase === 'ended') { toast.error('Challenge has ended'); return; }
+    if (timing.phase === 'active' && Date.now() > timing.entryDeadline) {
+      toast.error('Entry window has closed'); return;
+    }
+    setJoining(true);
+    try {
+      // Register as participant if not already
+      const res = await fetch(`/api/groups/${groupId}/challenges/${challengeId}/join`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || 'Cannot join');
       }
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
-    } finally {
-      setIsLeaderboardLoading(false);
-    }
+      // Navigate to the test environment
+      router.push(`/groups/${groupId}/challenges/${challengeId}/test`);
+    } catch (err) { toast.error(err.message); }
+    finally { setJoining(false); }
   };
-  
-  // Fetch leaderboard when tab changes to leaderboard
-  useEffect(() => {
-    if (activeTab === 'leaderboard') {
-      fetchLeaderboard();
-    }
-  }, [activeTab]);
-  
-  if (isLoading || authStatus === 'loading') {
+
+  if (loading || authStatus === 'loading') {
     return (
-      <div className="container py-8 flex justify-center items-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
       </div>
     );
   }
-  
-  if (!challenge || !group) {
+
+  if (!challenge) {
     return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="text-center py-20">
-          <h2 className="text-2xl font-bold mb-2">Challenge not found</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            The challenge you're looking for doesn't exist or you don't have permission to view it.
-          </p>
-          <Link 
-            href={`/groups/${groupId}/challenges`} 
-            className="inline-block bg-indigo-600 text-white px-5 py-2.5 rounded-md font-medium hover:bg-indigo-700 transition-colors"
-          >
-            Back to Challenges
-          </Link>
-        </div>
+      <div className="max-w-lg mx-auto px-4 py-20 text-center">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-2">Challenge not found</h2>
+        <Link href={`/groups/${groupId}/challenges`}
+          className="text-sm text-indigo-600 hover:underline">Back to challenges</Link>
       </div>
     );
   }
-  
-  // Helper function to determine the challenge status
-  const getChallengeStatus = () => {
-    const now = new Date();
-    const startTime = new Date(challenge.startTime);
-    const endTime = new Date(challenge.endTime);
-    
-    if (now < startTime) return 'upcoming';
-    if (now > endTime) return 'past';
-    return 'active';
-  };
-  
-  const challengeStatus = getChallengeStatus();
-  const statusColors = {
-    active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    upcoming: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    past: 'bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-400'
-  };
-  
-  const formattedStartDate = new Date(challenge.startTime).toLocaleString();
-  const formattedEndDate = new Date(challenge.endTime).toLocaleString();
-  
+
+  const problems = challenge.problems || [];
+  const isDisqualified = challenge.participant?.status === 'DISQUALIFIED';
+
   return (
-    <div className="container mx-auto py-8 px-4">
-      <Toaster position="top-center" />
-      
-      {/* Header with back button */}
-      <div className="mb-6">
-        <Link 
-          href={`/groups/${groupId}/challenges`} 
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Challenges
-        </Link>
-      </div>
-      
-      {/* Challenge Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
-        <div className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
-            <span className={`px-2.5 py-0.5 text-xs font-medium rounded ${statusColors[challengeStatus]}`}>
-              {challengeStatus === 'active' && 'Active'}
-              {challengeStatus === 'upcoming' && 'Upcoming'}
-              {challengeStatus === 'past' && 'Ended'}
-            </span>
-            {!challenge.isPublic && (
-              <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded dark:bg-yellow-900/30 dark:text-yellow-400">
-                Private
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* Back */}
+      <Link href={`/groups/${groupId}/challenges`}
+        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Challenges
+      </Link>
+
+      {/* ─── Header card ─── */}
+      <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+        <div className="p-5 sm:p-6">
+          {/* Status + Title */}
+          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+            <div className="flex gap-2">
+              <span className={`px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wider ${
+                timing?.phase === 'active' || timing?.phase === 'entry-open'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : timing?.phase === 'upcoming'
+                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+              }`}>
+                {timing?.phase === 'entry-open' ? 'Live — Entry Open' :
+                 timing?.phase === 'active' ? 'Live' :
+                 timing?.phase === 'upcoming' ? 'Upcoming' : 'Ended'}
               </span>
+              {challenge.strictMode && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                  <Shield className="w-3 h-3" /> Proctored
+                </span>
+              )}
+            </div>
+            {challenge.creator?.name && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">by {challenge.creator.name}</span>
             )}
           </div>
-          
-          <h1 className="text-2xl font-bold mb-2">{challenge.title}</h1>
-          
+
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mb-1">{challenge.title}</h1>
           {challenge.description && (
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              {challenge.description}
-            </p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">{challenge.description}</p>
           )}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-              <Calendar className="h-4 w-4 mr-2" />
-              <div>
-                <div><strong>Start:</strong> {formattedStartDate}</div>
-                <div><strong>End:</strong> {formattedEndDate}</div>
-              </div>
-            </div>
-            
-            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-              <UserCheck className="h-4 w-4 mr-2" />
-              <div>
-                <div><strong>Participants:</strong> {challenge.participants}</div>
-                <div><strong>Created by:</strong> {challenge.creator.name}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 dark:border-gray-800 mb-6">
-        <button
-          onClick={() => setActiveTab('problems')}
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'problems'
-              ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-          }`}
-        >
-          Problems
-        </button>
-        <button
-          onClick={() => setActiveTab('leaderboard')}
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'leaderboard'
-              ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-          }`}
-        >
-          Leaderboard
-        </button>
-        <button
-          onClick={() => setActiveTab('details')}
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'details'
-              ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-          }`}
-        >
-          Details
-        </button>
-      </div>
-      
-      {/* Tab Content */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-        {activeTab === 'problems' && (
-          <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Challenge Problems</h2>
-            
-            {challenge.problems.length === 0 ? (
-              <p className="text-gray-600 dark:text-gray-400">No problems in this challenge.</p>
-            ) : (
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {challenge.problems.map((problem, index) => (
-                  <div key={problem.id} className="py-4 flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="text-gray-500 dark:text-gray-400 mr-4">{index + 1}.</span>
-                      <div>
-                        <h3 className="font-medium">{problem.title}</h3>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded mt-1 inline-block
-                          ${problem.difficulty === 'EASY' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 
-                            problem.difficulty === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
-                          {problem.difficulty}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <Link
-                      href={`/problems/${problem.id}/challenge?challengeId=${challengeId}&groupId=${groupId}`}
-                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-md transition-colors"
-                    >
-                      Solve
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        
-        {activeTab === 'leaderboard' && (
-          <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Leaderboard</h2>
-            
-            {isLeaderboardLoading ? (
-              <div className="flex justify-center py-10">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-              </div>
-            ) : leaderboard.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-800">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Rank
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        User
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Problems Solved
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Score
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                    {leaderboard.map((entry) => (
-                      <tr key={entry.user.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
-                            entry.rank === 1 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                            entry.rank === 2 ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' :
-                            entry.rank === 3 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-                            'bg-gray-50 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                          }`}>
-                            {entry.rank}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {entry.user.image ? (
-                              <div className="relative h-8 w-8 rounded-full overflow-hidden mr-3">
-                                <Image
-                                  src={entry.user.image}
-                                  alt={`${entry.user.name}'s avatar`}
-                                  fill
-                                  sizes="32px"
-                                  className="object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 mr-3">
-                                <User className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                              </div>
-                            )}
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                              {entry.user.name}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {entry.problemsSolved}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {entry.score}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-            <div className="mt-4 text-center py-10">
-              <BarChart className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">
-                  {!leaderboardStatus.hasStarted 
-                    ? 'Leaderboard will be available once the challenge begins.' 
-                    : leaderboardStatus.hasEnded && leaderboard.length === 0
-                      ? 'Challenge has ended. No submissions were made.'
-                      : 'No submissions yet. Be the first to submit!'}
+
+          {/* Schedule row */}
+          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-sm">
+            <div>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mb-0.5">Start</p>
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                {new Date(challenge.startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
               </p>
             </div>
-            )}
-          </div>
-        )}
-        
-        {activeTab === 'details' && (
-          <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Challenge Details</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</h3>
-                <p className="mt-1">{challenge.description || 'No description provided.'}</p>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Rules</h3>
-                <ul className="mt-1 list-disc list-inside text-gray-600 dark:text-gray-400">
-                  <li>Solve as many problems as you can before the challenge ends</li>
-                  <li>Points are awarded based on difficulty and submission time</li>
-                  <li>Each correct submission earns points: Easy (100), Medium (200), Hard (300)</li>
-                  <li>Partial solutions are not awarded points</li>
-                  <li>You can submit multiple times, only your best submission counts</li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Visibility</h3>
-                <p className="mt-1">This challenge is {challenge.isPublic ? 'public' : 'private'} to members of {group.name}.</p>
-              </div>
+            <div>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mb-0.5">End</p>
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                {new Date(challenge.endTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+              </p>
             </div>
           </div>
-        )}
+
+          {/* Stats row */}
+          <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="flex items-center gap-1"><Trophy className="w-3.5 h-3.5" /> {problems.length} problem{problems.length !== 1 ? 's' : ''}</span>
+            <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {challenge.participants ?? 0} participant{(challenge.participants ?? 0) !== 1 ? 's' : ''}</span>
+            <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {challenge.lateEntryMinutes || 5}m entry window</span>
+          </div>
+        </div>
+
+        {/* Countdown / Entry */}
+        <div className="border-t border-zinc-100 dark:border-zinc-800 p-5 sm:p-6 bg-zinc-50/50 dark:bg-zinc-800/30">
+          {isDisqualified ? (
+            <div className="text-center py-4">
+              <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">You have been disqualified</p>
+              <p className="text-xs text-zinc-400 mt-1">{challenge.participant?.disqualifyReason || 'Violated challenge rules'}</p>
+            </div>
+          ) : timing?.phase === 'upcoming' ? (
+            <Countdown target={timing.start} label="Challenge starts in" />
+          ) : timing?.phase === 'entry-open' ? (
+            <div className="space-y-4">
+              <Countdown target={timing.entryDeadline} label="Entry closes in" />
+              <div className="flex justify-center">
+                <button onClick={handleEnter} disabled={joining}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 transition-colors shadow-sm">
+                  {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Enter Challenge
+                </button>
+              </div>
+            </div>
+          ) : timing?.phase === 'active' ? (
+            <div className="text-center space-y-3">
+              {Date.now() <= timing.entryDeadline ? (
+                <>
+                  <Countdown target={timing.entryDeadline} label="Entry closes in" />
+                  <button onClick={handleEnter} disabled={joining}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50 transition-colors shadow-sm">
+                    {joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    Enter Challenge
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-zinc-500 dark:text-zinc-400">
+                  <Lock className="w-4 h-4" />
+                  <p className="text-sm">Entry window closed. Challenge is in progress.</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="font-medium">Challenge has ended</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Tabs ─── */}
+      <div className="flex gap-1 border-b border-zinc-200 dark:border-zinc-800">
+        {['problems', 'leaderboard'].map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              tab === t
+                ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+            }`}>
+            {t === 'problems' ? 'Problems' : 'Leaderboard'}
+          </button>
+        ))}
       </div>
+
+      {/* ─── Tab content ─── */}
+      {tab === 'problems' && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden divide-y divide-zinc-50 dark:divide-zinc-800/60">
+          {problems.length === 0 ? (
+            <div className="py-12 text-center text-sm text-zinc-400">No problems in this challenge.</div>
+          ) : problems.map((cp, i) => {
+            const p = cp.problem || cp;
+            const d = DIFF[p.difficulty] || DIFF.EASY;
+            return (
+              <div key={p.id} className={`flex items-center gap-3 px-4 sm:px-5 py-3.5 ${i % 2 ? 'bg-zinc-50/40 dark:bg-zinc-800/20' : ''}`}>
+                <span className="text-xs text-zinc-400 tabular-nums w-5 text-right">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">{p.title}</p>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide ${d.cls}`}>
+                  {d.label}
+                </span>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
+      {tab === 'leaderboard' && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+          {lbLoading ? (
+            <div className="py-12 flex justify-center"><Loader2 className="w-5 h-5 text-zinc-400 animate-spin" /></div>
+          ) : leaderboard.length === 0 ? (
+            <div className="py-12 text-center">
+              <BarChart3 className="w-8 h-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" />
+              <p className="text-sm text-zinc-400">No submissions yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-50 dark:divide-zinc-800/60">
+              {leaderboard.map((entry, i) => (
+                <div key={entry.user?.id || i}
+                  className={`flex items-center gap-3 px-4 sm:px-5 py-3 ${
+                    entry.user?.id === session?.user?.id ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : ''
+                  }`}>
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    i === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                    i === 1 ? 'bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300' :
+                    i === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400' :
+                    'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  }`}>{i + 1}</span>
+                  {entry.user?.image ? (
+                    <img src={entry.user.image} alt="" className="w-7 h-7 rounded-full object-cover"
+                      onError={e => { e.currentTarget.style.display='none'; e.currentTarget.nextSibling.style.display='flex'; }} />
+                  ) : null}
+                  <div className={`w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 items-center justify-center text-[11px] font-bold text-zinc-500 dark:text-zinc-400 ${entry.user?.image ? 'hidden' : 'flex'}`}>
+                    {entry.user?.name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <span className="flex-1 text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">{entry.user?.name}</span>
+                  <span className="text-xs text-zinc-400 tabular-nums">{entry.problemsSolved} solved</span>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50 tabular-nums w-12 text-right">{entry.score}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
-} 
+}

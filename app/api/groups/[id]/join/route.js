@@ -1,18 +1,15 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/app/lib/db';
-import { sendEmail } from '@/app/lib/email';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/app/lib/db";
+import { sendEmail } from "@/app/lib/email";
 
 export async function POST(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
     const groupId = params.id;
@@ -23,12 +20,33 @@ export async function POST(request, { params }) {
         id: groupId,
         isActive: true,
       },
+      select: {
+        id: true,
+        name: true,
+        visibility: true,
+        memberLimit: true,
+        creatorId: true,
+        _count: { select: { members: true } },
+      },
     });
 
     if (!group) {
+      return NextResponse.json({ message: "Group not found" }, { status: 404 });
+    }
+
+    // Only PUBLIC groups can be freely joined; PRIVATE/UNLISTED require an invite
+    if (group.visibility !== "PUBLIC") {
       return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
+        { message: "This group requires an invitation to join" },
+        { status: 403 },
+      );
+    }
+
+    // Check member limit
+    if (group.memberLimit && group._count.members >= group.memberLimit) {
+      return NextResponse.json(
+        { message: "This group is full", isFull: true },
+        { status: 400 },
       );
     }
 
@@ -42,8 +60,8 @@ export async function POST(request, { params }) {
 
     if (existingMembership) {
       return NextResponse.json(
-        { message: 'You are already a member of this group', groupId },
-        { status: 200 }
+        { message: "You are already a member of this group", groupId },
+        { status: 200 },
       );
     }
 
@@ -52,7 +70,7 @@ export async function POST(request, { params }) {
       data: {
         userId: session.user.id,
         groupId,
-        role: 'MEMBER', // Default role is MEMBER
+        role: "MEMBER", // Default role is MEMBER
       },
     });
 
@@ -62,7 +80,7 @@ export async function POST(request, { params }) {
         where: { id: groupId },
         include: {
           members: {
-            where: { role: 'ADMIN' },
+            where: { role: "ADMIN" },
             include: {
               user: true,
             },
@@ -74,7 +92,8 @@ export async function POST(request, { params }) {
         const admin = groupWithAdmin.members[0].user;
         const newUser = session.user;
 
-        if (admin.email && admin.id !== newUser.id) { // Don't send email if admin joins their own group
+        if (admin.email && admin.id !== newUser.id) {
+          // Don't send email if admin joins their own group
           await sendEmail({
             to: admin.email,
             subject: `New Member Alert: ${newUser.name} joined ${groupWithAdmin.name}`,
@@ -97,19 +116,22 @@ export async function POST(request, { params }) {
         }
       }
     } catch (emailError) {
-      console.error('Failed to send new member notification email:', emailError);
+      console.error(
+        "Failed to send new member notification email:",
+        emailError,
+      );
       // Do not block the join process if email fails
     }
 
     return NextResponse.json({
-      message: 'Successfully joined the group',
+      message: "Successfully joined the group",
       groupId,
     });
   } catch (error) {
-    console.error('Error joining group:', error);
+    console.error("Error joining group:", error);
     return NextResponse.json(
-      { message: 'Error joining group', error: error.message },
-      { status: 500 }
+      { message: "Error joining group", error: error.message },
+      { status: 500 },
     );
   }
-} 
+}

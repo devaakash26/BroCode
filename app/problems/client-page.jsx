@@ -1,463 +1,293 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Search, ArrowUpDown, ChevronUp, ChevronDown, Filter, ChevronLeft } from 'lucide-react';
+import {
+  Search, ChevronUp, ChevronDown, X, CheckCircle2,
+  Circle, Tag, SlidersHorizontal, RotateCcw,
+} from 'lucide-react';
+
+const DIFF_COLOR = { EASY: 'text-emerald-500', MEDIUM: 'text-amber-500', HARD: 'text-rose-500' };
+const DIFF_BG   = { EASY: 'bg-emerald-500/10', MEDIUM: 'bg-amber-500/10', HARD: 'bg-rose-500/10' };
+const DIFF_RING = { EASY: 'ring-emerald-500/30', MEDIUM: 'ring-amber-500/30', HARD: 'ring-rose-500/30' };
+const DIFF_TRACK = { EASY: 'bg-emerald-500', MEDIUM: 'bg-amber-500', HARD: 'bg-rose-500' };
+
+function DifficultyPill({ d }) {
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase rounded ${DIFF_BG[d]} ${DIFF_COLOR[d]}`}>
+      {d.charAt(0) + d.slice(1).toLowerCase()}
+    </span>
+  );
+}
+
+function StatRing({ label, solved, total, color }) {
+  const pct = total ? Math.round((solved / total) * 100) : 0;
+  const r = 28, stroke = 5;
+  const circ = 2 * Math.PI * r;
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative w-16 h-16">
+        <svg viewBox="0 0 70 70" className="w-full h-full -rotate-90">
+          <circle cx="35" cy="35" r={r} fill="none" stroke="currentColor" className="text-zinc-200 dark:text-zinc-700" strokeWidth={stroke} />
+          <circle cx="35" cy="35" r={r} fill="none" stroke="currentColor" className={color} strokeWidth={stroke}
+            strokeDasharray={circ} strokeDashoffset={circ - (circ * pct) / 100} strokeLinecap="round" />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-zinc-800 dark:text-zinc-100">
+          {solved}<span className="text-zinc-400 dark:text-zinc-500 font-normal">/{total}</span>
+        </span>
+      </div>
+      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">{label}</span>
+    </div>
+  );
+}
 
 export default function ClientProblemsPage({ initialProblems, stats }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // Extract stats
-  const { total, solved, easy, medium, hard, tags } = stats;
-  
-  // Memoize uniqueProblems to prevent re-creation on every render
-  const uniqueProblems = useMemo(() => 
-    Array.from(new Map(initialProblems.map(problem => [problem.id, problem])).values()),
-    [initialProblems]
+  const { total, solved, easy, medium, hard, tags: allTags } = stats;
+
+  const uniqueProblems = useMemo(
+    () => Array.from(new Map(initialProblems.map((p) => [p.id, p])).values()),
+    [initialProblems],
   );
-  
-  // State for problems and filters
-  const [problems, setProblems] = useState(uniqueProblems);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-  const [difficulty, setDifficulty] = useState(searchParams.get('difficulty') || '');
-  const [status, setStatus] = useState(searchParams.get('status') || '');
-  const [selectedTags, setSelectedTags] = useState(searchParams.get('tags')?.split(',') || []);
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'recent');
-  const [sortOrder, setSortOrder] = useState(searchParams.get('order') || 'desc');
-  
-  // Filter problems
-  useEffect(() => {
-    setLoading(true);
-    
-    let filtered = [...uniqueProblems];
-    
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(p => 
-        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
+
+  const [search, setSearch] = useState(searchParams.get('q') || '');
+  const [difficulty, setDifficulty] = useState(searchParams.get('d') || '');
+  const [status, setStatus] = useState(searchParams.get('s') || '');
+  const [activeTags, setActiveTags] = useState(() => {
+    const t = searchParams.get('tags');
+    return t ? t.split(',') : [];
+  });
+  const [sortCol, setSortCol] = useState('recent');
+  const [sortDir, setSortDir] = useState('desc');
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filtered = useMemo(() => {
+    let list = [...uniqueProblems];
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => p.title.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q)));
     }
-    
-    // Apply difficulty filter
-    if (difficulty) {
-      filtered = filtered.filter(p => p.difficulty === difficulty.toUpperCase());
-    }
-    
-    // Apply status filter
-    if (status === 'solved') {
-      filtered = filtered.filter(p => p.solved);
-    } else if (status === 'todo') {
-      filtered = filtered.filter(p => !p.solved);
-    }
-    
-    // Apply tags filter
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter(p => 
-        selectedTags.every(tag => p.tags.includes(tag))
-      );
-    }
-    
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case 'difficulty':
-          const difficultyOrder = { EASY: 1, MEDIUM: 2, HARD: 3 };
-          comparison = difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-          break;
-        case 'acceptance':
-          comparison = a.acceptance - b.acceptance;
-          break;
-        case 'submissions':
-          comparison = a.submissionCount - b.submissionCount;
-          break;
-        default: // Recent by default
-          // Assuming ID correlates with recency, higher ID = more recent
-          comparison = b.id.localeCompare(a.id);
-      }
-      
-      return sortOrder === 'asc' ? -comparison : comparison;
+    if (difficulty) list = list.filter((p) => p.difficulty === difficulty);
+    if (status === 'solved') list = list.filter((p) => p.solved);
+    if (status === 'todo') list = list.filter((p) => !p.solved);
+    if (activeTags.length) list = list.filter((p) => activeTags.every((t) => p.tags.includes(t)));
+
+    const diffOrder = { EASY: 1, MEDIUM: 2, HARD: 3 };
+    list.sort((a, b) => {
+      let c = 0;
+      if (sortCol === 'title') c = a.title.localeCompare(b.title);
+      else if (sortCol === 'difficulty') c = diffOrder[a.difficulty] - diffOrder[b.difficulty];
+      else if (sortCol === 'acceptance') c = a.acceptance - b.acceptance;
+      else c = b.id.localeCompare(a.id);
+      return sortDir === 'asc' ? -c : c;
     });
-    
-    setProblems(filtered);
-    setLoading(false);
-  }, [searchTerm, difficulty, status, selectedTags, sortBy, sortOrder, uniqueProblems]);
-  
-  // Update URL with filters
-  const updateUrlParams = () => {
-    const params = new URLSearchParams();
-    
-    if (searchTerm) params.set('search', searchTerm);
-    if (difficulty) params.set('difficulty', difficulty);
-    if (status) params.set('status', status);
-    if (selectedTags.length > 0) params.set('tags', selectedTags.join(','));
-    if (sortBy !== 'recent') params.set('sortBy', sortBy);
-    if (sortOrder !== 'desc') params.set('order', sortOrder);
-    
-    router.push(`/problems?${params.toString()}`, { scroll: false });
-  };
-  
-  // Handle filter change
-  const applyFilters = () => {
-    updateUrlParams();
-  };
-  
-  // Handle sort
-  const handleSort = (column) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('desc');
-    }
-  };
-  
-  // Reset filters
-  const resetFilters = () => {
-    setSearchTerm('');
-    setDifficulty('');
-    setStatus('');
-    setSelectedTags([]);
-    setSortBy('recent');
-    setSortOrder('desc');
+    return list;
+  }, [uniqueProblems, search, difficulty, status, activeTags, sortCol, sortDir]);
+
+  const hasFilters = search || difficulty || status || activeTags.length;
+
+  const toggleTag = useCallback((tag) => {
+    setActiveTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setSearch(''); setDifficulty(''); setStatus(''); setActiveTags([]);
+    setSortCol('recent'); setSortDir('desc');
     router.push('/problems', { scroll: false });
-  };
-  
+  }, [router]);
+
+  const handleSort = useCallback((col) => {
+    if (sortCol === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortCol(col); setSortDir('desc'); }
+  }, [sortCol]);
+
+  const SortIcon = ({ col }) =>
+    sortCol === col
+      ? (sortDir === 'asc' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)
+      : <ChevronDown className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40" />;
+
+  const visibleTags = showAllTags ? allTags : allTags.slice(0, 12);
+
   return (
-    <div className="w-full px-0 py-6 space-y-6">
-      {/* Progress header */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-6 py-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center">
-            <h1 className="text-xl font-bold text-white">Problem Set</h1>
-            <div className="mt-3 sm:mt-0 flex items-center gap-2">
-              <div className="text-sm font-medium text-white">Your progress:</div>
-              <div className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-sm text-white">
-                {solved} / {total} problems solved
-              </div>
-            </div>
-          </div>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+      {/* ── Stats bar ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight">Problems</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{total} problems &middot; {solved} solved</p>
         </div>
-        
-        <div className="px-6 py-4 grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-0 sm:divide-x divide-gray-200 dark:divide-gray-700">
-          <div className="px-4 text-center">
-            <div className="text-2xl font-bold text-gray-800 dark:text-white">{total}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Total</div>
-            <div className="mt-1 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className="h-1.5 bg-indigo-600 rounded-full" 
-                style={{ width: `${(solved / total) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="px-4 text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{easy.total}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Easy</div>
-            <div className="mt-1 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className="h-1.5 bg-green-600 rounded-full" 
-                style={{ width: `${(easy.solved / easy.total) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="px-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{medium.total}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Medium</div>
-            <div className="mt-1 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className="h-1.5 bg-yellow-600 rounded-full" 
-                style={{ width: `${(medium.solved / medium.total) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="px-4 text-center">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{hard.total}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Hard</div>
-            <div className="mt-1 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div 
-                className="h-1.5 bg-red-600 rounded-full" 
-                style={{ width: `${(hard.solved / hard.total) * 100}%` }}
-              ></div>
-            </div>
-          </div>
+        <div className="flex items-center gap-6">
+          <StatRing label="Easy" solved={easy.solved} total={easy.total} color="text-emerald-500" />
+          <StatRing label="Medium" solved={medium.solved} total={medium.total} color="text-amber-500" />
+          <StatRing label="Hard" solved={hard.solved} total={hard.total} color="text-rose-500" />
         </div>
       </div>
-      
-      {/* Search and filter tools */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="Search questions by title, tag, or ID"
-                />
-              </div>
-            </div>
-            
-            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-              <select 
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="">All Difficulties</option>
-                <option value="EASY">Easy</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HARD">Hard</option>
-              </select>
-              
-              <select 
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="block pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              >
-                <option value="">All Status</option>
-                <option value="solved">Solved</option>
-                <option value="todo">To Do</option>
-              </select>
 
-              <button
-                onClick={applyFilters}
-                className="flex items-center space-x-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md"
-              >
-                <Filter className="h-4 w-4" />
-                <span>Filter</span>
-              </button>
-              
-              {(searchTerm || difficulty || status || selectedTags.length > 0) && (
-                <button
-                  onClick={resetFilters}
-                  className="px-3 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-md dark:border-gray-600 dark:hover:bg-gray-700"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Tags section */}
-          <div className="mt-3 flex flex-wrap gap-2">
-            {tags.slice(0, 10).map(tag => (
-              <button
-                key={tag}
-                onClick={() => {
-                  setSelectedTags(prev => 
-                    prev.includes(tag) 
-                      ? prev.filter(t => t !== tag) 
-                      : [...prev, tag]
-                  );
-                }}
-                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
-                  selectedTags.includes(tag)
-                    ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
-                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                {tag}
-                {selectedTags.includes(tag) && (
-                  <span className="ml-1">×</span>
-                )}
-              </button>
-            ))}
-            {tags.length > 10 && (
-              <button className="px-2.5 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
-                +{tags.length - 10} more
+      {/* ── Search + quick filters ── */}
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by title or tag…"
+              className="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600" />
               </button>
             )}
           </div>
+
+          {/* Difficulty pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['EASY', 'MEDIUM', 'HARD'].map((d) => (
+              <button key={d} onClick={() => setDifficulty((prev) => (prev === d ? '' : d))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ring-1
+                  ${difficulty === d
+                    ? `${DIFF_BG[d]} ${DIFF_COLOR[d]} ${DIFF_RING[d]}`
+                    : 'ring-zinc-200 dark:ring-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                {d.charAt(0) + d.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* Status */}
+          <div className="flex items-center gap-1.5">
+            {[{ key: 'solved', label: 'Solved', icon: CheckCircle2 }, { key: 'todo', label: 'Todo', icon: Circle }].map(({ key, label, icon: Icon }) => (
+              <button key={key} onClick={() => setStatus((prev) => (prev === key ? '' : key))}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ring-1
+                  ${status === key
+                    ? 'ring-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                    : 'ring-zinc-200 dark:ring-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+                <Icon className="w-3.5 h-3.5" />{label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tags toggle */}
+          <button onClick={() => setShowFilters((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg ring-1 transition-all
+              ${showFilters ? 'ring-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                : 'ring-zinc-200 dark:ring-zinc-700 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}>
+            <SlidersHorizontal className="w-3.5 h-3.5" />Tags
+          </button>
+
+          {hasFilters && (
+            <button onClick={clearAll}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+              <RotateCcw className="w-3 h-3" />Clear
+            </button>
+          )}
         </div>
+
+        {/* Tag chips */}
+        {showFilters && allTags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {visibleTags.map((tag) => (
+              <button key={tag} onClick={() => toggleTag(tag)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md transition-all
+                  ${activeTags.includes(tag)
+                    ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-1 ring-indigo-500/30'
+                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'}`}>
+                <Tag className="w-3 h-3" />{tag}
+                {activeTags.includes(tag) && <X className="w-3 h-3 ml-0.5" />}
+              </button>
+            ))}
+            {allTags.length > 12 && (
+              <button onClick={() => setShowAllTags((v) => !v)}
+                className="px-2.5 py-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
+                {showAllTags ? 'Show less' : `+${allTags.length - 12} more`}
+              </button>
+            )}
+          </div>
+        )}
       </div>
-      
-      {/* Problems table */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th scope="col" className="pl-6 pr-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-16">
-                  Status
+
+      {/* ── Problem list ── */}
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800">
+          <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {filtered.length} problem{filtered.length !== 1 ? 's' : ''}{hasFilters ? ' matched' : ''}
+          </span>
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-100 dark:border-zinc-800 text-[11px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                <th className="w-10 py-2.5 pl-4 pr-2 text-center font-medium">Status</th>
+                <th className="py-2.5 px-3 text-left font-medium">
+                  <button onClick={() => handleSort('title')} className="group flex items-center gap-1">Title <SortIcon col="title" /></button>
                 </th>
-                <th 
-                  scope="col" 
-                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('title')}
-                >
-                  <div className="flex items-center">
-                    <span>Title</span>
-                    {sortBy === 'title' ? (
-                      sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
-                    )}
-                  </div>
+                <th className="py-2.5 px-3 text-left font-medium">
+                  <button onClick={() => handleSort('difficulty')} className="group flex items-center gap-1">Difficulty <SortIcon col="difficulty" /></button>
                 </th>
-                <th 
-                  scope="col" 
-                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('difficulty')}
-                >
-                  <div className="flex items-center">
-                    <span>Difficulty</span>
-                    {sortBy === 'difficulty' ? (
-                      sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
-                    )}
-                  </div>
+                <th className="py-2.5 px-3 text-left font-medium">
+                  <button onClick={() => handleSort('acceptance')} className="group flex items-center gap-1">Acceptance <SortIcon col="acceptance" /></button>
                 </th>
-                <th 
-                  scope="col" 
-                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('acceptance')}
-                >
-                  <div className="flex items-center">
-                    <span>Acceptance</span>
-                    {sortBy === 'acceptance' ? (
-                      sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('submissions')}
-                >
-                  <div className="flex items-center">
-                    <span>Submissions</span>
-                    {sortBy === 'submissions' ? (
-                      sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />
-                    ) : (
-                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
-                    )}
-                  </div>
-                </th>
-                <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Tags
-                </th>
+                <th className="py-2.5 px-3 text-left font-medium hidden lg:table-cell">Tags</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {loading ? (
-                <tr><td colSpan="4" className="text-center py-4">Loading...</td></tr>
-              ) : problems.length > 0 ? (
-                problems.map((problem) => (
-                  <tr key={problem.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {problem.solved ? <span className="text-green-500 font-bold">✔</span> : ''}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <Link href={`/problems/${problem.id}`} className="text-gray-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400">
-                        {problem.title}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        problem.difficulty === 'EASY' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 
-                          problem.difficulty === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 
-                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}
-                      >
-                        {problem.difficulty.charAt(0) + problem.difficulty.slice(1).toLowerCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      <div className="flex items-center">
-                        <span className={`text-sm ${
-                          problem.acceptance > 75 ? 'text-green-600 dark:text-green-400' : 
-                          problem.acceptance > 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {problem.acceptance}%
-                        </span>
-                        <div className="ml-2 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                          <div
-                            className={`h-1.5 rounded-full ${
-                              problem.acceptance > 75 ? 'bg-green-600' : 
-                              problem.acceptance > 50 ? 'bg-yellow-600' : 'bg-red-600'
-                            }`}
-                            style={{ width: `${problem.acceptance}%` }}
-                          ></div>
-                        </div>
+            <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/60">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={5} className="py-16 text-center text-zinc-400 dark:text-zinc-500">No problems match your filters.</td></tr>
+              ) : filtered.map((p, i) => (
+                <tr key={p.id} className={`group transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${i % 2 === 0 ? '' : 'bg-zinc-50/40 dark:bg-zinc-800/20'}`}>
+                  <td className="py-3 pl-4 pr-2 text-center">
+                    {p.solved ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" /> : <Circle className="w-4 h-4 text-zinc-300 dark:text-zinc-600 mx-auto" />}
+                  </td>
+                  <td className="py-3 px-3">
+                    <Link href={`/problems/${p.id}`} className="font-medium text-zinc-800 dark:text-zinc-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {p.title}
+                    </Link>
+                  </td>
+                  <td className="py-3 px-3"><DifficultyPill d={p.difficulty} /></td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-14 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                        <div className={`h-full rounded-full ${DIFF_TRACK[p.difficulty]}`} style={{ width: `${p.acceptance}%` }} />
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {problem.submissionCount}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-wrap gap-1">
-                        {problem.tags.slice(0, 2).map((tag) => (
-                          <span 
-                            key={tag} 
-                            className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {problem.tags.length > 2 && (
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 rounded">
-                            +{problem.tags.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                    No problems found. Try adjusting your filters.
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums w-9">{p.acceptance}%</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 hidden lg:table-cell">
+                    <div className="flex gap-1 flex-wrap">
+                      {p.tags.slice(0, 3).map((t) => (
+                        <span key={t} className="px-2 py-0.5 text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded">{t}</span>
+                      ))}
+                      {p.tags.length > 3 && <span className="px-1.5 py-0.5 text-[10px] text-zinc-400 dark:text-zinc-500">+{p.tags.length - 3}</span>}
+                    </div>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
-      
-      {/* Pagination */}
-      {problems.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between bg-white dark:bg-gray-800 px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm sm:px-6">
-          <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">{Math.min(problems.length, 10)}</span> of{' '}
-                <span className="font-medium">{problems.length}</span> results
-              </p>
-            </div>
-            <div>
-              <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                <button className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-700 dark:text-gray-500">
-                  <span className="sr-only">Previous</span>
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <button className="relative z-10 inline-flex items-center bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
-                  1
-                </button>
-                <button className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 dark:ring-gray-700 dark:hover:bg-gray-700 dark:text-gray-500">
-                  <span className="sr-only">Next</span>
-                  <ChevronDown className="h-5 w-5 rotate-270" />
-                </button>
-              </nav>
-            </div>
-          </div>
+
+        {/* Mobile card list */}
+        <div className="sm:hidden divide-y divide-zinc-100 dark:divide-zinc-800">
+          {filtered.length === 0 ? (
+            <div className="py-16 text-center text-zinc-400 dark:text-zinc-500 text-sm">No problems match your filters.</div>
+          ) : filtered.map((p) => (
+            <Link key={p.id} href={`/problems/${p.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+              {p.solved ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <Circle className="w-4 h-4 text-zinc-300 dark:text-zinc-600 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">{p.title}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <DifficultyPill d={p.difficulty} />
+                  <span className="text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums">{p.acceptance}%</span>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 } 

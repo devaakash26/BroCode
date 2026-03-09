@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addMessage, confirmMessage, setMessages, setTypingUser, clearTypingUser } from '@/lib/store/groupSlice';
-import { Send, RefreshCw, MessageSquare, Circle, Smile } from 'lucide-react';
+import { Send, RefreshCw, MessageSquare, Circle, Smile, AlertCircle, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import useSocket from '@/app/hooks/useSocket';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
@@ -83,13 +83,15 @@ export default function GroupChat({ groupId }) {
 
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [emojiData, setEmojiData] = useState(_emojiCache);
   const [emojiSearch, setEmojiSearch] = useState('');
   const [emojiLoading, setEmojiLoading] = useState(false);
   const [activeEmojiCat, setActiveEmojiCat] = useState(null);
+  // Per-message failure tracking: Set of tempIds that failed delivery
+  const [failedIds, setFailedIds] = useState(new Set());
+  const pendingTimeouts = useRef(new Map()); // tempId -> timeoutHandle
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
@@ -110,16 +112,22 @@ export default function GroupChat({ groupId }) {
     sendHeartbeat,
   } = useSocket({ disableToasts: true });
 
-  const fetchMessages = useCallback(async () => {
+  // Accept an optional AbortSignal so the useEffect can cancel in-flight fetches
+  // during React StrictMode's simulate-unmount/remount cycle (fixes double fetch).
+  const fetchMessages = useCallback(async (signal) => {
     setIsLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch(`/api/groups/${groupId}/messages`);
+      const res = await fetch(
+        `/api/groups/${groupId}/messages`,
+        signal ? { signal } : {},
+      );
       if (!res.ok) throw new Error('Failed to load messages');
       const data = await res.json();
       dispatch(setMessages(data.messages || []));
-    } catch {
-      setLoadError(true);
+    } catch (err) {
+      // Ignore aborts — not a real error
+      if (!signal || err.name !== 'AbortError') setLoadError(true);
     } finally {
       setIsLoading(false);
       if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
@@ -127,9 +135,13 @@ export default function GroupChat({ groupId }) {
   }, [groupId, dispatch]);
 
   useEffect(() => {
-    fetchMessages();
+    const controller = new AbortController();
+    fetchMessages(controller.signal);
     loadingTimeoutRef.current = setTimeout(() => setIsLoading(false), 5000);
-    return () => { if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current); };
+    return () => {
+      controller.abort(); 
+      if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+    };
   }, [fetchMessages]);
 
   useEffect(() => {
@@ -162,6 +174,13 @@ export default function GroupChat({ groupId }) {
       // Own message: replace the optimistic temp bubble; others: add normally
       if (msg.senderId === currentUserId) {
         dispatch(confirmMessage(msg));
+        // Clear the failure timeout for this sender's oldest pending message
+        const [firstKey] = pendingTimeouts.current.keys();
+        if (firstKey) {
+          clearTimeout(pendingTimeouts.current.get(firstKey));
+          pendingTimeouts.current.delete(firstKey);
+          setFailedIds(prev => { const n = new Set(prev); n.delete(firstKey); return n; });
+        }
       } else {
         dispatch(addMessage(msg));
       }
@@ -245,46 +264,61 @@ export default function GroupChat({ groupId }) {
     sendTyping({ groupId, isTyping: value.length > 0 });
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isSending) return;
-    setIsSending(true);
+  const markFailed = useCallback((tempId) => {
+    pendingTimeouts.current.delete(tempId);
+    setFailedIds(prev => new Set(prev).add(tempId));
+  }, []);
 
+  const doSend = useCallback((content, tempId) => {
+    // Try socket first (fire and forget)
+    const socketSent = isConnected && sendMessage({ groupId, content });
+    if (socketSent) {
+      // Auto-fail if socket never echoes back within 12s
+      const t = setTimeout(() => markFailed(tempId), 12_000);
+      pendingTimeouts.current.set(tempId, t);
+    } else {
+      // Fallback: HTTP POST (also non-blocking)
+      fetch(`/api/groups/${groupId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, content }),
+      }).catch(() => markFailed(tempId));
+    }
+  }, [isConnected, sendMessage, groupId, markFailed]);
+
+  const handleSendMessage = useCallback((e) => {
+    e?.preventDefault();
     const content = inputValue.trim();
+    if (!content || !session?.user?.id) return;
+
+    const tempId = `temp-${Date.now()}`;
     const tempMsg = {
-      id: `temp-${Date.now()}`,
+      id: tempId,
       content,
       groupId,
-      senderId: session?.user?.id,
-      senderName: session?.user?.name || 'You',
-      senderImage: session?.user?.image || null,
+      senderId: session.user.id,
+      senderName: session.user.name || 'You',
+      senderImage: session.user.image || null,
       sentAt: new Date().toISOString(),
       isTemp: true,
     };
 
+    // 1. Show immediately — no waiting
     dispatch(addMessage(tempMsg));
     setInputValue('');
-    if (isConnected) sendTyping({ groupId, isTyping: false });
-
-    let socketSent = false;
-    if (isConnected) socketSent = sendMessage({ groupId, content });
-
-    if (!socketSent) {
-      try {
-        await fetch(`/api/groups/${groupId}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ groupId, content }),
-        });
-      } catch {
-        // message stays as optimistic — no crash
-      }
-    }
-
-    setIsSending(false);
     setShowEmoji(false);
+    if (isConnected) sendTyping({ groupId, isTyping: false });
     inputRef.current?.focus();
-  };
+
+    // 2. Deliver in background — UI never blocks
+    doSend(content, tempId);
+  }, [inputValue, session, groupId, dispatch, isConnected, sendTyping, doSend]);
+
+  const handleRetry = useCallback((msg) => {
+    // Remove failed state, re-dispatch same content
+    setFailedIds(prev => { const n = new Set(prev); n.delete(msg.id); return n; });
+    doSend(msg.content, msg.id);
+  }, [doSend]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -316,7 +350,7 @@ export default function GroupChat({ groupId }) {
             <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">Group Chat</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white leading-none">Brocode Arena</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5">
               {isConnected ? (
                 <>
@@ -405,12 +439,39 @@ export default function GroupChat({ groupId }) {
                       isOwn
                         ? 'bg-indigo-600 text-white rounded-br-[4px] shadow-sm'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-[4px] shadow-sm'
-                    } ${msg.isTemp ? 'opacity-60' : ''}`}>
+                    } ${msg.isTemp && !failedIds.has(msg.id) ? 'opacity-70' : ''}`}>
                       {msg.content}
                     </div>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      {safeFormat(timestamp, 'h:mm a')}
-                    </span>
+                    {/* Delivery status */}
+                    {isOwn && (
+                      <div className="flex items-center gap-1 px-1">
+                        {failedIds.has(msg.id) ? (
+                          <button
+                            onClick={() => handleRetry(msg)}
+                            className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-600 dark:text-red-400"
+                            title="Failed to send — tap to retry"
+                          >
+                            <AlertCircle className="w-3 h-3" />
+                            <span>Failed</span>
+                            <RotateCcw className="w-2.5 h-2.5" />
+                          </button>
+                        ) : msg.isTemp ? (
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
+                            <Circle className="w-1.5 h-1.5 fill-gray-300 text-gray-300" />
+                            Sending
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {safeFormat(timestamp, 'h:mm a')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {!isOwn && (
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                        {safeFormat(timestamp, 'h:mm a')}
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -537,27 +598,23 @@ export default function GroupChat({ groupId }) {
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          placeholder={isConnected ? 'Type a message\u2026' : 'Connecting\u2026'}
-          disabled={!isConnected}
+          placeholder="Type a message…"
           autoComplete="off"
-          className="flex-1 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 rounded-xl px-3.5 py-2 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition-all disabled:opacity-50"
+          className="flex-1 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 rounded-xl px-3.5 py-2 border border-gray-200 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition-all"
         />
         <button
           type="button"
           onClick={() => setShowEmoji(v => !v)}
-          disabled={!isConnected}
-          className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl transition-colors disabled:opacity-40 ${showEmoji ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${showEmoji ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
         >
           <Smile className="w-4 h-4" />
         </button>
         <button
           type="submit"
-          disabled={!inputValue.trim() || isSending || !isConnected}
+          disabled={!inputValue.trim()}
           className="w-9 h-9 flex-shrink-0 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
         >
-          {isSending
-            ? <RefreshCw className="w-3.5 h-3.5 text-white animate-spin" />
-            : <Send className="w-3.5 h-3.5 text-white" />}
+          <Send className="w-3.5 h-3.5 text-white" />
         </button>
       </form>
     </div>

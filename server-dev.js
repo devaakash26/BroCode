@@ -199,7 +199,7 @@ app.prepare().then(() => {
     // Send a message to a group
     socket.on("sendMessage", async (data) => {
       try {
-        const { groupId, content } = data || {};
+        const { groupId, content, challengeId, ephemeral } = data || {};
         if (!groupId || !content?.trim()) return;
 
         const { userId, userData } = findUser(socket.id);
@@ -209,6 +209,22 @@ app.prepare().then(() => {
         }
 
         const trimmedContent = content.trim();
+
+        // Challenge ephemeral messages: broadcast only, no DB
+        if (challengeId && ephemeral) {
+          const msg = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            content: trimmedContent,
+            sender: {
+              id: userId,
+              name: userData?.name || "Unknown",
+              image: userData?.image || null,
+            },
+            sentAt: new Date().toISOString(),
+          };
+          io.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+          return;
+        }
 
         // Persist to DB
         let dbMessage;

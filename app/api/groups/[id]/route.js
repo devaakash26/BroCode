@@ -1,86 +1,96 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-options";
-import { prisma, disconnectPrisma } from "@/app/lib/db";
+import { prisma } from "@/app/lib/db";
+
+// Module-level in-memory cache — works in both API routes and RSC.
+// Each entry: { data, cachedAt }.
+const _groupCache = new Map();
+const CACHE_TTL = 30_000; // 30 seconds
+
+async function getGroupCached(id) {
+  const hit = _groupCache.get(id);
+  if (hit && Date.now() - hit.cachedAt < CACHE_TTL) return hit.data;
+
+  const data = await prisma.group.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      inviteCode: true,
+      inviteLink: true,
+      isActive: true,
+      visibility: true,
+      memberLimit: true,
+      image: true,
+      createdAt: true,
+      creatorId: true,
+      _count: { select: { members: true } },
+      creator: { select: { id: true, name: true, image: true } },
+      members: {
+        select: {
+          userId: true,
+          role: true,
+          score: true,
+          solvedCount: true,
+          joinedAt: true,
+          lastActive: true,
+          user: { select: { id: true, name: true, image: true } },
+        },
+        orderBy: { score: "desc" },
+        take: 20,
+      },
+      challenges: {
+        where: { endTime: { gt: new Date() } },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          startTime: true,
+          endTime: true,
+          isActive: true,
+        },
+        orderBy: { startTime: "asc" },
+        take: 5,
+      },
+    },
+  });
+
+  // only cache successful fetches
+  if (data) _groupCache.set(id, { data, cachedAt: Date.now() });
+  return data;
+}
+
+// Exported so mutation endpoints (PATCH/DELETE) can invalidate the cache.
+export function invalidateGroupCache(id) {
+  _groupCache.delete(id);
+}
 
 export async function GET(request, { params }) {
   try {
     const { id } = params;
 
-    // Run session check and DB fetch in parallel
-    const [session, group] = await Promise.all([
-      getServerSession(authOptions),
-      prisma.group.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          inviteCode: true,
-          inviteLink: true,
-          isActive: true,
-          visibility: true,
-          memberLimit: true,
-          image: true,
-          createdAt: true,
-          creatorId: true,
-          _count: {
-            select: { members: true },
-          },
-          creator: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
-          },
-          members: {
-            select: {
-              userId: true,
-              role: true,
-              score: true,
-              solvedCount: true,
-              joinedAt: true,
-              lastActive: true,
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  image: true,
-                },
-              },
-            },
-            orderBy: { score: "desc" },
-            take: 100,
-          },
-          challenges: {
-            where: { endTime: { gt: new Date() } },
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              startTime: true,
-              endTime: true,
-              isActive: true,
-            },
-            orderBy: { startTime: "asc" },
-            take: 5,
-          },
-        },
-      }),
-    ]);
-
+    // getServerSession with JWT strategy is a pure JWT decode — no DB call, ~5 ms.
+    const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    // Cached group data (heavy) + tiny membership point-lookup run in parallel.
+    const [group, membership] = await Promise.all([
+      getGroupCached(id),
+      prisma.userGroup.findUnique({
+        where: { userId_groupId: { userId: session.user.id, groupId: id } },
+        select: { role: true },
+      }),
+    ]);
 
     if (!group) {
       return NextResponse.json({ message: "Group not found" }, { status: 404 });
     }
 
-    const userRole = group.members.find(
-      (member) => member.userId === session.user.id,
-    )?.role;
+    const userRole = membership?.role ?? null;
     const isAdmin = userRole === "ADMIN" || userRole === "CREATOR";
     const isMember = !!userRole;
 

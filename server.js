@@ -287,7 +287,7 @@ app
       // Handle sending a message to a group
       socket.on("sendMessage", async (data) => {
         try {
-          const { groupId, content } = data;
+          const { groupId, content, challengeId, ephemeral } = data;
           if (!groupId || !content?.trim()) return;
 
           // Find user ID for this socket
@@ -308,6 +308,22 @@ app
           }
 
           const trimmedContent = content.trim();
+
+          // Challenge ephemeral messages: broadcast only, no DB
+          if (challengeId && ephemeral) {
+            const msg = {
+              id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              content: trimmedContent,
+              sender: {
+                id: userId,
+                name: userData?.name || "Unknown",
+                image: userData?.image || null,
+              },
+              sentAt: new Date().toISOString(),
+            };
+            io.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+            return;
+          }
 
           // Persist to DB
           let dbMessage;

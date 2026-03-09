@@ -1,22 +1,19 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/app/lib/db";
 
 // Get details of a specific challenge
 export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    
+
     const { id: groupId, challengeId } = params;
-    
+
     // First, check if the user is a member of the group
     const userGroup = await prisma.userGroup.findFirst({
       where: {
@@ -25,39 +22,36 @@ export async function GET(request, { params }) {
       },
       select: {
         role: true,
-      }
+      },
     });
-    
+
     // Also check if user is the creator of the group
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { 
+      select: {
         creatorId: true,
-        name: true
-      }
+        name: true,
+      },
     });
-    
+
     if (!group) {
-      return NextResponse.json(
-        { message: 'Group not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "Group not found" }, { status: 404 });
     }
-    
+
     const isCreator = group.creatorId === session.user.id;
-    const isAdmin = userGroup?.role === 'ADMIN';
+    const isAdmin = userGroup?.role === "ADMIN";
     const isMember = !!userGroup;
-    
+
     if (!isMember && !isCreator) {
       return NextResponse.json(
-        { message: 'You are not a member of this group' },
-        { status: 403 }
+        { message: "You are not a member of this group" },
+        { status: 403 },
       );
     }
-    
+
     // Get the challenge with problems
     const challenge = await prisma.challenge.findUnique({
-      where: { 
+      where: {
         id: challengeId,
         groupId, // Ensure it belongs to the right group
       },
@@ -69,6 +63,9 @@ export async function GET(request, { params }) {
         endTime: true,
         isActive: true,
         visibleToParticipants: true,
+        strictMode: true,
+        inviteOnly: true,
+        lateEntryMinutes: true,
         createdAt: true,
         updatedAt: true,
         groupId: true,
@@ -87,6 +84,10 @@ export async function GET(request, { params }) {
                 title: true,
                 difficulty: true,
                 tags: true,
+                description: true,
+                exampleInput: true,
+                exampleOutput: true,
+                testCases: true,
               },
             },
           },
@@ -98,48 +99,67 @@ export async function GET(request, { params }) {
         },
       },
     });
-    
+
     if (!challenge) {
       return NextResponse.json(
-        { message: 'Challenge not found' },
-        { status: 404 }
+        { message: "Challenge not found" },
+        { status: 404 },
       );
     }
-    
+
     // If challenge is not public and user is not an admin/creator
     // and the challenge hasn't started yet, restrict access
     const now = new Date();
     if (
-      !challenge.visibleToParticipants && 
-      !isAdmin && 
-      !isCreator && 
+      !challenge.visibleToParticipants &&
+      !isAdmin &&
+      !isCreator &&
       now < challenge.startTime
     ) {
       return NextResponse.json(
-        { message: 'You do not have access to this challenge yet' },
-        { status: 403 }
+        { message: "You do not have access to this challenge yet" },
+        { status: 403 },
       );
     }
-    
-    // Get participant count
-    const participantCount = await prisma.submission.findMany({
-      where: {
-        challengeId,
-      },
-      select: {
-        userId: true,
-      },
-      distinct: ['userId'],
-    }).then(results => results.length);
-    
+
+    // Get participant count + current user's participant record in parallel
+    const [participantCount, currentParticipant] = await Promise.all([
+      prisma.submission
+        .findMany({
+          where: { challengeId },
+          select: { userId: true },
+          distinct: ["userId"],
+        })
+        .then((results) => results.length),
+      prisma.challengeParticipant.findUnique({
+        where: { userId_challengeId: { userId: session.user.id, challengeId } },
+        select: {
+          status: true,
+          warningCount: true,
+          disqualifyReason: true,
+          score: true,
+        },
+      }),
+    ]);
+
     // Format problems
-    const formattedProblems = challenge.problems.map(p => ({
+    const formattedProblems = challenge.problems.map((p) => ({
       id: p.problem.id,
       title: p.problem.title,
       difficulty: p.problem.difficulty,
       tags: p.problem.tags || [],
+      description: p.problem.description || "",
+      examples: p.problem.exampleInput
+        ? [
+            {
+              input: p.problem.exampleInput,
+              output: p.problem.exampleOutput || "",
+            },
+          ]
+        : [],
+      testCases: p.problem.testCases || [],
     }));
-    
+
     return NextResponse.json({
       id: challenge.id,
       title: challenge.title,
@@ -147,20 +167,24 @@ export async function GET(request, { params }) {
       startTime: challenge.startTime,
       endTime: challenge.endTime,
       isPublic: challenge.visibleToParticipants,
+      strictMode: challenge.strictMode,
+      inviteOnly: challenge.inviteOnly,
+      lateEntryMinutes: challenge.lateEntryMinutes,
       creator: challenge.creator,
       problems: formattedProblems,
       participants: participantCount,
       submissionCount: challenge._count.submissions,
+      participant: currentParticipant,
       group: {
         id: groupId,
-        name: group.name
-      }
+        name: group.name,
+      },
     });
   } catch (error) {
-    console.error('Error fetching challenge details:', error);
+    console.error("Error fetching challenge details:", error);
     return NextResponse.json(
-      { message: 'Error fetching challenge details', error: error.message },
-      { status: 500 }
+      { message: "Error fetching challenge details", error: error.message },
+      { status: 500 },
     );
   }
-} 
+}

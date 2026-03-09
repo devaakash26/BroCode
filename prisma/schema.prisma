@@ -234,6 +234,9 @@ model Challenge {
   realTimeLeaderboard   Boolean  @default(true) // Whether to show live leaderboard
   allowLateSubmissions  Boolean  @default(false) // Whether to allow submissions after end time
   visibleToParticipants Boolean  @default(true) // Visibility to group members
+  lateEntryMinutes      Int      @default(5) // Minutes after start time participants can still join
+  strictMode            Boolean  @default(true) // Fullscreen + anti-copy-paste enforcement
+  inviteOnly            Boolean  @default(false) // Only invited members can participate
 
   // Relations
   group                Group                  @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -242,6 +245,8 @@ model Challenge {
   submissions          Submission[]
   messages             ChatMessage[]
   ChallengeParticipant ChallengeParticipant[]
+
+  @@index([groupId, endTime]) // active challenges query
 }
 
 // ChallengeProblems model (many-to-many relationship)
@@ -317,8 +322,8 @@ model ChatMessage {
   group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
   challenge Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
 
-  @@index([groupId, sentAt])       // group chat pagination
-  @@index([challengeId, sentAt])   // challenge chat pagination
+  @@index([groupId, challengeId, sentAt]) // group chat pagination (covers challengeId: null filter)
+  @@index([challengeId, sentAt])          // challenge chat pagination
 }
 
 // Setting model for storing application settings
@@ -369,14 +374,16 @@ model ChallengeParticipant {
   id             String            @id @default(cuid())
   userId         String
   challengeId    String
-  status         ParticipantStatus @default(REGISTERED)
-  score          Int               @default(0)
-  problemsSolved Int               @default(0)
-  startedAt      DateTime?
-  completedAt    DateTime?
-  disqualifiedAt DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  status           ParticipantStatus @default(REGISTERED)
+  score            Int               @default(0)
+  problemsSolved   Int               @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  disqualifiedAt   DateTime?
+  warningCount     Int               @default(0)
+  disqualifyReason String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   // Relations
   user      User      @relation(fields: [userId], references: [id])

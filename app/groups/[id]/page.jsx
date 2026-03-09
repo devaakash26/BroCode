@@ -192,6 +192,183 @@ function EmptyState({ icon, title, subtitle, action }) {
   );
 }
 
+// ─── Join Preview Screen ───────────────────────────────────────────────────────
+function JoinPreviewScreen({ group, groupId }) {
+  const [joining, setJoining] = useState(false);
+  const router = useRouter();
+  const dispatch = useDispatch();
+
+  const memberCount = group._count?.members ?? 0;
+  const isFull = group.memberLimit && memberCount >= group.memberLimit;
+  const fillPct = group.memberLimit ? Math.min(100, Math.round((memberCount / group.memberLimit) * 100)) : 0;
+
+  const handleJoin = async () => {
+    setJoining(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/join`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Could not join');
+      toast.success('Joined successfully!');
+      // Hard-navigate so Redux state resets and fresh membership is loaded
+      window.location.href = `/groups/${groupId}`;
+    } catch (err) {
+      toast.error(err.message);
+      setJoining(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center px-4 py-12">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="w-full max-w-md"
+      >
+        {/* Card */}
+        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          {/* Header banner */}
+          <div className="relative h-32 overflow-hidden">
+            {group.image ? (
+              <>
+                <Image src={group.image} alt={group.name} fill className="object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700">
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(ellipse at 25% 40%, rgba(255,255,255,0.15) 0%, transparent 60%)' }} />
+              </div>
+            )}
+            {/* Visibility badge */}
+            <div className="absolute top-3 right-3">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-white/20 backdrop-blur text-white border border-white/25">
+                <Globe className="h-3 w-3" /> Public
+              </span>
+            </div>
+          </div>
+
+          {/* Avatar overlay */}
+          <div className="relative flex justify-center -mt-8 mb-4">
+            <div className="h-16 w-16 rounded-2xl bg-white dark:bg-gray-800 border-4 border-white dark:border-gray-900 shadow-lg flex items-center justify-center">
+              {group.image ? (
+                <Image src={group.image} alt={group.name} width={56} height={56} className="rounded-xl object-cover" />
+              ) : (
+                <Users className="h-7 w-7 text-indigo-500" />
+              )}
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 space-y-5">
+            {/* Group name + description */}
+            <div className="text-center">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{group.name}</h1>
+              {group.description && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-relaxed line-clamp-3">{group.description}</p>
+              )}
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                {
+                  icon: <Users className="h-4 w-4 text-indigo-500" />,
+                  value: group.memberLimit ? `${memberCount} / ${group.memberLimit}` : memberCount,
+                  label: 'Members',
+                },
+                {
+                  icon: <Trophy className="h-4 w-4 text-amber-500" />,
+                  value: group.challenges?.length ?? 0,
+                  label: 'Challenges',
+                },
+                {
+                  icon: <Calendar className="h-4 w-4 text-emerald-500" />,
+                  value: new Date(group.createdAt).toLocaleDateString([], { month: 'short', year: '2-digit' }),
+                  label: 'Created',
+                },
+              ].map(({ icon, value, label }) => (
+                <div key={label} className="flex flex-col items-center p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/60">
+                  {icon}
+                  <span className="mt-1 text-sm font-bold text-gray-900 dark:text-white tabular-nums">{value}</span>
+                  <span className="text-[11px] text-gray-400 mt-0.5">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Member limit progress bar */}
+            {group.memberLimit && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <span>Capacity</span>
+                  <span className={isFull ? 'text-rose-500 font-semibold' : ''}>{fillPct}% full</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      fillPct >= 100 ? 'bg-rose-500' : fillPct >= 80 ? 'bg-amber-500' : 'bg-indigo-500'
+                    }`}
+                    style={{ width: `${fillPct}%` }}
+                  />
+                </div>
+                {isFull && (
+                  <p className="text-xs text-rose-500 font-medium text-center">This group is full — no new members can join</p>
+                )}
+              </div>
+            )}
+
+            {/* Creator */}
+            {group.creator && (
+              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-gray-50 dark:bg-gray-800/60">
+                <div className="h-8 w-8 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                  {group.creator.image
+                    ? <Image src={group.creator.image} alt={group.creator.name} width={32} height={32} className="object-cover" />
+                    : <span className="text-xs font-bold text-gray-500">{group.creator.name?.charAt(0)?.toUpperCase()}</span>
+                  }
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-400">Created by</p>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{group.creator.name}</p>
+                </div>
+                <Crown className="h-4 w-4 text-amber-500 ml-auto flex-shrink-0" />
+              </div>
+            )}
+
+            {/* Join button */}
+            <button
+              onClick={handleJoin}
+              disabled={isFull || joining}
+              className={`w-full py-3.5 rounded-2xl text-sm font-bold transition-all shadow-sm ${
+                isFull
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/20 shadow-lg active:scale-[0.98]'
+              }`}
+            >
+              {joining ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                  </svg>
+                  Joining…
+                </span>
+              ) : isFull ? (
+                'Group is Full'
+              ) : (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <UserPlus className="h-4 w-4" /> Join Group
+                </span>
+              )}
+            </button>
+
+            <Link href="/groups" className="block text-center text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+              ← Browse other groups
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 
 export default function GroupDetailPage({ params }) {
   const { id: groupId } = params;
@@ -199,14 +376,17 @@ export default function GroupDetailPage({ params }) {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { data: group, isAdmin, status: groupStatus, leaderboard, activeMembers, lastFetched, status: groupSliceStatus } = useSelector(s => s.group);
+  const { data: group, isAdmin, isMember, status: groupStatus, leaderboard, activeMembers, lastFetched, status: groupSliceStatus } = useSelector(s => s.group);
   const { isConnected, joinGroup, subscribe, sendHeartbeat } = useSocket({ disableToasts: true });
   const heartbeatRef = useRef(null);
   const hasJoinedRef = useRef(false);
 
   const fiveMinAgo = () => new Date(Date.now() - 5 * 60 * 1000);
 
-  // Fetch group — skip if already cached for this groupId
+  // Fetch group — skip if already cached for this groupId.
+  // NOTE: groupSliceStatus is intentionally NOT in the deps array — adding it
+  // would re-trigger this effect on every status change (idle→loading→failed)
+  // causing a retry storm on DB connection errors.
   useEffect(() => {
     if (status === 'loading') return;
     if (status === 'unauthenticated') {
@@ -217,7 +397,7 @@ export default function GroupDetailPage({ params }) {
     if (lastFetched === groupId && groupSliceStatus === 'succeeded') return;
     dispatch(fetchGroup(groupId));
     // Don't clearGroup on unmount — settings page reuses the same cached Redux state
-  }, [groupId, status, dispatch, router, lastFetched, groupSliceStatus]);
+  }, [groupId, status, dispatch, router, lastFetched]);
   // Socket: join room once per connection
   useEffect(() => {
     if (!isConnected || !group) return;
@@ -298,7 +478,8 @@ export default function GroupDetailPage({ params }) {
     return () => { u1?.(); u2?.(); u3?.(); u4?.(); u5?.(); };
   }, [isConnected, groupId, subscribe, dispatch, session?.user?.id]);
 
-  // Polling: refresh group members every 60s to catch joins/leaves outside socket
+  // Polling: refresh group members every 60s to catch joins/leaves outside socket.
+  // The Redux condition will block the poll when already loading or recently failed.
   useEffect(() => {
     const pollId = setInterval(() => {
       dispatch(fetchGroup(groupId));
@@ -317,8 +498,7 @@ export default function GroupDetailPage({ params }) {
 
   if (groupStatus === 'loading' || groupStatus === 'idle' || status === 'loading') return <GroupSkeleton />;
 
-  if (groupStatus === 'failed' || !group) {
-    return (
+  if (groupStatus === 'failed' || !group) {    return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
         <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
           <Hash className="h-8 w-8 text-red-500" />
@@ -328,6 +508,11 @@ export default function GroupDetailPage({ params }) {
         <Link href="/groups" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors">Browse Groups</Link>
       </div>
     );
+  }
+
+  // Non-member viewing a public group → show join preview
+  if (!isMember && group.visibility === 'PUBLIC') {
+    return <JoinPreviewScreen group={group} groupId={groupId} />;
   }
 
   return (
