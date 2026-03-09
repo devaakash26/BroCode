@@ -1,552 +1,629 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, Flag, CheckCircle2, FileEdit, BookOpen, Code, X, Search, Info, Sparkles, LightbulbIcon, BrainCircuit, Rocket } from 'lucide-react';
+import {
+  ArrowLeft, Search, X, Check, Plus, Clock, Eye, EyeOff, Loader2,
+  Users, Shield, Mail, ChevronDown, ChevronUp, UserPlus, Link2,
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
+const DIFF = {
+  EASY:   { label: 'Easy',   text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
+  MEDIUM: { label: 'Medium', text: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-500/10',   dot: 'bg-amber-500'   },
+  HARD:   { label: 'Hard',   text: 'text-rose-600 dark:text-rose-400',       bg: 'bg-rose-500/10',    dot: 'bg-rose-500'     },
+};
 
-const formSchema = z.object({
-  title: z.string().min(5, { message: "Challenge title must be at least 5 characters." }),
-  description: z.string().optional(),
-  startTime: z.string().min(1, { message: "Start time is required." }),
-  endTime: z.string().min(1, { message: "End time is required." }),
-  isPublic: z.boolean().default(true),
-});
+function DiffBadge({ d }) {
+  const c = DIFF[d] || DIFF.EASY;
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide ${c.bg} ${c.text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
+  );
+}
+
+/* ── Toggle switch ── */
+function Toggle({ on, onToggle, label, sublabel, icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between py-3">
+      <div className="flex items-center gap-2.5">
+        {Icon && <Icon className="w-4 h-4 text-zinc-400 flex-shrink-0" />}
+        <div>
+          <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{label}</p>
+          {sublabel && <p className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-tight mt-0.5">{sublabel}</p>}
+        </div>
+      </div>
+      <button type="button" onClick={onToggle}
+        className={`relative w-10 h-[22px] rounded-full transition-colors ${on ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+        <span className={`absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-[18px]' : ''}`} />
+      </button>
+    </div>
+  );
+}
+
+/* ── Step indicator ── */
+function Steps({ current }) {
+  const steps = ['Details', 'Problems', 'Participants', 'Review'];
+  return (
+    <div className="flex items-center gap-1">
+      {steps.map((s, i) => (
+        <div key={s} className="flex items-center gap-1">
+          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+            i < current ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+            i === current ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' :
+            'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500'
+          }`}>
+            {i < current ? <Check className="w-3 h-3" /> : <span className="w-3 text-center">{i + 1}</span>}
+            <span className="hidden sm:inline">{s}</span>
+          </div>
+          {i < steps.length - 1 && <div className="w-4 h-px bg-zinc-200 dark:bg-zinc-700" />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function CreateChallengePage({ params }) {
   const router = useRouter();
   const groupId = params.id;
   const { data: session, status } = useSession();
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [group, setGroup] = useState(null);
-  const [fetchError, setFetchError] = useState("");
-  const [availableProblems, setAvailableProblems] = useState([]);
-  const [selectedProblems, setSelectedProblems] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filteredProblems, setFilteredProblems] = useState([]);
-  
-  // Setup form with zod validation
-  const form = useForm({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      startTime: "",
-      endTime: "",
-      isPublic: true,
-    },
-  });
 
-  // Fetch group info and check permissions
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [group, setGroup] = useState(null);
+  const [step, setStep] = useState(0);
+
+  // Form state
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [strictMode, setStrictMode] = useState(true);
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const [lateEntryMinutes, setLateEntryMinutes] = useState(5);
+
+  // Problems
+  const [problems, setProblems] = useState([]);
+  const [selected, setSelected] = useState(new Set());
+  const [problemSearch, setProblemSearch] = useState('');
+
+  // Members
+  const [members, setMembers] = useState([]);
+  const [invitedMembers, setInvitedMembers] = useState(new Set());
+  const [memberSearch, setMemberSearch] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   useEffect(() => {
-    const fetchGroup = async () => {
+    if (!session) return;
+    (async () => {
       try {
-        // Fetch group
-        const groupResponse = await fetch(`/api/groups/${groupId}`);
-        if (!groupResponse.ok) {
-          throw new Error('Failed to fetch group');
+        const [gRes, pRes] = await Promise.all([
+          fetch(`/api/groups/${groupId}`),
+          fetch('/api/problems'),
+        ]);
+        if (!gRes.ok) throw new Error('Failed to load group');
+        const gData = await gRes.json();
+        setGroup(gData);
+        if (gData.userRole !== 'ADMIN') {
+          toast.error('No permission'); router.push(`/groups/${groupId}`); return;
         }
-        const groupData = await groupResponse.json();
-        setGroup(groupData);
-        
-        // If user is not an admin, redirect
-        if (groupData.userRole !== 'ADMIN') {
-          toast.error('You do not have permission to create challenges for this group');
-          router.push(`/groups/${groupId}`);
-          return;
+        // Extract members from group data
+        if (gData.group?.members) {
+          setMembers(gData.group.members.map(m => ({
+            id: m.user?.id || m.userId,
+            name: m.user?.name || 'Unknown',
+            email: m.user?.email || '',
+            image: m.user?.image,
+          })).filter(m => m.id !== session.user.id));
         }
-        
-        // Fetch available problems
-        const problemsResponse = await fetch('/api/problems');
-        if (!problemsResponse.ok) {
-          throw new Error('Failed to fetch problems');
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          setProblems(pData.problems || []);
         }
-        const problemsData = await problemsResponse.json();
-        setAvailableProblems(problemsData.problems || []);
-        setFilteredProblems(problemsData.problems || []);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setFetchError('Failed to load required data. Please try again later.');
-        toast.error('Failed to load required data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (session) {
-      fetchGroup();
-    }
+      } catch { toast.error('Failed to load data'); }
+      finally { setLoading(false); }
+    })();
   }, [groupId, session, router]);
 
-  // Filter problems based on search query
-  useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredProblems(availableProblems);
-    } else {
-      const lowerCaseQuery = searchQuery.toLowerCase();
-      const filtered = availableProblems.filter(problem => 
-        problem.title.toLowerCase().includes(lowerCaseQuery) || 
-        (problem.tags && problem.tags.some(tag => tag.toLowerCase().includes(lowerCaseQuery)))
-      );
-      setFilteredProblems(filtered);
-    }
-  }, [searchQuery, availableProblems]);
+  // Filtered problems
+  const filteredProblems = useMemo(() => {
+    if (!problemSearch.trim()) return problems;
+    const q = problemSearch.toLowerCase();
+    return problems.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      p.tags?.some(t => t.toLowerCase().includes(q))
+    );
+  }, [problems, problemSearch]);
 
-  // Redirect if not logged in
+  // Filtered members
+  const filteredMembers = useMemo(() => {
+    if (!memberSearch.trim()) return members;
+    const q = memberSearch.toLowerCase();
+    return members.filter(m =>
+      m.name?.toLowerCase().includes(q) ||
+      m.email?.toLowerCase().includes(q)
+    );
+  }, [members, memberSearch]);
+
+  const toggleProblem = useCallback((id) => {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }, []);
+
+  const toggleMember = useCallback((id) => {
+    setInvitedMembers(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }, []);
+
+  const selectAllMembers = useCallback(() => {
+    setInvitedMembers(new Set(members.map(m => m.id)));
+  }, [members]);
+
+  const deselectAllMembers = useCallback(() => {
+    setInvitedMembers(new Set());
+  }, []);
+
+  const selectedProblems = useMemo(
+    () => problems.filter(p => selected.has(p.id)),
+    [problems, selected],
+  );
+
+  const invitedMembersList = useMemo(
+    () => members.filter(m => invitedMembers.has(m.id)),
+    [members, invitedMembers],
+  );
+
+  // Validation
+  const step0Valid = title.trim().length >= 5 && startTime && endTime && new Date(startTime) < new Date(endTime);
+  const step1Valid = selected.size > 0;
+  const step2Valid = !inviteOnly || invitedMembers.size > 0;
+
+  const canSubmit = step0Valid && step1Valid && step2Valid;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/challenges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          startTime,
+          endTime,
+          isPublic,
+          strictMode,
+          inviteOnly,
+          lateEntryMinutes,
+          problemIds: [...selected],
+          invitedMemberIds: inviteOnly ? [...invitedMembers] : [],
+          sendInviteEmails: inviteOnly && invitedMembers.size > 0,
+          isCustom: false,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed');
+      toast.success('Challenge created!');
+      router.push(`/groups/${groupId}/challenges/${data.id}`);
+    } catch (err) { toast.error(err.message || 'Failed to create challenge'); }
+    finally { setSubmitting(false); }
+  };
+
   if (status === 'unauthenticated') {
     router.push(`/auth/signin?callbackUrl=/groups/${groupId}/create-challenge`);
     return null;
   }
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="container py-10 flex justify-center items-center min-h-[600px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
       </div>
     );
   }
 
-  // Handle adding a problem to the selection
-  const addProblem = (problem) => {
-    if (!selectedProblems.some(p => p.id === problem.id)) {
-      setSelectedProblems([...selectedProblems, problem]);
-    }
-  };
-
-  // Handle removing a problem from the selection
-  const removeProblem = (problemId) => {
-    setSelectedProblems(selectedProblems.filter(p => p.id !== problemId));
-  };
-
-  const onSubmit = async (data) => {
-    if (selectedProblems.length === 0) {
-      toast.error('Please select at least one problem for the challenge');
-      return;
-    }
-    
-    if (new Date(data.startTime) >= new Date(data.endTime)) {
-      form.setError("endTime", { 
-        type: "manual", 
-        message: "End time must be after start time" 
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    
-    try {
-      const response = await fetch(`/api/groups/${groupId}/challenges`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          problemIds: selectedProblems.map(p => p.id),
-          isCustom: false
-        }),
-      });
-      
-      const responseData = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(responseData.message || 'Failed to create challenge');
-      }
-      
-      toast.success('Challenge created successfully!');
-      router.push(`/groups/${groupId}/challenges/${responseData.id}`);
-    } catch (error) {
-      console.error('Error creating challenge:', error);
-      toast.error(error.message || 'Failed to create challenge');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const getDifficultyBadgeVariant = (difficulty) => {
-    switch(difficulty) {
-      case 'EASY': return 'success';
-      case 'MEDIUM': return 'warning';
-      case 'HARD': return 'danger';
-      default: return 'default';
-    }
-  };
-
-  const getDifficultyIcon = (difficulty) => {
-    switch(difficulty) {
-      case 'EASY': return <LightbulbIcon className="h-3.5 w-3.5 mr-1" />;
-      case 'MEDIUM': return <BrainCircuit className="h-3.5 w-3.5 mr-1" />;
-      case 'HARD': return <Rocket className="h-3.5 w-3.5 mr-1" />;
-      default: return null;
-    }
-  };
-
   return (
-    <TooltipProvider>
-      <div className="container py-10 max-w-5xl mx-auto">
-        <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="gap-1"
-            asChild
-          >
-            <Link href={`/groups/${groupId}`}>
-              <ArrowLeft className="h-4 w-4" />
-              Back to Group
-            </Link>
-          </Button>
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+      {/* Back */}
+      <Link href={`/groups/${groupId}`}
+        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Back to group
+      </Link>
+
+      {/* Header + steps */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight">New Challenge</h1>
+          {group?.group?.name && (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{group.group.name}</p>
+          )}
         </div>
-        
-        <Card className="bg-card border-0 shadow-lg">
-          <CardHeader className="text-center bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-t-lg border-b">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full mb-4 shadow-md">
-              <Sparkles className="h-8 w-8 text-white" />
-            </div>
-            <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">Create New Challenge</CardTitle>
-            <CardDescription className="text-lg">
-              For {group?.name}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="pt-8">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="title"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">Challenge Title</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Enter a descriptive title for your challenge" 
-                              className="text-base py-6"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">Challenge Description</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Provide details about the challenge, goals, and any special rules"
-                              className="resize-y min-h-[120px] text-base"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription className="flex items-center gap-1">
-                            <Info className="h-3.5 w-3.5" />
-                            Optional. Markdown formatting is supported.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <FormField
-                    control={form.control}
-                    name="startTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base">Start Time</FormLabel>
-                        <FormControl>
-                          <DateTimePicker
-                            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="endTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-base">End Time</FormLabel>
-                        <FormControl>
-                          <DateTimePicker
-                            icon={<Clock className="h-4 w-4 text-muted-foreground" />}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="md:col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="isPublic"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between space-x-4 rounded-md p-4 bg-muted/40">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Visibility</FormLabel>
-                            <FormDescription>
-                              Make challenge visible to all group members
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              
-                <Separator className="my-8" />
-                
-                <div id="select-problems-section">
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
-                      <Code className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <h3 className="text-xl font-medium">Select Problems</h3>
-                  </div>
-                  
-                  {/* Selected problems */}
-                  <div className="mb-8">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-base font-medium">Selected Problems</h4>
-                      <Badge variant="secondary" className="text-xs px-2 py-1">
-                        {selectedProblems.length} selected
-                      </Badge>
-                    </div>
-                    
-                    {selectedProblems.length === 0 ? (
-                      <div className="bg-muted/50 rounded-md p-6 text-center text-muted-foreground flex flex-col items-center gap-2">
-                        <Flag className="h-6 w-6 mb-1 opacity-60" />
-                        <p>No problems selected yet.</p>
-                        <p className="text-sm">Select problems from the list below to include in this challenge.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {selectedProblems.map(problem => (
-                          <div key={problem.id} className="flex items-center justify-between bg-card border rounded-md p-3 shadow-sm hover:shadow-md transition-shadow group">
-                            <div className="flex items-center gap-3">
-                              <Badge 
-                                variant={getDifficultyBadgeVariant(problem.difficulty)} 
-                                className="flex items-center"
-                              >
-                                {getDifficultyIcon(problem.difficulty)}
-                                {problem.difficulty.charAt(0) + problem.difficulty.slice(1).toLowerCase()}
-                              </Badge>
-                              <span className="font-medium truncate">{problem.title}</span>
-                            </div>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => removeProblem(problem.id)}
-                              className="text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Problem search */}
-                  <div className="relative mb-4">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                      <Search className="h-4 w-4" />
-                    </div>
-                    <Input
-                      type="text"
-                      placeholder="Search problems by title or tags..."
-                      className="pl-10 py-6"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  
-                  {/* Available problems list */}
-                  <div className="border rounded-lg overflow-hidden shadow-sm">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="w-[40px]"></TableHead>
-                          <TableHead>Problem</TableHead>
-                          <TableHead>Difficulty</TableHead>
-                          <TableHead>Tags</TableHead>
-                          <TableHead className="w-[100px] text-right">Add</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProblems.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                              <div className="flex flex-col items-center">
-                                <Search className="h-8 w-8 mb-2 opacity-40" />
-                                {availableProblems.length === 0 
-                                  ? "No problems available." 
-                                  : "No problems match your search criteria."}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredProblems.map(problem => (
-                            <TableRow key={problem.id} className="group hover:bg-muted/30">
-                              <TableCell className="pr-0">
-                                <Checkbox 
-                                  checked={selectedProblems.some(p => p.id === problem.id)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      addProblem(problem);
-                                    } else {
-                                      removeProblem(problem.id);
-                                    }
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="font-medium">{problem.title}</TableCell>
-                              <TableCell>
-                                <Badge 
-                                  variant={getDifficultyBadgeVariant(problem.difficulty)}
-                                  className="flex items-center w-fit"
-                                >
-                                  {getDifficultyIcon(problem.difficulty)}
-                                  {problem.difficulty.charAt(0) + problem.difficulty.slice(1).toLowerCase()}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {problem.tags && problem.tags.map((tag, i) => (
-                                    <Badge 
-                                      key={i} 
-                                      variant="info"
-                                      className="text-xs"
-                                    >
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant={selectedProblems.some(p => p.id === problem.id) ? "secondary" : "outline"}
-                                      size="sm"
-                                      onClick={() => {
-                                        if (selectedProblems.some(p => p.id === problem.id)) {
-                                          removeProblem(problem.id);
-                                        } else {
-                                          addProblem(problem);
-                                        }
-                                      }}
-                                      className="gap-1 transition-all"
-                                    >
-                                      {selectedProblems.some(p => p.id === problem.id) ? (
-                                        <>
-                                          <CheckCircle2 className="h-3.5 w-3.5" />
-                                          Added
-                                        </>
-                                      ) : (
-                                        'Add'
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {selectedProblems.some(p => p.id === problem.id) 
-                                      ? 'Remove from challenge' 
-                                      : 'Add to challenge'}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-                
-                <div className="mt-8 flex justify-end">
-                  <Button 
-                    type="submit" 
-                    className="min-w-36 py-6 text-base flex items-center gap-2 shadow-md hover:shadow-lg transition-shadow"
-                    disabled={isSubmitting || selectedProblems.length === 0}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                        Creating Challenge...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        Create Challenge
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+        <Steps current={step} />
       </div>
-    </TooltipProvider>
+
+      {/* ═══════════════════════ STEP 0: Details ═══════════════════════ */}
+      {step === 0 && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+          {/* Title */}
+          <div className="p-4 sm:p-5">
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Title</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="Weekly DSA Sprint" maxLength={100}
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition" />
+          </div>
+
+          {/* Description */}
+          <div className="p-4 sm:p-5">
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+              Description <span className="text-zinc-400 font-normal">(optional)</span>
+            </label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="Rules, goals, or notes for participants…" rows={3} maxLength={2000}
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition resize-y" />
+          </div>
+
+          {/* Time */}
+          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                <Clock className="w-3.5 h-3.5 inline mr-1 opacity-50" />Start
+              </label>
+              <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                <Clock className="w-3.5 h-3.5 inline mr-1 opacity-50" />End
+              </label>
+              <input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)}
+                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition" />
+            </div>
+          </div>
+
+          {/* Toggles */}
+          <div className="p-4 sm:p-5 space-y-0 divide-y divide-zinc-50 dark:divide-zinc-800/50">
+            <Toggle on={isPublic} onToggle={() => setIsPublic(v => !v)}
+              icon={isPublic ? Eye : EyeOff}
+              label={isPublic ? 'Visible to all members' : 'Hidden challenge'}
+              sublabel="Controls whether non-invited members can see this challenge" />
+            <Toggle on={strictMode} onToggle={() => setStrictMode(v => !v)}
+              icon={Shield}
+              label="Proctored mode"
+              sublabel="Full-screen lock, no copy/paste, exit warnings with auto-disqualification" />
+            <Toggle on={inviteOnly} onToggle={() => setInviteOnly(v => !v)}
+              icon={UserPlus}
+              label="Invite only"
+              sublabel="Only selected members can enter the challenge" />
+          </div>
+
+          {/* Advanced */}
+          <div className="p-4 sm:p-5">
+            <button type="button" onClick={() => setShowAdvanced(v => !v)}
+              className="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors">
+              {showAdvanced ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              Advanced settings
+            </button>
+            {showAdvanced && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Late entry window (minutes)
+                  </label>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mb-1.5">
+                    Participants can join up to this many minutes after start time. After that, entry is blocked.
+                  </p>
+                  <input type="number" min={0} max={30} value={lateEntryMinutes}
+                    onChange={e => setLateEntryMinutes(Math.max(0, Math.min(30, parseInt(e.target.value) || 0)))}
+                    className="w-24 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition" />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ═══════════════════════ STEP 1: Problems ═══════════════════════ */}
+      {step === 1 && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Select Problems</span>
+            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 tabular-nums">
+              {selected.size} selected
+            </span>
+          </div>
+
+          {/* Selected chips */}
+          {selected.size > 0 && (
+            <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap gap-2">
+              {selectedProblems.map(p => (
+                <span key={p.id}
+                  className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
+                  {p.title}
+                  <button type="button" onClick={() => toggleProblem(p.id)}
+                    className="p-0.5 rounded hover:bg-indigo-200/60 dark:hover:bg-indigo-500/20 transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input type="text" value={problemSearch} onChange={e => setProblemSearch(e.target.value)}
+                placeholder="Search by title or tag…"
+                className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition" />
+            </div>
+          </div>
+
+          {/* Problem list */}
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-zinc-50 dark:divide-zinc-800/60">
+            {filteredProblems.length === 0 ? (
+              <div className="py-12 text-center text-sm text-zinc-400 dark:text-zinc-500">No problems found.</div>
+            ) : filteredProblems.map((p, i) => {
+              const isSelected = selected.has(p.id);
+              const c = DIFF[p.difficulty] || DIFF.EASY;
+              return (
+                <button key={p.id} type="button" onClick={() => toggleProblem(p.id)}
+                  className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${i % 2 ? 'bg-zinc-50/40 dark:bg-zinc-800/20' : ''}`}>
+                  <span className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                    isSelected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                    {isSelected && <Check className="w-3 h-3" />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">{p.title}</p>
+                    {p.tags?.length > 0 && (
+                      <div className="flex gap-1 mt-0.5 flex-wrap">
+                        {p.tags.slice(0, 3).map(t => (
+                          <span key={t} className="px-1.5 py-0.5 text-[10px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded">{t}</span>
+                        ))}
+                        {p.tags.length > 3 && <span className="text-[10px] text-zinc-400">+{p.tags.length - 3}</span>}
+                      </div>
+                    )}
+                  </div>
+                  <DiffBadge d={p.difficulty} />
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ═══════════════════════ STEP 2: Participants ═══════════════════════ */}
+      {step === 2 && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {inviteOnly ? 'Select Members to Invite' : 'Challenge Participants'}
+              </span>
+              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 tabular-nums">
+                {inviteOnly ? `${invitedMembers.size} invited` : `${members.length} members`}
+              </span>
+            </div>
+            {!inviteOnly && (
+              <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
+                All group members can join this challenge. Turn on &quot;Invite only&quot; in step 1 to restrict.
+              </p>
+            )}
+          </div>
+
+          {inviteOnly && (
+            <>
+              {/* Select all / none */}
+              <div className="px-4 sm:px-5 py-2 border-b border-zinc-100 dark:border-zinc-800 flex gap-3">
+                <button type="button" onClick={selectAllMembers}
+                  className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Select all</button>
+                <button type="button" onClick={deselectAllMembers}
+                  className="text-xs font-medium text-zinc-500 dark:text-zinc-400 hover:underline">Clear</button>
+              </div>
+
+              {/* Search */}
+              <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                  <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
+                    placeholder="Search members…"
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition" />
+                </div>
+              </div>
+
+              {/* Invited chips */}
+              {invitedMembers.size > 0 && (
+                <div className="px-4 sm:px-5 py-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-wrap gap-2">
+                  {invitedMembersList.map(m => (
+                    <span key={m.id}
+                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-medium">
+                      {m.name}
+                      <button type="button" onClick={() => toggleMember(m.id)}
+                        className="p-0.5 rounded hover:bg-emerald-200/60 dark:hover:bg-emerald-500/20 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Member list */}
+              <div className="max-h-[340px] overflow-y-auto divide-y divide-zinc-50 dark:divide-zinc-800/60">
+                {filteredMembers.length === 0 ? (
+                  <div className="py-10 text-center text-sm text-zinc-400">No members found.</div>
+                ) : filteredMembers.map((m, i) => {
+                  const inv = invitedMembers.has(m.id);
+                  return (
+                    <button key={m.id} type="button" onClick={() => toggleMember(m.id)}
+                      className={`w-full flex items-center gap-3 px-4 sm:px-5 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${i % 2 ? 'bg-zinc-50/40 dark:bg-zinc-800/20' : ''}`}>
+                      <span className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                        inv ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>
+                        {inv && <Check className="w-3 h-3" />}
+                      </span>
+                      {m.image ? (
+                        <img src={m.image} alt=""
+                          className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                          onError={e => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=6366f1&color=fff&size=56`; }} />
+                      ) : (
+                        <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(m.name)}&background=6366f1&color=fff&size=56`}
+                          alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100 truncate">{m.name}</p>
+                        <p className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">{m.email}</p>
+                      </div>
+                      {inv && <Mail className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Info about emails */}
+          {inviteOnly && invitedMembers.size > 0 && (
+            <div className="px-4 sm:px-5 py-3 border-t border-zinc-100 dark:border-zinc-800 bg-indigo-50/50 dark:bg-indigo-500/5">
+              <div className="flex items-start gap-2">
+                <Mail className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" />
+                <p className="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                  An email with the challenge link and schedule will be sent to all {invitedMembers.size} invited member{invitedMembers.size > 1 ? 's' : ''} when the challenge is created.
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ═══════════════════════ STEP 3: Review ═══════════════════════ */}
+      {step === 3 && (
+        <section className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 divide-y divide-zinc-100 dark:divide-zinc-800">
+          {/* Summary header */}
+          <div className="p-4 sm:p-5">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{title}</h2>
+            {description && <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">{description}</p>}
+          </div>
+
+          {/* Schedule */}
+          <div className="p-4 sm:p-5 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mb-0.5">Starts</p>
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                {startTime ? new Date(startTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-zinc-400 dark:text-zinc-500 text-xs mb-0.5">Ends</p>
+              <p className="font-medium text-zinc-800 dark:text-zinc-200">
+                {endTime ? new Date(endTime).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+              </p>
+            </div>
+          </div>
+
+          {/* Settings summary */}
+          <div className="p-4 sm:p-5 space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium ${
+                isPublic ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'
+              }`}>
+                {isPublic ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                {isPublic ? 'Public' : 'Hidden'}
+              </span>
+              {strictMode && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400">
+                  <Shield className="w-3 h-3" /> Proctored
+                </span>
+              )}
+              {inviteOnly && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                  <UserPlus className="w-3 h-3" /> Invite only
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                <Clock className="w-3 h-3" /> {lateEntryMinutes}m late entry
+              </span>
+            </div>
+          </div>
+
+          {/* Problems summary */}
+          <div className="p-4 sm:p-5">
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">{selected.size} Problem{selected.size !== 1 ? 's' : ''}</p>
+            <div className="space-y-1.5">
+              {selectedProblems.map((p, i) => (
+                <div key={p.id} className="flex items-center gap-2 text-sm">
+                  <span className="text-zinc-400 dark:text-zinc-500 tabular-nums text-xs w-4 text-right">{i + 1}.</span>
+                  <span className="text-zinc-800 dark:text-zinc-200 flex-1 truncate">{p.title}</span>
+                  <DiffBadge d={p.difficulty} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Participants summary */}
+          {inviteOnly && invitedMembers.size > 0 && (
+            <div className="p-4 sm:p-5">
+              <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-2">{invitedMembers.size} Invited Member{invitedMembers.size !== 1 ? 's' : ''}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {invitedMembersList.map(m => (
+                  <span key={m.id} className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-xs font-medium">
+                    {m.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Navigation ── */}
+      <div className="flex items-center justify-between pt-2">
+        <div>
+          {step > 0 && (
+            <button type="button" onClick={() => setStep(s => s - 1)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-zinc-200 dark:border-zinc-700 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {/* Step validation hint */}
+          {step === 0 && !step0Valid && (
+            <p className="text-xs text-zinc-400 hidden sm:block">Fill in title and valid times</p>
+          )}
+          {step === 1 && !step1Valid && (
+            <p className="text-xs text-zinc-400 hidden sm:block">Select at least 1 problem</p>
+          )}
+          {step === 2 && inviteOnly && !step2Valid && (
+            <p className="text-xs text-zinc-400 hidden sm:block">Select at least 1 member</p>
+          )}
+
+          {step < 3 ? (
+            <button type="button"
+              onClick={() => setStep(s => s + 1)}
+              disabled={
+                (step === 0 && !step0Valid) ||
+                (step === 1 && !step1Valid) ||
+                (step === 2 && !step2Valid)
+              }
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
+              Continue
+            </button>
+          ) : (
+            <button type="button" onClick={handleSubmit}
+              disabled={submitting || !canSubmit}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm">
+              {submitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Creating…</>
+              ) : (
+                <><Plus className="w-4 h-4" /> Create Challenge</>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
-} 
+}

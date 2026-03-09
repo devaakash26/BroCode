@@ -16,12 +16,12 @@ export async function GET(request, { params }) {
     const url = new URL(request.url);
     const before = url.searchParams.get("before"); // cursor-based pagination
     const limit = Math.min(
-      50,
-      Math.max(1, parseInt(url.searchParams.get("limit") || "50", 10)),
+      30,
+      Math.max(1, parseInt(url.searchParams.get("limit") || "30", 10)),
     );
 
-    // Check membership and fetch messages in parallel
-    const [membership, dbMessages] = await prisma.$transaction([
+    // Run membership check and messages fetch in parallel
+    const [membership, dbMessages] = await Promise.all([
       prisma.userGroup.findUnique({
         where: {
           userId_groupId: {
@@ -99,7 +99,12 @@ export async function GET(request, { params }) {
       messages,
       hasMore: dbMessages.length === limit,
     });
-    response.headers.set("Cache-Control", "private, max-age=5");
+    // Browser caches initial history for 60 s; serves stale up to 2 min while
+    // revalidating. Real-time additions arrive via socket so stale history is fine.
+    response.headers.set(
+      "Cache-Control",
+      "private, max-age=60, stale-while-revalidate=120",
+    );
     return response;
   } catch (error) {
     console.error("Error fetching group messages:", error);

@@ -218,11 +218,18 @@ export default function GroupChallengesPage({ params }) {
                       {status === 'upcoming' && 'Upcoming'}
                       {status === 'past' && 'Ended'}
                     </span>
-                    {!challenge.isPublic && (
-                      <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded dark:bg-yellow-900/30 dark:text-yellow-400">
-                        Private
-                      </span>
-                    )}
+                    <div className="flex gap-1.5">
+                      {challenge.userParticipant?.status === 'DISQUALIFIED' && (
+                        <span className="px-2.5 py-0.5 bg-rose-100 text-rose-700 text-xs font-semibold rounded dark:bg-rose-500/15 dark:text-rose-400">
+                          Disqualified
+                        </span>
+                      )}
+                      {!challenge.isPublic && (
+                        <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded dark:bg-yellow-900/30 dark:text-yellow-400">
+                          Private
+                        </span>
+                      )}
+                    </div>
                   </div>
                   
                   <h3 className="text-lg font-semibold mb-2 line-clamp-2">{challenge.title}</h3>
