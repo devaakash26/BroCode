@@ -111,6 +111,8 @@ app.prepare().then(() => {
   const socketConnections = new ConnectionManager();
   const groupRooms = new Map(); // groupId → Set<userId>
   const challengeRooms = new Map();
+  // Reverse map: socketId → userId  (O(1) lookup, fixes findUser race)
+  const socketToUser = new Map();
 
   // Periodic cleanup of empty rooms
   setInterval(() => {
@@ -122,13 +124,13 @@ app.prepare().then(() => {
     }
   }, 300000);
 
-  // Helper: find userId by socketId
+  // Helper: find userId by socketId — O(1) via reverse map
   function findUser(socketId) {
-    for (const [id, data] of socketConnections.entries()) {
-      if (data.socketId === socketId)
-        return { userId: id, userData: data.userData };
-    }
-    return { userId: null, userData: null };
+    const userId = socketToUser.get(socketId);
+    if (!userId) return { userId: null, userData: null };
+    const data = socketConnections.get(userId);
+    if (!data) return { userId: null, userData: null };
+    return { userId, userData: data.userData };
   }
 
   // ── Socket event handlers ────────────────────────────────────────────────────
@@ -138,9 +140,15 @@ app.prepare().then(() => {
     // Identify authenticated user
     socket.on("identify", (userData) => {
       if (!userData?.id) return;
+      // Remove old reverse-map entry for this user if they had a previous socket
+      const existing = socketConnections.get(userData.id);
+      if (existing?.socketId && existing.socketId !== socket.id) {
+        socketToUser.delete(existing.socketId);
+      }
       socketConnections.set(userData.id, { socketId: socket.id, userData });
+      socketToUser.set(socket.id, userData.id);
       console.log(
-        `[socket] user identified: ${userData.id} (${userData.name})`,
+        `[socket] user identified: ${userData.id} (${userData.name}) socketId: ${socket.id}`,
       );
     });
 
@@ -204,6 +212,9 @@ app.prepare().then(() => {
 
         const { userId, userData } = findUser(socket.id);
         if (!userId) {
+          console.warn(
+            `[socket] sendMessage: findUser failed for ${socket.id} — user not identified`,
+          );
           socket.emit("error", { message: "User not identified" });
           return;
         }
@@ -222,7 +233,13 @@ app.prepare().then(() => {
             },
             sentAt: new Date().toISOString(),
           };
-          io.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+          // Use socket.to (exclude sender — client adds optimistic copy)
+          socket.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+          // Also echo back to sender so all clients get the confirmed message
+          socket.emit("challengeMessage", msg);
+          console.log(
+            `[socket] challengeMessage → room challenge:${challengeId} from ${userId}`,
+          );
           return;
         }
 
@@ -271,6 +288,19 @@ app.prepare().then(() => {
       });
     });
 
+    // Challenge typing indicator
+    socket.on("challengeTyping", (data) => {
+      const { challengeId, isTyping } = data || {};
+      if (!challengeId) return;
+      const { userId, userData } = findUser(socket.id);
+      if (!userId) return;
+      socket.to(`challenge:${challengeId}`).emit("challengeUserTyping", {
+        userId,
+        userName: userData?.name || "Unknown",
+        isTyping: !!isTyping,
+      });
+    });
+
     // Heartbeat — maintain presence
     socket.on("heartbeat", (data) => {
       try {
@@ -306,10 +336,16 @@ app.prepare().then(() => {
       if (!challengeId) return;
       const room = `challenge:${challengeId}`;
       socket.join(room);
+      console.log(`[socket] ${socket.id} joined ${room}`);
       if (!challengeRooms.has(challengeId))
         challengeRooms.set(challengeId, new Set());
       const { userId, userData } = findUser(socket.id);
-      if (!userId) return;
+      if (!userId) {
+        console.warn(
+          `[socket] joinChallenge: findUser failed for ${socket.id} — socket joined room but not tracked`,
+        );
+        return;
+      }
       challengeRooms.get(challengeId).add(userId);
       socket.to(room).emit("participantJoined", {
         userId,
@@ -326,6 +362,7 @@ app.prepare().then(() => {
     socket.on("disconnect", () => {
       console.log("[socket] disconnected:", socket.id);
       const { userId } = findUser(socket.id);
+      socketToUser.delete(socket.id);
       if (!userId) return;
 
       socketConnections.delete(userId);

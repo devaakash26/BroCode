@@ -53,6 +53,7 @@ const io = new Server(server, {
 const socketConnections = new Map(); // userId → { socketId, userData }
 const groupRooms = new Map(); // groupId → Set<userId>
 const challengeRooms = new Map(); // challengeId → Set<userId>
+const socketToUser = new Map(); // socketId → userId  (O(1) reverse lookup)
 
 // Periodic cleanup of empty rooms
 setInterval(() => {
@@ -65,10 +66,11 @@ setInterval(() => {
 }, 300_000);
 
 function findUser(socketId) {
-  for (const [userId, data] of socketConnections.entries()) {
-    if (data.socketId === socketId) return { userId, userData: data.userData };
-  }
-  return { userId: null, userData: null };
+  const userId = socketToUser.get(socketId);
+  if (!userId) return { userId: null, userData: null };
+  const data = socketConnections.get(userId);
+  if (!data) return { userId: null, userData: null };
+  return { userId, userData: data.userData };
 }
 
 // ── Socket event handlers ────────────────────────────────────────────────────────
@@ -77,8 +79,16 @@ io.on("connection", (socket) => {
 
   socket.on("identify", (userData) => {
     if (!userData?.id) return;
+    // Remove old reverse-map entry for this user if they had a previous socket
+    const existing = socketConnections.get(userData.id);
+    if (existing?.socketId && existing.socketId !== socket.id) {
+      socketToUser.delete(existing.socketId);
+    }
     socketConnections.set(userData.id, { socketId: socket.id, userData });
-    console.log(`[socket] identified: ${userData.id} (${userData.name})`);
+    socketToUser.set(socket.id, userData.id);
+    console.log(
+      `[socket] identified: ${userData.id} (${userData.name}) socketId: ${socket.id}`,
+    );
   });
 
   socket.on("joinGroup", (groupId) => {
@@ -138,6 +148,9 @@ io.on("connection", (socket) => {
 
       const { userId, userData } = findUser(socket.id);
       if (!userId) {
+        console.warn(
+          `[socket] sendMessage: findUser failed for ${socket.id} — user not identified`,
+        );
         socket.emit("error", { message: "User not identified" });
         return;
       }
@@ -156,7 +169,12 @@ io.on("connection", (socket) => {
           },
           sentAt: new Date().toISOString(),
         };
-        io.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+        // socket.to excludes sender; then echo back to sender separately
+        socket.to(`challenge:${challengeId}`).emit("challengeMessage", msg);
+        socket.emit("challengeMessage", msg);
+        console.log(
+          `[socket] challengeMessage → room challenge:${challengeId} from ${userId}`,
+        );
         return;
       }
 
@@ -210,6 +228,19 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Challenge typing indicator
+  socket.on("challengeTyping", (data) => {
+    const { challengeId, isTyping } = data || {};
+    if (!challengeId) return;
+    const { userId, userData } = findUser(socket.id);
+    if (!userId) return;
+    socket.to(`challenge:${challengeId}`).emit("challengeUserTyping", {
+      userId,
+      userName: userData?.name || "Unknown",
+      isTyping: !!isTyping,
+    });
+  });
+
   socket.on("heartbeat", (data) => {
     try {
       const { groupId } = data || {};
@@ -242,10 +273,16 @@ io.on("connection", (socket) => {
     if (!challengeId) return;
     const room = `challenge:${challengeId}`;
     socket.join(room);
+    console.log(`[socket] ${socket.id} joined ${room}`);
     if (!challengeRooms.has(challengeId))
       challengeRooms.set(challengeId, new Set());
     const { userId, userData } = findUser(socket.id);
-    if (!userId) return;
+    if (!userId) {
+      console.warn(
+        `[socket] joinChallenge: findUser failed for ${socket.id} — socket joined room but not tracked`,
+      );
+      return;
+    }
     challengeRooms.get(challengeId).add(userId);
     socket.to(room).emit("participantJoined", {
       userId,
@@ -261,6 +298,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("[socket] disconnected:", socket.id);
     const { userId } = findUser(socket.id);
+    socketToUser.delete(socket.id);
     if (!userId) return;
 
     socketConnections.delete(userId);
