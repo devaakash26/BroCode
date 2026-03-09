@@ -120,10 +120,6 @@ app
       perMessageDeflate: {
         threshold: 1024, // Only compress messages larger than 1KB
       },
-      // Cache adapters
-      adapter: process.env.REDIS_URL
-        ? require("@socket.io/redis-adapter")
-        : null,
     });
 
     // Make io instance available globally for API routes
