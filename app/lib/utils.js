@@ -1,6 +1,6 @@
-import { nanoid } from 'nanoid';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { nanoid } from "nanoid";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs) {
   return twMerge(clsx(inputs));
@@ -11,10 +11,10 @@ export function createRandomToken() {
 }
 
 export function formatDate(date) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
   }).format(new Date(date));
 }
 
@@ -34,21 +34,31 @@ export async function notifyWhatsApp(userName, userEmail) {
       ``,
       `━━━━━━━━━━━━━━━`,
       `🔗 *BroCode* | brocode-ai.vercel.app`,
-    ].join('\n');
-    await fetch(`https://graph.facebook.com/v22.0/${phoneId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    ].join("\n");
+
+    const res = await fetch(
+      `https://graph.facebook.com/v22.0/${phoneId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: notifyNumber,
+          type: "text",
+          text: { body: message },
+        }),
       },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: notifyNumber,
-        type: 'text',
-        text: { body: message },
-      }),
-    });
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("WhatsApp API error:", JSON.stringify(data, null, 2));
+    } else {
+      console.log("WhatsApp sent successfully:", JSON.stringify(data));
+    }
   } catch (err) {
-    console.error('WhatsApp notification error:', err);
+    console.error("WhatsApp notification error:", err);
   }
-} 
+}

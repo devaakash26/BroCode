@@ -1,5 +1,5 @@
-import { withAuth } from 'next-auth/middleware';
-import { NextResponse } from 'next/server';
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
 export default withAuth(
   async function middleware(req) {
@@ -7,12 +7,12 @@ export default withAuth(
     const { pathname } = req.nextUrl;
 
     // Role-based access control for admin routes
-    if (pathname.startsWith('/admin') && token?.role !== 'PLATFORM_ADMIN') {
-      const url = req.nextUrl.clone()
-      url.pathname = '/unauthorized' // Redirect to a generic unauthorized page
+    if (pathname.startsWith("/admin") && token?.role !== "PLATFORM_ADMIN") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/unauthorized"; // Redirect to a generic unauthorized page
       return NextResponse.redirect(url);
     }
-    
+
     // Let all other authorized requests pass.
     return NextResponse.next();
   },
@@ -23,14 +23,16 @@ export default withAuth(
 
         // Allow public access to home, auth, and specific API routes
         const publicPaths = [
-          '/',
-          '/auth',
-          '/api/auth',
-          '/api/trpc', // Allow tRPC requests
-          '/problems' // Let's make problems public
+          "/",
+          "/auth",
+          "/api/auth",
+          "/api/trpc", // Allow tRPC requests
+          "/problems", // Let's make problems public
+          "/leaderboard", // Public leaderboard
+          "/help",
         ];
 
-        if (publicPaths.some(path => pathname.startsWith(path))) {
+        if (publicPaths.some((path) => pathname.startsWith(path))) {
           return true;
         }
 
@@ -40,10 +42,10 @@ export default withAuth(
     },
     // If authorization fails, redirect to the login page.
     pages: {
-      signIn: '/auth/signin',
-      error: '/auth/error', // Error code passed in query string
-    }
-  }
+      signIn: "/auth/signin",
+      error: "/auth/error", // Error code passed in query string
+    },
+  },
 );
 
 export const config = {
@@ -56,8 +58,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - /logo.svg (logo file)
+     * - public assets (images, svgs, etc.)
      */
-    '/((?!api/health|api/socket|_next/static|_next/image|favicon.ico|logo.svg).*)',
+    "/((?!api/health|api/socket|_next/static|_next/image|favicon.ico|logo.svg|.*\\.svg$|.*\\.png$|.*\\.jpg$|.*\\.ico$|.*\\.webp$).*)",
   ],
 };
-

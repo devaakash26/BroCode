@@ -135,6 +135,8 @@ model UserGroup {
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId])
+  @@index([userId])  // user's groups lookup
+  @@index([groupId]) // group member listing
 }
 
 enum GroupRole {
@@ -279,6 +281,13 @@ model Submission {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   problem   Problem    @relation(fields: [problemId], references: [id], onDelete: Cascade)
   challenge Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  // Performance indexes
+  @@index([userId, status])           // dashboard stats, profile queries
+  @@index([userId, submittedAt])       // recent submissions, streak calc
+  @@index([userId, problemId, status]) // unique solved problems
+  @@index([problemId])                 // problem submission counts
+  @@index([challengeId])               // challenge leaderboards
 }
 
 enum SubmissionStatus {
@@ -307,6 +316,9 @@ model ChatMessage {
   sender    User       @relation("MessageSender", fields: [senderId], references: [id])
   group     Group      @relation(fields: [groupId], references: [id], onDelete: Cascade)
   challenge Challenge? @relation(fields: [challengeId], references: [id], onDelete: SetNull)
+
+  @@index([groupId, sentAt])       // group chat pagination
+  @@index([challengeId, sentAt])   // challenge chat pagination
 }
 
 // Setting model for storing application settings
@@ -371,6 +383,7 @@ model ChallengeParticipant {
   challenge Challenge @relation(fields: [challengeId], references: [id])
 
   @@unique([userId, challengeId])
+  @@index([challengeId]) // challenge participant listing
 }
 
 // Help Query model

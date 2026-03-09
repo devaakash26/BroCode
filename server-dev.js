@@ -4,6 +4,8 @@ const next = require("next");
 const { Server } = require("socket.io");
 const path = require("path");
 const fs = require("fs");
+const { PrismaClient } = require("@prisma/client");
+const prisma = new PrismaClient({ log: ["error"] });
 
 // This server script uses Next.js in dev mode as a workaround for production build issues
 
@@ -195,7 +197,7 @@ app.prepare().then(() => {
     });
 
     // Send a message to a group
-    socket.on("sendMessage", (data) => {
+    socket.on("sendMessage", async (data) => {
       try {
         const { groupId, content } = data || {};
         if (!groupId || !content?.trim()) return;
@@ -206,14 +208,29 @@ app.prepare().then(() => {
           return;
         }
 
+        const trimmedContent = content.trim();
+
+        // Persist to DB
+        let dbMessage;
+        try {
+          dbMessage = await prisma.chatMessage.create({
+            data: { content: trimmedContent, senderId: userId, groupId },
+            select: { id: true, sentAt: true },
+          });
+        } catch (dbErr) {
+          console.error("[socket] DB save error:", dbErr);
+        }
+
         const message = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          content: content.trim(),
+          id:
+            dbMessage?.id ||
+            `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          content: trimmedContent,
           groupId,
           senderId: userId,
           senderName: userData?.name || "Unknown",
           senderImage: userData?.image || null,
-          sentAt: new Date().toISOString(),
+          sentAt: dbMessage?.sentAt?.toISOString() || new Date().toISOString(),
         };
 
         io.to(`group:${groupId}`).emit("newMessage", message);

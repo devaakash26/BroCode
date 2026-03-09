@@ -7,8 +7,12 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const { PrismaClient } = require("@prisma/client");
 
 const port = parseInt(process.env.PORT || "4000", 10);
+
+// ── Prisma client for persisting messages ───────────────────────────────────────
+const prisma = new PrismaClient({ log: ["error"] });
 
 // ── CORS origins ────────────────────────────────────────────────────────────────
 // Set ALLOWED_ORIGIN to your Vercel URL, e.g. https://brocode.vercel.app
@@ -127,7 +131,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("sendMessage", (data) => {
+  socket.on("sendMessage", async (data) => {
     try {
       const { groupId, content } = data || {};
       if (!groupId || !content?.trim()) return;
@@ -138,14 +142,35 @@ io.on("connection", (socket) => {
         return;
       }
 
+      const trimmedContent = content.trim();
+
+      // Save message to database
+      let dbMessage;
+      try {
+        console.log(dbMessage);
+        dbMessage = await prisma.chatMessage.create({
+          data: {
+            content: trimmedContent,
+            senderId: userId,
+            groupId,
+          },
+          select: { id: true, sentAt: true },
+        });
+      } catch (dbErr) {
+        console.error("[socket] DB save message error:", dbErr);
+        // Continue with in-memory ID as fallback so chat still works
+      }
+
       const message = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        content: content.trim(),
+        id:
+          dbMessage?.id ||
+          `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        content: trimmedContent,
         groupId,
         senderId: userId,
         senderName: userData?.name || "Unknown",
         senderImage: userData?.image || null,
-        sentAt: new Date().toISOString(),
+        sentAt: dbMessage?.sentAt?.toISOString() || new Date().toISOString(),
       };
 
       io.to(`group:${groupId}`).emit("newMessage", message);
@@ -260,4 +285,11 @@ expressApp.get("/", (req, res) => {
 server.listen(port, "0.0.0.0", () => {
   console.log(`Socket.io server running on port ${port}`);
   console.log(`Allowed origins: ${allowedOrigins.join(", ")}`);
+});
+
+// ── Graceful shutdown ────────────────────────────────────────────────────────────
+process.on("SIGTERM", async () => {
+  console.log("[socket-server] SIGTERM received, shutting down...");
+  await prisma.$disconnect();
+  server.close(() => process.exit(0));
 });

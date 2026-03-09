@@ -55,20 +55,15 @@ export async function POST(request) {
       },
     });
 
-    // Send verification email
-    await sendVerificationEmail({
-      to: email,
-      name: name,
-      verificationLink: `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email?token=${token}`,
-    });
+    // Send emails and WhatsApp notification (non-blocking — don't fail registration if these fail)
+    const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL}/auth/verify-email?token=${token}`;
 
-    // Send welcome email
-    await sendWelcomeEmail({
-      to: email,
-      name: name,
-    });
-
-    // Notify via WhatsApp
+    sendVerificationEmail({ to: email, name, verificationLink }).catch((err) =>
+      console.error("Error sending verification email:", err),
+    );
+    sendWelcomeEmail({ to: email, name }).catch((err) =>
+      console.error("Error sending welcome email:", err),
+    );
     notifyWhatsApp(name, email);
 
     // Remove password from response
