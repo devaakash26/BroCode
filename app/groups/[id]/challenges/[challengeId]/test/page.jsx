@@ -55,6 +55,8 @@ export default function TestPage({ params }) {
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState('');
   const chatEndRef = useRef(null);
+  const [typingUsers, setTypingUsers] = useState([]); // [{userId, userName}]
+  const typingTimeoutRef = useRef(null); // for debouncing own typing emit
 
   // Socket
   const {
@@ -118,8 +120,10 @@ export default function TestPage({ params }) {
   /* ─── Socket subscriptions ─── */
   useEffect(() => {
     if (!isConnected || !challengeId) return;
+    console.log('[test] socket subscriptions: joining group', groupId, 'challenge', challengeId);
     joinGroup(groupId);
-    joinChallenge(challengeId);
+    const joined = joinChallenge(challengeId);
+    console.log('[test] joinChallenge result:', joined);
 
     const unsubs = [
       subscribe('leaderboardUpdate', (data) => {
@@ -129,7 +133,17 @@ export default function TestPage({ params }) {
         }
       }),
       subscribe('challengeMessage', (msg) => {
-        setMessages(prev => [...prev.slice(-99), msg]);
+        // Deduplicate: skip if we already added this as an optimistic local message
+        setMessages(prev => {
+          const isDupe = prev.some(m => m._localKey && msg.content === m.content && msg.sender?.id === m.sender?.id);
+          if (isDupe) {
+            // Replace the local message with the server-confirmed one
+            return prev.map(m =>
+              (m._localKey && msg.content === m.content && msg.sender?.id === m.sender?.id) ? msg : m
+            );
+          }
+          return [...prev.slice(-99), msg];
+        });
       }),
       subscribe('challengeEnded', () => handleAutoSubmit()),
       subscribe('participantJoined', ({ userId: joinedId, userName }) => {
@@ -145,6 +159,25 @@ export default function TestPage({ params }) {
       }),
       subscribe('participantCountUpdate', ({ count }) => {
         setOnlineCount(count);
+      }),
+      subscribe('challengeUserTyping', ({ userId: typerId, userName, isTyping }) => {
+        if (typerId === session?.user?.id) return;
+        setTypingUsers(prev => {
+          if (isTyping) {
+            if (prev.some(u => u.userId === typerId)) return prev;
+            return [...prev, { userId: typerId, userName }];
+          }
+          return prev.filter(u => u.userId !== typerId);
+        });
+        // Auto-clear after 3s in case stop event is missed
+        if (isTyping) {
+          setTimeout(() => {
+            setTypingUsers(prev => prev.filter(u => u.userId !== typerId));
+          }, 3000);
+        }
+      }),
+      subscribe('error', (err) => {
+        console.error('[test] socket error from server:', err);
       }),
     ];
     return () => unsubs.forEach(fn => fn());
@@ -292,21 +325,27 @@ export default function TestPage({ params }) {
     const text = msgInput.trim();
     if (!text || !isConnected) return;
 
-    // Ephemeral: socket only, NO DB persistence
-    socketSend({
-      content: text,
-      groupId,
-      challengeId,
-      ephemeral: true, // Signal to socket server not to persist
-    });
-
-    // Optimistic local add
+    // Optimistic local add (deduped when server echo arrives)
     setMessages(prev => [...prev, {
       id: `local-${Date.now()}`,
+      _localKey: true,
       content: text,
       sender: { id: session.user.id, name: session.user.name, image: session.user.image },
       sentAt: new Date().toISOString(),
     }]);
+
+    // Stop typing indicator on send
+    clearTimeout(typingTimeoutRef.current);
+    if (socket?.connected) socket.emit('challengeTyping', { challengeId, isTyping: false });
+
+    // Ephemeral: socket only, NO DB persistence
+    const sent = socketSend({
+      content: text,
+      groupId,
+      challengeId,
+      ephemeral: true,
+    });
+    console.log('[test] sendMessage result:', sent, 'groupId:', groupId, 'challengeId:', challengeId);
     setMsgInput('');
   };
 
@@ -645,10 +684,35 @@ export default function TestPage({ params }) {
                   <div ref={chatEndRef} />
                 </div>
                 {/* Chat input */}
+                {/* Typing indicator */}
+                {typingUsers.length > 0 && (
+                  <div className="px-3 py-1 flex items-center gap-1.5">
+                    <span className="flex gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:300ms]" />
+                    </span>
+                    <span className="text-[10px] text-zinc-500">
+                      {typingUsers.length === 1
+                        ? `${typingUsers[0].userName} is typing`
+                        : `${typingUsers.length} people typing`}
+                    </span>
+                  </div>
+                )}
                 <form onSubmit={handleSendMessage} className="flex items-center gap-2 p-2 border-t border-zinc-800/40">
                   <input
                     value={msgInput}
-                    onChange={e => setMsgInput(e.target.value)}
+                    onChange={e => {
+                      setMsgInput(e.target.value);
+                      // Emit typing indicator
+                      if (socket?.connected && challengeId) {
+                        socket.emit('challengeTyping', { challengeId, isTyping: true });
+                        clearTimeout(typingTimeoutRef.current);
+                        typingTimeoutRef.current = setTimeout(() => {
+                          socket?.emit('challengeTyping', { challengeId, isTyping: false });
+                        }, 1500);
+                      }
+                    }}
                     placeholder="Type a message..."
                     className="flex-1 bg-zinc-800 text-sm text-zinc-200 placeholder-zinc-500 rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-zinc-600"
                     maxLength={500}
