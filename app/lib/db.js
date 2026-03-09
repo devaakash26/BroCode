@@ -3,32 +3,12 @@ import { PrismaClient } from "@prisma/client";
 // This prevents multiple prisma instances in development
 const globalForPrisma = global;
 
-// Initialize Prisma client with error handling
+// Initialize Prisma client
 const createPrismaClient = () => {
-  try {
-    const client = new PrismaClient({
-      log: ["error"],
-      errorFormat: "pretty",
-    });
-
-    // Add middleware for error handling
-    client.$use(async (params, next) => {
-      try {
-        return await next(params);
-      } catch (error) {
-        console.error(
-          `Database error in ${params.model}.${params.action}:`,
-          error,
-        );
-        throw error;
-      }
-    });
-
-    return client;
-  } catch (error) {
-    console.error("Error creating Prisma client:", error);
-    throw error;
-  }
+  const client = new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+  return client;
 };
 
 // Create the Prisma client singleton or reuse the existing one

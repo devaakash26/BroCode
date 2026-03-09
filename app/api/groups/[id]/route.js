@@ -6,50 +6,73 @@ import { prisma, disconnectPrisma } from "@/app/lib/db";
 export async function GET(request, { params }) {
   try {
     const { id } = params;
-    const session = await getServerSession(authOptions);
+
+    // Run session check and DB fetch in parallel
+    const [session, group] = await Promise.all([
+      getServerSession(authOptions),
+      prisma.group.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          inviteCode: true,
+          inviteLink: true,
+          isActive: true,
+          visibility: true,
+          memberLimit: true,
+          image: true,
+          createdAt: true,
+          creatorId: true,
+          _count: {
+            select: { members: true },
+          },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
+          },
+          members: {
+            select: {
+              userId: true,
+              role: true,
+              score: true,
+              solvedCount: true,
+              joinedAt: true,
+              lastActive: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                },
+              },
+            },
+            orderBy: { score: "desc" },
+            take: 100,
+          },
+          challenges: {
+            where: { endTime: { gt: new Date() } },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              startTime: true,
+              endTime: true,
+              isActive: true,
+            },
+            orderBy: { startTime: "asc" },
+            take: 5,
+          },
+        },
+      }),
+    ]);
 
     if (!session) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    // Fetch the group with all necessary data
-    const group = await prisma.group.findUnique({
-      where: { id },
-      include: {
-        creator: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
-        },
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true,
-              },
-            },
-          },
-          orderBy: {
-            score: "desc",
-          },
-        },
-        challenges: {
-          where: {
-            endTime: {
-              gt: new Date(),
-            },
-          },
-          orderBy: {
-            startTime: "asc",
-          },
-          take: 5,
-        },
-      },
-    });
 
     if (!group) {
       return NextResponse.json({ message: "Group not found" }, { status: 404 });

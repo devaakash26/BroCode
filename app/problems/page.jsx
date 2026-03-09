@@ -8,7 +8,10 @@ export const metadata = {
   description: 'Browse and solve DSA problems',
 };
 
+export const revalidate = 60; // ISR: revalidate every 60 seconds
+
 async function getProblems(userId) {
+  // Only select the fields needed for the problem list
   const problems = await prisma.problem.findMany({
     where: {
       isPublic: true,
@@ -23,13 +26,16 @@ async function getProblems(userId) {
           submissions: true,
         },
       },
-      submissions: {
-        where: {
-          userId,
-          status: 'ACCEPTED',
+      ...(userId ? {
+        submissions: {
+          where: {
+            userId,
+            status: 'ACCEPTED',
+          },
+          select: { id: true },
+          take: 1,
         },
-        take: 1,
-      },
+      } : {}),
     },
     orderBy: {
       createdAt: 'desc',

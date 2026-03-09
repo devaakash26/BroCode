@@ -74,18 +74,6 @@ async function loadEmojis() {
   }
 }
 
-const CATEGORY_LABELS = {
-  'smileys-emotion': '😀 Smileys',
-  'people-body': '🧑 People',
-  'animals-nature': '🐶 Animals',
-  'food-drink': '🍕 Food',
-  'travel-places': '✈️ Travel',
-  'activities': '⚽ Activities',
-  'objects': '💡 Objects',
-  'symbols': '❤️ Symbols',
-  'flags': '🏳️ Flags',
-};
-
 export default function GroupChat({ groupId }) {
   const { data: session } = useSession();
   const dispatch = useDispatch();
@@ -489,26 +477,6 @@ export default function GroupChat({ groupId }) {
               </div>
             ) : emojiData ? (
               <>
-                {/* Category tabs */}
-                {!emojiSearch && (
-                  <div className="flex gap-1 px-2 pt-2 pb-1 overflow-x-auto scrollbar-hide">
-                    {Object.keys(emojiData).filter(k => emojiData[k]?.length).map(cat => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setActiveEmojiCat(cat)}
-                        className={`flex-shrink-0 text-[10px] font-medium px-2 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                          activeEmojiCat === cat
-                            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
-                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat]?.split(' ')[0] || cat.split('-')[0]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
                 {/* Emoji grid */}
                 <div className="overflow-y-auto flex-1 px-2 pb-2">
                   {(() => {

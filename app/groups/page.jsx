@@ -13,58 +13,63 @@ export const metadata = {
 
 async function getGroups(userId) {
   try {
-    // Get the user's groups
-    const userGroups = await prisma.userGroup.findMany({
-      where: {
-        userId,
-      },
-      include: {
-        group: {
-          include: {
-            _count: {
-              select: {
-                members: true,
-                challenges: true,
+    // Run both queries in parallel instead of sequentially
+    const [userGroups, otherGroups] = await Promise.all([
+      // 1) User's groups — use select instead of include
+      prisma.userGroup.findMany({
+        where: { userId },
+        select: {
+          role: true,
+          group: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              visibility: true,
+              image: true,
+              _count: {
+                select: { members: true, challenges: true },
               },
             },
           },
         },
-      },
-    });
+      }),
+      // 2) Discover groups — avoid the slow `none` subquery
+      //    Instead, get public groups ordered by popularity, then filter in JS
+      prisma.group.findMany({
+        where: {
+          isActive: true,
+          visibility: 'PUBLIC',
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          visibility: true,
+          image: true,
+          _count: {
+            select: { members: true, challenges: true },
+          },
+        },
+        orderBy: {
+          members: { _count: 'desc' },
+        },
+        take: 20, // fetch a few extra to filter out user's groups
+      }),
+    ]);
 
-    // Get public groups the user is not part of (limited to 5)
-    const otherGroups = await prisma.group.findMany({
-      where: {
-        isActive: true,
-        visibility: 'PUBLIC',
-        members: {
-          none: {
-            userId,
-          },
-        },
-      },
-      take: 5,
-      include: {
-        _count: {
-          select: {
-            members: true,
-            challenges: true,
-          },
-        },
-      },
-      orderBy: {
-        members: {
-          _count: 'desc',
-        },
-      },
-    });
+    // Build a set of the user's group IDs for fast lookup
+    const userGroupIds = new Set(userGroups.map(ug => ug.group.id));
 
     return {
       userGroups: userGroups.map(ug => ({
         ...ug.group,
         role: ug.role,
       })),
-      otherGroups,
+      // Filter out groups the user already belongs to (in JS, not a DB subquery)
+      otherGroups: otherGroups
+        .filter(g => !userGroupIds.has(g.id))
+        .slice(0, 5),
     };
   } catch (error) {
     console.error('Error fetching groups:', error);

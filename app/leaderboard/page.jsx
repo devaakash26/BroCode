@@ -14,77 +14,86 @@ export const metadata = {
   description: 'Global rankings of BroCode users',
 };
 
+export const revalidate = 120; // ISR: revalidate every 2 minutes
+
 async function getLeaderboard(searchQuery = '', sortBy = 'total') {
-  // Get top users by solved problems count
-  const users = await prisma.user.findMany({
-    where: {
-      // Exclude the system user
-      email: { not: 'system@neetcode.io' },
-      // Include search query if provided
-      ...(searchQuery ? {
-        OR: [
-          { name: { contains: searchQuery, mode: 'insensitive' } },
-          { email: { contains: searchQuery, mode: 'insensitive' } },
-        ],
-      } : {}),
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      submissions: {
-        where: {
-          status: 'ACCEPTED',
-        },
-        select: {
-          problemId: true,
-          submittedAt: true,
-        },
-      },
-    },
-    orderBy: {
-      submissions: {
-        _count: 'desc',
-      },
-    },
-    take: 100,
-  });
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Process data to count unique solved problems and calculate rank
-  const leaderboardData = users.map((user, index) => {
-    // Count unique solved problems by filtering out duplicates
-    const uniqueSolvedProblems = [...new Set(user.submissions.map(s => s.problemId))];
-    
-    // Calculate recent activity (problems solved in the last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentSolves = user.submissions.filter(s => s.submittedAt > thirtyDaysAgo).length;
-    
-    return {
-      rank: index + 1,
-      id: user.id,
-      name: user.name || 'Anonymous User',
-      email: user.email,
-      image: user.image,
-      solvedCount: uniqueSolvedProblems.length,
-      recentSolves,
-    };
-  });
+  // Build WHERE clause for the user search
+  const userWhere = {
+    email: { not: 'system@neetcode.io' },
+    ...(searchQuery ? {
+      OR: [
+        { name: { contains: searchQuery, mode: 'insensitive' } },
+        { email: { contains: searchQuery, mode: 'insensitive' } },
+      ],
+    } : {}),
+  };
 
-  // Sort based on the chosen criteria
+  // Run both aggregations in parallel instead of fetching raw submissions
+  const [users, solvedCounts, recentCounts] = await Promise.all([
+    // 1) Fetch user info only — NO submissions loaded
+    prisma.user.findMany({
+      where: userWhere,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+      },
+    }),
+    // 2) Count unique solved problems per user via groupBy
+    prisma.submission.groupBy({
+      by: ['userId', 'problemId'],
+      where: { status: 'ACCEPTED' },
+      _min: { submittedAt: true }, // just to satisfy Prisma; lightweight
+    }),
+    // 3) Count recent submissions (last 30 days) per user
+    prisma.submission.groupBy({
+      by: ['userId'],
+      where: {
+        submittedAt: { gte: thirtyDaysAgo },
+      },
+      _count: { id: true },
+    }),
+  ]);
+
+  // Build lookup maps from the aggregation results
+  const solvedMap = new Map(); // userId -> Set of problemIds
+  for (const row of solvedCounts) {
+    if (!solvedMap.has(row.userId)) solvedMap.set(row.userId, new Set());
+    solvedMap.get(row.userId).add(row.problemId);
+  }
+
+  const recentMap = new Map(); // userId -> count
+  for (const row of recentCounts) {
+    recentMap.set(row.userId, row._count.id);
+  }
+
+  // Build leaderboard from user list
+  const leaderboardData = users.map(user => ({
+    rank: 0,
+    id: user.id,
+    name: user.name || 'Anonymous User',
+    email: user.email,
+    image: user.image,
+    solvedCount: solvedMap.get(user.id)?.size || 0,
+    recentSolves: recentMap.get(user.id) || 0,
+  }));
+
+  // Sort
   if (sortBy === 'recent') {
     leaderboardData.sort((a, b) => b.recentSolves - a.recentSolves);
   } else {
     leaderboardData.sort((a, b) => b.solvedCount - a.solvedCount);
   }
 
-  // Reassign ranks after sorting
-  leaderboardData.forEach((user, index) => {
-    user.rank = index + 1;
-  });
+  // Take top 100 after sorting and assign ranks
+  const top100 = leaderboardData.slice(0, 100);
+  top100.forEach((user, index) => { user.rank = index + 1; });
 
-  return leaderboardData;
+  return top100;
 }
 
 async function LeaderboardContent({searchParams}) {
