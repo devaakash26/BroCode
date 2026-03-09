@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
-import { authOptions } from '@/lib/auth-options';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/app/lib/db';
-import { PrismaClient } from '@prisma/client';
-import redisClient, { redisHelpers } from '@/lib/redis';
+import { NextResponse } from "next/server";
+import { authOptions } from "@/lib/auth-options";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/app/lib/db";
+import { PrismaClient } from "@prisma/client";
+import redisClient, { redisHelpers } from "@/lib/redis";
 
 const prismaClient = new PrismaClient();
 
@@ -12,10 +12,7 @@ export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: groupId } = params;
@@ -32,29 +29,31 @@ export async function GET(request, { params }) {
 
     if (!membership) {
       return NextResponse.json(
-        { error: 'Not a member of this group' },
-        { status: 403 }
+        { error: "Not a member of this group" },
+        { status: 403 },
       );
     }
 
     // Get online users from Redis
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
     const key = `online_users:${groupId}`;
-    
+
     let userIds = [];
     let onlineUsers = [];
-    
+
     try {
       if (redisClient) {
-        userIds = await redisClient.zrangebyscore(key, fiveMinutesAgo, '+inf');
+        userIds = await redisClient.zrange(key, fiveMinutesAgo, "+inf", {
+          byScore: true,
+        });
         // Get actual online users data
         onlineUsers = await redisHelpers.getOnlineUsers(groupId);
       }
     } catch (error) {
-      console.error('Redis error:', error);
+      console.error("Redis error:", error);
       // Continue with fallback data
     }
-    
+
     // Get current member count from database (for comparison/debugging)
     const { _count } = await prismaClient.userGroup.aggregate({
       where: {
@@ -88,24 +87,28 @@ export async function GET(request, { params }) {
         await redisHelpers.updateGroupMemberCount(groupId, _count);
       }
     } catch (error) {
-      console.error('Redis update error:', error);
+      console.error("Redis update error:", error);
       // Continue as Redis is optional
     }
 
     return NextResponse.json({
       onlineCount: userIds.length || 1, // Default to at least 1 (current user)
       totalCount: _count,
-      onlineUsers: onlineUsers.length ? onlineUsers : [{ 
-        userId: session.user.id, 
-        name: session.user.name,
-        lastActive: Date.now()
-      }],
+      onlineUsers: onlineUsers.length
+        ? onlineUsers
+        : [
+            {
+              userId: session.user.id,
+              name: session.user.name,
+              lastActive: Date.now(),
+            },
+          ],
     });
   } catch (error) {
-    console.error('Error getting online users:', error);
+    console.error("Error getting online users:", error);
     return NextResponse.json(
-      { error: 'Failed to get online users' },
-      { status: 500 }
+      { error: "Failed to get online users" },
+      { status: 500 },
     );
   }
-} 
+}
