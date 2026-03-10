@@ -2,18 +2,31 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
+import { redisHelpers } from "@/lib/redis";
 
 // GET handler for fetching the current user's profile
 export async function GET(request) {
+  console.log("[Profile API] ===== REQUEST RECEIVED =====");
   try {
     // Check if user is authenticated
     const session = await getServerSession(authOptions);
+    console.log("[Profile API] Session retrieved:", session?.user?.id);
     if (!session || !session.user) {
       return NextResponse.json(
         { success: false, message: "Unauthorized" },
         { status: 401 },
       );
     }
+
+    // Check cache first
+    console.log("[Profile API] Checking cache for user:", session.user.id);
+    const cachedProfile = await redisHelpers.getUserProfile(session.user.id);
+    console.log("[Profile API] Cache result:", cachedProfile ? "HIT" : "MISS");
+    if (cachedProfile) {
+      console.log("[Profile API] Returning cached profile");
+      return NextResponse.json(cachedProfile, { status: 200 });
+    }
+    console.log("[Profile API] Fetching from database...");
 
     // Fetch user details
     const user = await prisma.user.findUnique({
@@ -122,7 +135,7 @@ export async function GET(request) {
     }
 
     // Return the user details with submissions, activities, and stats
-    const response = NextResponse.json({
+    const profileData = {
       success: true,
       user: {
         ...user,
@@ -133,7 +146,21 @@ export async function GET(request) {
         streak,
         contestsParticipated: 0,
       },
-    });
+    };
+
+    // Cache the profile data
+    console.log(
+      "[Profile API] Attempting to cache profile for user:",
+      session.user.id,
+    );
+    try {
+      await redisHelpers.cacheUserProfile(session.user.id, profileData);
+      console.log("[Profile API] Profile cached successfully");
+    } catch (cacheError) {
+      console.error("[Profile API] Cache error:", cacheError);
+    }
+
+    const response = NextResponse.json(profileData);
     response.headers.set(
       "Cache-Control",
       "private, max-age=30, stale-while-revalidate=60",

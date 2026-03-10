@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
 import { sendEmail } from "@/app/lib/email";
+import { redisHelpers } from "@/lib/redis";
 
 async function notifyAdmin(group, newUser) {
   try {
@@ -117,6 +118,12 @@ export async function POST(request) {
       },
     });
 
+    // Invalidate group cache and user's dashboard stats (since group count changes)
+    await Promise.all([
+      redisHelpers.invalidateGroup(group.id),
+      redisHelpers.invalidateDashboardStats(session.user.id),
+    ]);
+
     // Notify admin
     await notifyAdmin(group, session.user);
 
@@ -194,6 +201,12 @@ export async function GET(request) {
         role: "MEMBER", // Default role is MEMBER
       },
     });
+
+    // Invalidate group cache and user's dashboard stats (since group count changes)
+    await Promise.all([
+      redisHelpers.invalidateGroup(group.id),
+      redisHelpers.invalidateDashboardStats(session.user.id),
+    ]);
 
     // Notify admin
     await notifyAdmin(group, session.user);

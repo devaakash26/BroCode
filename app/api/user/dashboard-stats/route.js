@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
+import { cache } from "@/lib/redis";
 
 export async function GET() {
+  console.log("[Dashboard Stats API] ===== REQUEST RECEIVED =====");
   try {
     const session = await getServerSession(authOptions);
+    console.log("[Dashboard Stats API] Session retrieved:", session?.user?.id);
 
     if (!session || !session.user) {
       return NextResponse.json(
@@ -15,6 +18,21 @@ export async function GET() {
     }
 
     const userId = session.user.id;
+
+    // Check cache first
+    console.log("[Dashboard Stats API] Checking cache for user:", userId);
+    // Dynamic cache key definition using the convention
+    const cacheKey = `brocode-dashboard-stats-${userId}`;
+    const cachedStats = await cache.get(cacheKey);
+    console.log(
+      "[Dashboard Stats API] Cache result:",
+      cachedStats ? "HIT" : "MISS",
+    );
+    if (cachedStats) {
+      console.log("[Dashboard Stats API] Returning cached stats");
+      return NextResponse.json(cachedStats);
+    }
+    console.log("[Dashboard Stats API] Fetching from database...");
 
     // Run all independent queries in parallel with $transaction
     const [
@@ -78,7 +96,7 @@ export async function GET() {
       }),
     ]);
 
-    const response = NextResponse.json({
+    const statsData = {
       success: true,
       stats: {
         submissionCount,
@@ -87,12 +105,23 @@ export async function GET() {
         upcomingChallenges,
         recentSubmissions,
       },
-    });
+    };
 
-    // Cache for 60 seconds — dashboard data doesn't need to be real-time
+    // Cache the stats (1 hour TTL)
+    console.log("[Dashboard Stats API] Attempting to cache stats");
+    try {
+      await cache.set(cacheKey, statsData, 3600); // 1 hour = 3600 seconds
+      console.log("[Dashboard Stats API] Stats cached successfully");
+    } catch (cacheError) {
+      console.error("[Dashboard Stats API] Cache error:", cacheError);
+    }
+
+    const response = NextResponse.json(statsData);
+
+    // Cache for 1 hour — dashboard data doesn't need to be real-time
     response.headers.set(
       "Cache-Control",
-      "private, max-age=60, stale-while-revalidate=120",
+      "private, max-age=3600, stale-while-revalidate=7200",
     );
     return response;
   } catch (error) {
