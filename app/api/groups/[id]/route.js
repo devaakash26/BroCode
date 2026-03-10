@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/app/lib/db";
+import { redisHelpers } from "@/lib/redis";
 
-// Module-level in-memory cache — works in both API routes and RSC.
-// Each entry: { data, cachedAt }.
+// Module-level fallback cache when Redis is unavailable
 const _groupCache = new Map();
 const CACHE_TTL = 30_000; // 30 seconds
 
 async function getGroupCached(id) {
+  // Try Redis first
+  const redisData = await redisHelpers.getGroup(id);
+  if (redisData) return redisData;
+
+  // Fallback to in-memory cache
   const hit = _groupCache.get(id);
   if (hit && Date.now() - hit.cachedAt < CACHE_TTL) return hit.data;
 
@@ -57,13 +62,17 @@ async function getGroupCached(id) {
     },
   });
 
-  // only cache successful fetches
-  if (data) _groupCache.set(id, { data, cachedAt: Date.now() });
+  // Cache in both Redis and in-memory for redundancy
+  if (data) {
+    await redisHelpers.cacheGroup(id, data);
+    _groupCache.set(id, { data, cachedAt: Date.now() });
+  }
   return data;
 }
 
 // Exported so mutation endpoints (PATCH/DELETE) can invalidate the cache.
-export function invalidateGroupCache(id) {
+export async function invalidateGroupCache(id) {
+  await redisHelpers.invalidateGroup(id);
   _groupCache.delete(id);
 }
 
@@ -182,6 +191,9 @@ export async function PATCH(request, { params }) {
       where: { id },
       data: updateData,
     });
+
+    // Invalidate group cache after update
+    await invalidateGroupCache(id);
 
     return NextResponse.json({
       group: updatedGroup,

@@ -2,6 +2,7 @@ import { prisma } from '@/app/lib/db';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import ClientProblemsPage from './client-page';
+import { redisHelpers } from '@/lib/redis';
 
 export const metadata = {
   title: 'Problems - BroCode',
@@ -11,6 +12,22 @@ export const metadata = {
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
 async function getProblems(userId) {
+  // Check if we can use the cached full list
+  const cacheKey = userId ? `brocode-problems-list-user-${userId}` : `brocode-problems-list-public`;
+  
+  if (redisHelpers?.cache) {
+    try {
+      const cachedList = await redisHelpers.cache.get(cacheKey);
+      if (cachedList) {
+        console.log(`[Problems Page] Cache HIT for key: ${cacheKey}`);
+        return cachedList;
+      }
+      console.log(`[Problems Page] Cache MISS for key: ${cacheKey}`);
+    } catch (e) {
+      console.error(`[Problems Page] Cache error mapping to fallback:`, e);
+    }
+  }
+
   // Only select the fields needed for the problem list
   const problems = await prisma.problem.findMany({
     where: {
@@ -54,14 +71,27 @@ async function getProblems(userId) {
   };
 
   // Format the data to include submission status
-  return problems.map(problem => ({
+  const formattedProblems = problems.map(problem => ({
     ...problem,
-    solved: problem.submissions.length > 0,
+    solved: problem.submissions?.length > 0 || false,
     submissions: undefined, // Remove submissions from the returned object
     submissionCount: problem._count.submissions,
     _count: undefined, // Remove _count from the returned object
     acceptance: 60 + (simpleHash(problem.id) % 41), // Deterministic acceptance rate
   }));
+
+  // Cache the result for future use (1 hour for public list, 5 mins for user-specific)
+  if (redisHelpers?.cache) {
+    try {
+      const ttl = userId ? 300 : 3600;
+      await redisHelpers.cache.set(cacheKey, formattedProblems, ttl);
+      console.log(`[Problems Page] Successfully cached list at key: ${cacheKey}`);
+    } catch (e) {
+      console.error(`[Problems Page] Failed to cache list:`, e);
+    }
+  }
+
+  return formattedProblems;
 }
 
 export default async function ProblemsPage() {

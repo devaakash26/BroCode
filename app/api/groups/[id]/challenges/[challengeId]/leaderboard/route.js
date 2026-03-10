@@ -1,21 +1,19 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/app/lib/db";
+import { redisHelpers } from "@/lib/redis";
 
 export async function GET(request, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    
+
     const { id: groupId, challengeId } = params;
-    
+
     // Check if the challenge exists and belongs to the group
     const challenge = await prisma.challenge.findFirst({
       where: {
@@ -26,16 +24,16 @@ export async function GET(request, { params }) {
         startTime: true,
         endTime: true,
         realTimeLeaderboard: true,
-      }
+      },
     });
-    
+
     if (!challenge) {
       return NextResponse.json(
-        { message: 'Challenge not found' },
-        { status: 404 }
+        { message: "Challenge not found" },
+        { status: 404 },
       );
     }
-    
+
     // Check if the user is a member of the group
     const userGroup = await prisma.userGroup.findFirst({
       where: {
@@ -43,21 +41,27 @@ export async function GET(request, { params }) {
         groupId,
       },
     });
-    
+
     const isGroupMember = !!userGroup;
-    
+
     if (!isGroupMember) {
       return NextResponse.json(
-        { message: 'You are not a member of this group' },
-        { status: 403 }
+        { message: "You are not a member of this group" },
+        { status: 403 },
       );
     }
-    
+
+    // Check cache first
+    const cachedLeaderboard = await redisHelpers.getLeaderboard(challengeId);
+    if (cachedLeaderboard) {
+      return NextResponse.json(cachedLeaderboard);
+    }
+
     // Get all submissions for this challenge
     const submissions = await prisma.submission.findMany({
       where: {
         challengeId,
-        status: 'ACCEPTED', // Only count accepted submissions
+        status: "ACCEPTED", // Only count accepted submissions
       },
       include: {
         user: {
@@ -76,39 +80,39 @@ export async function GET(request, { params }) {
         },
       },
       orderBy: {
-        submittedAt: 'asc', // Earlier submissions first
+        submittedAt: "asc", // Earlier submissions first
       },
     });
-    
+
     // Process submissions to create the leaderboard
     const userMap = new Map();
-    
-    submissions.forEach(submission => {
+
+    submissions.forEach((submission) => {
       const userId = submission.user.id;
-      
+
       // Calculate points based on difficulty
       let points = 0;
       switch (submission.problem.difficulty) {
-        case 'EASY':
+        case "EASY":
           points = 100;
           break;
-        case 'MEDIUM':
+        case "MEDIUM":
           points = 200;
           break;
-        case 'HARD':
+        case "HARD":
           points = 300;
           break;
         default:
           points = 100;
       }
-      
+
       // Add bonus points for early submission
       // This could be refined based on your scoring algorithm
-      
+
       // If this user is already in the map
       if (userMap.has(userId)) {
         const userData = userMap.get(userId);
-        
+
         // If this problem is not already solved by this user
         if (!userData.solvedProblems.has(submission.problem.id)) {
           userData.solvedProblems.add(submission.problem.id);
@@ -129,35 +133,40 @@ export async function GET(request, { params }) {
         });
       }
     });
-    
+
     // Convert the map to an array and sort by score
     const leaderboard = Array.from(userMap.values())
-      .map(entry => ({
+      .map((entry) => ({
         user: entry.user,
         score: entry.score,
         problemsSolved: entry.problemsSolved,
       }))
       .sort((a, b) => b.score - a.score || b.problemsSolved - a.problemsSolved);
-    
+
     // Add ranks
     leaderboard.forEach((entry, index) => {
       entry.rank = index + 1;
     });
-    
+
     // Check if the challenge has started
     const now = new Date();
     const hasStarted = now >= challenge.startTime;
     const hasEnded = now >= challenge.endTime;
-    
+
     // Only return real data if challenge has started or if real-time leaderboard is enabled
     if (hasStarted || challenge.realTimeLeaderboard) {
-      return NextResponse.json({
+      const responseData = {
         leaderboard,
         status: {
           hasStarted,
           hasEnded,
         },
-      });
+      };
+
+      // Cache the leaderboard
+      await redisHelpers.cacheLeaderboard(challengeId, responseData);
+
+      return NextResponse.json(responseData);
     } else {
       // Return empty leaderboard if challenge hasn't started
       return NextResponse.json({
@@ -165,15 +174,15 @@ export async function GET(request, { params }) {
         status: {
           hasStarted: false,
           hasEnded: false,
-          message: "Leaderboard will be available once the challenge begins."
+          message: "Leaderboard will be available once the challenge begins.",
         },
       });
     }
   } catch (error) {
-    console.error('Error fetching leaderboard:', error);
+    console.error("Error fetching leaderboard:", error);
     return NextResponse.json(
-      { message: 'Error fetching leaderboard', error: error.message },
-      { status: 500 }
+      { message: "Error fetching leaderboard", error: error.message },
+      { status: 500 },
     );
   }
-} 
+}

@@ -3,9 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
 import axios from "axios";
-
-const JUDGE0_API_URL = process.env.JUDGE0_API_URL;
-const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY;
+import { JUDGE0_URL, getJudge0Headers, isJudge0Configured } from "@/lib/judge0";
+import { redisHelpers } from "@/lib/redis";
 
 const languageToJudge0Id = {
   javascript: 63,
@@ -46,7 +45,7 @@ async function getLeaderboard(challengeId) {
 
 export async function POST(request) {
   try {
-    if (!JUDGE0_API_URL || !JUDGE0_API_KEY) {
+    if (!isJudge0Configured()) {
       return NextResponse.json(
         { message: "Code execution service is not configured." },
         { status: 500 },
@@ -103,15 +102,9 @@ export async function POST(request) {
 
     // Submit code to Judge0
     const createSubmissionsResponse = await axios.post(
-      `${JUDGE0_API_URL}/submissions/batch?base64_encoded=false`,
+      `${JUDGE0_URL}/submissions/batch?base64_encoded=false`,
       { submissions },
-      {
-        headers: {
-          "X-RapidAPI-Key": JUDGE0_API_KEY,
-          "X-RapidAPI-Host": new URL(JUDGE0_API_URL).host,
-          "Content-Type": "application/json",
-        },
-      },
+      { headers: getJudge0Headers() },
     );
 
     const submissionTokens = createSubmissionsResponse.data.map((s) => s.token);
@@ -123,13 +116,8 @@ export async function POST(request) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const getSubmissionsResponse = await axios.get(
-        `${JUDGE0_API_URL}/submissions/batch?tokens=${submissionTokens.join(",")}&base64_encoded=false&fields=*`,
-        {
-          headers: {
-            "X-RapidAPI-Key": JUDGE0_API_KEY,
-            "X-RapidAPI-Host": new URL(JUDGE0_API_URL).host,
-          },
-        },
+        `${JUDGE0_URL}/submissions/batch?tokens=${submissionTokens.join(",")}&base64_encoded=false&fields=*`,
+        { headers: getJudge0Headers() },
       );
 
       const results = getSubmissionsResponse.data.submissions;
@@ -247,6 +235,17 @@ export async function POST(request) {
         }
       });
       */
+    }
+
+    // Invalidate caches after successful submission
+    if (status === "ACCEPTED") {
+      // Invalidate user profile and stats
+      await redisHelpers.invalidateUserProfile(session.user.id);
+
+      // If part of a challenge, invalidate leaderboard
+      if (challengeId) {
+        await redisHelpers.invalidateChallenge(challengeId);
+      }
     }
 
     return NextResponse.json({

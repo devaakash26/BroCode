@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma, disconnectPrisma } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma, disconnectPrisma } from "@/app/lib/db";
+import { redisHelpers } from "@/lib/redis";
 
 // Handler for removing a member from a group
 export async function DELETE(request, { params }) {
@@ -9,7 +10,10 @@ export async function DELETE(request, { params }) {
     // Authentication check
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     const { id: groupId, userId: targetUserId } = params;
@@ -17,11 +21,14 @@ export async function DELETE(request, { params }) {
     // Get the group to check permissions
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { creatorId: true }
+      select: { creatorId: true },
     });
 
     if (!group) {
-      return NextResponse.json({ success: false, error: 'Group not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Group not found" },
+        { status: 404 },
+      );
     }
 
     // Check if user is the creator of the group
@@ -38,14 +45,17 @@ export async function DELETE(request, { params }) {
     });
 
     // Check if user is admin
-    const isAdmin = userMembership?.role === 'ADMIN';
+    const isAdmin = userMembership?.role === "ADMIN";
 
     // Only admins and the creator can remove members
     if (!isAdmin && !isCreator) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'You do not have permission to remove members' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "You do not have permission to remove members",
+        },
+        { status: 403 },
+      );
     }
 
     // Get target user's membership
@@ -59,23 +69,32 @@ export async function DELETE(request, { params }) {
     });
 
     if (!targetMembership) {
-      return NextResponse.json({ success: false, error: 'User is not a member of this group' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "User is not a member of this group" },
+        { status: 404 },
+      );
     }
 
     // Don't allow removing the creator
     if (targetUserId === group.creatorId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Cannot remove the group creator' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cannot remove the group creator",
+        },
+        { status: 403 },
+      );
     }
 
     // Regular admins can't remove other admins, only the creator can
-    if (targetMembership.role === 'ADMIN' && !isCreator) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Only the group creator can remove admins' 
-      }, { status: 403 });
+    if (targetMembership.role === "ADMIN" && !isCreator) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Only the group creator can remove admins",
+        },
+        { status: 403 },
+      );
     }
 
     // Remove the user from the group
@@ -93,21 +112,30 @@ export async function DELETE(request, { params }) {
       where: { id: groupId },
       data: {
         currentMembers: {
-          decrement: 1
-        }
-      }
+          decrement: 1,
+        },
+      },
     });
+
+    // Invalidate group cache and the removed user's dashboard stats
+    await Promise.all([
+      redisHelpers.invalidateGroup(groupId),
+      redisHelpers.invalidateDashboardStats(targetUserId),
+    ]);
 
     return NextResponse.json({
       success: true,
-      message: 'Member removed successfully'
+      message: "Member removed successfully",
     });
   } catch (error) {
-    console.error('Error removing member:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to remove member' 
-    }, { status: 500 });
+    console.error("Error removing member:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to remove member",
+      },
+      { status: 500 },
+    );
   } finally {
     await disconnectPrisma();
   }
@@ -119,7 +147,10 @@ export async function PATCH(request, { params }) {
     // Authentication check
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     const { id: groupId, userId: targetUserId } = params;
@@ -127,26 +158,35 @@ export async function PATCH(request, { params }) {
     const { role } = data;
 
     // Validate role
-    if (role !== 'ADMIN' && role !== 'MEMBER') {
-      return NextResponse.json({ success: false, error: 'Invalid role' }, { status: 400 });
+    if (role !== "ADMIN" && role !== "MEMBER") {
+      return NextResponse.json(
+        { success: false, error: "Invalid role" },
+        { status: 400 },
+      );
     }
 
     // Get the group to check permissions
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { creatorId: true }
+      select: { creatorId: true },
     });
 
     if (!group) {
-      return NextResponse.json({ success: false, error: 'Group not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "Group not found" },
+        { status: 404 },
+      );
     }
 
     // Only the creator can change roles
     if (group.creatorId !== session.user.id) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Only the group creator can modify member roles' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Only the group creator can modify member roles",
+        },
+        { status: 403 },
+      );
     }
 
     // Check if the target user is a member of the group
@@ -160,15 +200,21 @@ export async function PATCH(request, { params }) {
     });
 
     if (!targetMembership) {
-      return NextResponse.json({ success: false, error: 'User is not a member of this group' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "User is not a member of this group" },
+        { status: 404 },
+      );
     }
 
     // Don't allow changing the role of the creator
     if (targetUserId === group.creatorId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Cannot change the role of the group creator' 
-      }, { status: 403 });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cannot change the role of the group creator",
+        },
+        { status: 403 },
+      );
     }
 
     // Update the user's role
@@ -179,20 +225,26 @@ export async function PATCH(request, { params }) {
           groupId: groupId,
         },
       },
-      data: { role }
+      data: { role },
     });
+
+    // Invalidate group cache after role change
+    await redisHelpers.invalidateGroup(groupId);
 
     return NextResponse.json({
       success: true,
-      message: `Member role updated to ${role}`
+      message: `Member role updated to ${role}`,
     });
   } catch (error) {
-    console.error('Error updating member role:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Failed to update member role' 
-    }, { status: 500 });
+    console.error("Error updating member role:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update member role",
+      },
+      { status: 500 },
+    );
   } finally {
     await disconnectPrisma();
   }
-} 
+}
