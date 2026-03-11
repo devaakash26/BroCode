@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
 import { sendEmail } from "@/app/lib/email";
+import { redisHelpers } from "@/lib/redis";
 
 export async function POST(request, { params }) {
   try {
@@ -122,6 +123,13 @@ export async function POST(request, { params }) {
       );
       // Do not block the join process if email fails
     }
+
+    // Invalidate group cache, user's dashboard stats, and groups list (member count changed)
+    await Promise.all([
+      redisHelpers.invalidateGroup(groupId),
+      redisHelpers.invalidateDashboardStats(session.user.id),
+      redisHelpers.invalidateAllGroupsLists(), // Member count in list changed
+    ]);
 
     return NextResponse.json({
       message: "Successfully joined the group",

@@ -5,6 +5,7 @@ import { prisma } from "@/app/lib/db";
 import { nanoid } from "nanoid";
 import { uploadToCloudinary } from "@/app/lib/fileUpload";
 import { v4 as uuidv4 } from "uuid";
+import { redisHelpers } from "@/lib/redis";
 
 export async function POST(request) {
   try {
@@ -164,6 +165,10 @@ export async function POST(request) {
         },
       },
     });
+
+    // Invalidate all groups list caches since a new group was created
+    console.log("[Groups Create API] Invalidating groups list cache");
+    await redisHelpers.invalidateAllGroupsLists();
 
     // Return the created group data
     return NextResponse.json(

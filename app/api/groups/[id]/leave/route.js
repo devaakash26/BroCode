@@ -48,10 +48,11 @@ export async function POST(request, { params }) {
       },
     });
 
-    // Invalidate group cache and user's dashboard stats
+    // Invalidate group cache, user's dashboard stats, and groups list (member count changed)
     await Promise.all([
       redisHelpers.invalidateGroup(groupId),
       redisHelpers.invalidateDashboardStats(userId),
+      redisHelpers.invalidateAllGroupsLists(), // Member count in list changed
     ]);
 
     return NextResponse.json({

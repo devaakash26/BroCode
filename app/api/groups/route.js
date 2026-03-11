@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
 import { nanoid } from "nanoid";
+import { redisHelpers } from "@/lib/redis";
 
 export async function POST(request) {
   try {
@@ -72,6 +73,23 @@ export async function GET(request) {
     const page = parseInt(searchParams.get("page") || "1", 10);
     const skip = (page - 1) * limit;
 
+    // Create cache key from filters
+    const filters = {
+      query,
+      limit,
+      page,
+      userId: session.user.id, // Include user ID since results are user-specific
+    };
+
+    // Try to get from cache first
+    const cachedData = await redisHelpers.getGroupsList(filters);
+    if (cachedData) {
+      console.log("[Groups API] Returning cached groups list");
+      return NextResponse.json(cachedData);
+    }
+
+    console.log("[Groups API] Cache miss, fetching from database");
+
     const whereClause = {
       isActive: true,
       name: {
@@ -120,7 +138,7 @@ export async function GET(request) {
       where: whereClause,
     });
 
-    return NextResponse.json({
+    const responseData = {
       groups,
       pagination: {
         total: totalCount,
@@ -128,7 +146,13 @@ export async function GET(request) {
         limit,
         totalPages: Math.ceil(totalCount / limit),
       },
-    });
+    };
+
+    // Cache the result
+    await redisHelpers.cacheGroupsList(filters, responseData);
+    console.log("[Groups API] Cached groups list");
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching groups:", error);
     return NextResponse.json(
