@@ -9,7 +9,12 @@ import { store } from '@/lib/store/store';
 export default function Providers({ children }) {
   return (
     <ReduxProvider store={store}>
-      <SessionProvider>
+      <SessionProvider
+        // Optimize session fetching to reduce API calls
+        refetchInterval={0}  // Disable periodic refetching (JWT handles auth)
+        refetchOnWindowFocus={false}  // Don't refetch when user focuses window
+        refetchWhenOffline={false}  // Don't refetch when offline
+      >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Toaster position="top-right" />
           {children}

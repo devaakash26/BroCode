@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import {
   ChevronLeft, ChevronRight, Trophy, MessageCircle, X,
   Users, Maximize2, Send, AlertTriangle, Clock, Shield,
-  Code2, BarChart3,
+  Code2, BarChart3, Loader2,
 } from 'lucide-react';
 import CodeEditor from '@/app/components/problems/code-editor';
 import useSocket from '@/app/hooks/useSocket';
@@ -27,6 +27,8 @@ export default function TestPage({ params }) {
   const [challenge, setChallenge] = useState(null);
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   // Navigation
   const [problemIdx, setProblemIdx] = useState(0);
@@ -51,6 +53,10 @@ export default function TestPage({ params }) {
   // Live presence
   const [onlineCount, setOnlineCount] = useState(0);
 
+  // Completion modal
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
+
   // Ephemeral chat
   const [messages, setMessages] = useState([]);
   const [msgInput, setMsgInput] = useState('');
@@ -71,11 +77,14 @@ export default function TestPage({ params }) {
       router.push(`/auth/signin?callbackUrl=/groups/${groupId}/challenges/${challengeId}/test`);
       return;
     }
-    (async () => {
+(async () => {
       try {
-        const res = await fetch(`/api/groups/${groupId}/challenges/${challengeId}`);
-        if (!res.ok) throw new Error('Failed to load');
-        const data = await res.json();
+        const [cRes, gRes] = await Promise.all([
+          fetch(`/api/groups/${groupId}/challenges/${challengeId}`),
+          fetch(`/api/groups/${groupId}`),
+        ]);
+        if (!cRes.ok) throw new Error('Failed to load');
+        const data = await cRes.json();
         setChallenge(data);
         setProblems(data.problems || []);
         if (data.participant?.status === 'DISQUALIFIED') {
@@ -86,6 +95,11 @@ export default function TestPage({ params }) {
         if (data.participant?.warningCount) {
           setWarnings(data.participant.warningCount);
           warningsRef.current = data.participant.warningCount;
+        }
+        // Check admin status
+        if (gRes.ok) {
+          const groupData = await gRes.json();
+          setIsAdmin(groupData.isAdmin || false);
         }
       } catch {
         toast.error('Failed to load challenge');
@@ -187,18 +201,6 @@ export default function TestPage({ params }) {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   /* ─── Fullscreen + Security ─── */
-  const enterFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
-    const el = containerRef.current;
-    (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen)?.call(el);
-  }, []);
-
-  const exitFullscreen = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.();
-    }
-  }, []);
-
   // Enter fullscreen on mount for strict mode
   // Browsers require a user gesture for requestFullscreen — show gate screen instead
   useEffect(() => {
@@ -294,24 +296,88 @@ export default function TestPage({ params }) {
     } catch {}
   }, [groupId, challengeId]);
 
+  // Fullscreen helpers
+  const exitFullscreen = useCallback(() => {
+    if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  }, []);
+
+  const enterFullscreen = useCallback(() => {
+    if (containerRef.current) {
+      const el = containerRef.current;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (fn) fn.call(el).catch(() => {});
+    }
+  }, []);
+
+  /* ─── End challenge (admin only) ─── */
+  const handleEndChallenge = useCallback(async () => {
+    if (!window.confirm('Are you sure you want to end this challenge? Report cards will be sent to all participants.')) {
+      return;
+    }
+    
+    setEnding(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/challenges/${challengeId}/end`, {
+        method: 'POST',
+      });
+      
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || 'Failed to end challenge');
+      }
+      
+      const data = await res.json();
+      toast.success(`Challenge ended! ${data.participantsNotified} report cards sent.`);
+      
+      // Exit fullscreen and redirect
+      isExitingRef.current = true;
+      exitFullscreen();
+      setTimeout(() => router.push(`/groups/${groupId}/challenges/${challengeId}`), 1500);
+    } catch (err) { 
+      toast.error(err.message); 
+    } finally { 
+      setEnding(false); 
+    }
+  }, [groupId, challengeId, router]);
+
   /* ─── Navigation & Actions ─── */
   const handleComplete = useCallback(async () => {
     try {
       await fetch(`/api/groups/${groupId}/challenges/${challengeId}/complete`, {
         method: 'POST',
       });
+      // Show completion modal
+      isExitingRef.current = true;
+      exitFullscreen();
+      setShowCompletionModal(true);
+      setRedirectCountdown(5);
     } catch {}
   }, [groupId, challengeId]);
+
+  // Auto redirect countdown
+  useEffect(() => {
+    if (!showCompletionModal) return;
+    if (redirectCountdown <= 0) {
+      router.push(`/groups/${groupId}`);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setRedirectCountdown(c => c - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [showCompletionModal, redirectCountdown, router, groupId]);
+
+  const handleBackToGroup = () => {
+    setShowCompletionModal(false);
+    router.push(`/groups/${groupId}`);
+  };
 
   const handleAutoSubmit = useCallback(() => {
     isExitingRef.current = true;
     exitFullscreen();
     handleComplete();
-    toast.success('Challenge ended. Your submissions have been recorded.');
-    setTimeout(() => {
-      router.push(`/groups/${groupId}/challenges/${challengeId}`);
-    }, 1500);
-  }, [groupId, challengeId, router, exitFullscreen, handleComplete]);
+    toast.success('Challenge time ended. Your submissions have been recorded.');
+  }, [exitFullscreen, handleComplete]);
 
   const handleExit = () => {
     isExitingRef.current = true;
@@ -463,6 +529,41 @@ export default function TestPage({ params }) {
             }`}>
               {pad(timeLeft.h)}:{pad(timeLeft.m)}:{pad(timeLeft.s)}
             </div>
+          )}
+
+          {/* Admin: Both End All and Finish buttons */}
+          {isAdmin && timeLeft && (
+            <>
+              <button
+                onClick={handleEndChallenge}
+                disabled={ending}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded transition-colors"
+                title="End Challenge for Everyone"
+              >
+                {ending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                {ending ? 'Ending...' : 'End All'}
+              </button>
+              <button
+                onClick={handleComplete}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors"
+                title="Finish and exit your participation"
+              >
+                <Clock className="w-3 h-3" />
+                Finish
+              </button>
+            </>
+          )}
+
+          {/* Regular participants: Only Finish button */}
+          {!isAdmin && timeLeft && (
+            <button
+              onClick={handleComplete}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors"
+              title="Finish and exit challenge"
+            >
+              <Clock className="w-3 h-3" />
+              Finish
+            </button>
           )}
 
           {/* Warning count */}
@@ -754,6 +855,38 @@ export default function TestPage({ params }) {
               }}
               className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-sm font-medium text-white transition-colors">
               {warnings >= 3 ? 'OK' : 'Return to Fullscreen'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━ Completion Modal ━━━ */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 mx-auto mb-4">
+              <Trophy className="w-8 h-8 text-emerald-400" />
+            </div>
+            <h3 className="text-2xl font-bold text-zinc-100 text-center mb-2">
+              Thank You!
+            </h3>
+            <p className="text-sm text-zinc-400 text-center mb-6">
+              Your test has been submitted successfully. Your submissions have been recorded and will be evaluated.
+            </p>
+            <div className="text-center mb-6">
+              <p className="text-xs text-zinc-500 mb-2">
+                Redirecting to group in
+              </p>
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-zinc-800 border border-zinc-700">
+                <span className="text-2xl font-bold text-zinc-100 tabular-nums">
+                  {redirectCountdown}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={handleBackToGroup}
+              className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-sm font-semibold text-white transition-colors shadow-lg">
+              Back to Group
             </button>
           </div>
         </div>

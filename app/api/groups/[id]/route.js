@@ -47,7 +47,6 @@ async function getGroupCached(id) {
         take: 20,
       },
       challenges: {
-        where: { endTime: { gt: new Date() } },
         select: {
           id: true,
           title: true,
@@ -56,8 +55,8 @@ async function getGroupCached(id) {
           endTime: true,
           isActive: true,
         },
-        orderBy: { startTime: "asc" },
-        take: 5,
+        orderBy: { startTime: "desc" },
+        take: 10,
       },
     },
   });
