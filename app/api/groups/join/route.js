@@ -118,10 +118,11 @@ export async function POST(request) {
       },
     });
 
-    // Invalidate group cache and user's dashboard stats (since group count changes)
+    // Invalidate group cache, user's dashboard stats, and groups list (member count changed)
     await Promise.all([
       redisHelpers.invalidateGroup(group.id),
       redisHelpers.invalidateDashboardStats(session.user.id),
+      redisHelpers.invalidateAllGroupsLists(), // Member count in list changed
     ]);
 
     // Notify admin
@@ -202,10 +203,11 @@ export async function GET(request) {
       },
     });
 
-    // Invalidate group cache and user's dashboard stats (since group count changes)
+    // Invalidate group cache, user's dashboard stats, and groups list (member count changed)
     await Promise.all([
       redisHelpers.invalidateGroup(group.id),
       redisHelpers.invalidateDashboardStats(session.user.id),
+      redisHelpers.invalidateAllGroupsLists(), // Member count in list changed
     ]);
 
     // Notify admin
