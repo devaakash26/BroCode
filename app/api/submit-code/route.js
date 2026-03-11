@@ -242,6 +242,9 @@ export async function POST(request) {
       // Invalidate user profile and stats
       await redisHelpers.invalidateUserProfile(session.user.id);
 
+      // Invalidate global leaderboard since rankings may have changed
+      await redisHelpers.invalidateLeaderboard();
+
       // If part of a challenge, invalidate leaderboard
       if (challengeId) {
         await redisHelpers.invalidateChallenge(challengeId);

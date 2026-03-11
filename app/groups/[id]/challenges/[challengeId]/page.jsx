@@ -66,6 +66,8 @@ export default function ChallengeDetailsPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [tab, setTab] = useState('problems');
+  const [ending, setEnding] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [lbLoading, setLbLoading] = useState(false);
@@ -103,7 +105,11 @@ export default function ChallengeDetailsPage({ params }) {
           fetch(`/api/groups/${groupId}`),
           fetch(`/api/groups/${groupId}/challenges/${challengeId}`),
         ]);
-        if (gRes.ok) { const d = await gRes.json(); setGroup(d.group); }
+        if (gRes.ok) { 
+          const d = await gRes.json(); 
+          setGroup(d.group);
+          setIsAdmin(d.isAdmin || false);
+        }
         if (cRes.ok) { setChallenge(await cRes.json()); }
         else throw new Error('Not found');
       } catch { toast.error('Failed to load challenge'); }
@@ -144,6 +150,38 @@ export default function ChallengeDetailsPage({ params }) {
       router.push(`/groups/${groupId}/challenges/${challengeId}/test`);
     } catch (err) { toast.error(err.message); }
     finally { setJoining(false); }
+  };
+
+  // End challenge (admin only)
+  const handleEndChallenge = async () => {
+    if (!window.confirm('Are you sure you want to end this challenge? Report cards will be sent to all participants.')) {
+      return;
+    }
+    
+    setEnding(true);
+    try {
+      const res = await fetch(`/api/groups/${groupId}/challenges/${challengeId}/end`, {
+        method: 'POST',
+      });
+      
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || 'Failed to end challenge');
+      }
+      
+      const data = await res.json();
+      toast.success(`Challenge ended! ${data.participantsNotified} report cards sent.`);
+      
+      // Refresh challenge data
+      const cRes = await fetch(`/api/groups/${groupId}/challenges/${challengeId}`);
+      if (cRes.ok) { 
+        setChallenge(await cRes.json()); 
+      }
+    } catch (err) { 
+      toast.error(err.message); 
+    } finally { 
+      setEnding(false); 
+    }
   };
 
   if (loading || authStatus === 'loading') {
@@ -198,9 +236,21 @@ export default function ChallengeDetailsPage({ params }) {
                 </span>
               )}
             </div>
-            {challenge.creator?.name && (
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">by {challenge.creator.name}</span>
-            )}
+            <div className="flex items-center gap-2">
+              {challenge.creator?.name && (
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">by {challenge.creator.name}</span>
+              )}
+              {isAdmin && timing?.phase === 'active' && (
+                <button
+                  onClick={handleEndChallenge}
+                  disabled={ending}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors"
+                >
+                  {ending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Clock className="w-3 h-3" />}
+                  {ending ? 'Ending...' : 'End Challenge'}
+                </button>
+              )}
+            </div>
           </div>
 
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50 tracking-tight mb-1">{challenge.title}</h1>
