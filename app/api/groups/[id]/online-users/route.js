@@ -38,14 +38,59 @@ export async function GET(req, { params }) {
     });
     const memberIds = groupMembers.map((m) => m.userId);
 
-    // Get online users from Redis
+    // Get online users - try Socket server first, then Redis fallback
     let onlineUserIds = [];
-    try {
-      onlineUserIds = await redisHelpers.getOnlineUserIds();
-      console.log("[online-users] Total online users:", onlineUserIds.length);
-    } catch (error) {
-      console.error("[online-users] Redis error:", error);
-      // Continue with empty array if Redis fails
+    let dataSource = "none";
+
+    // Method 1: Query Socket.io server directly (most reliable)
+    const socketUrl =
+      process.env.NEXT_PUBLIC_SOCKET_URL || process.env.SOCKET_SERVER_URL;
+    if (socketUrl) {
+      try {
+        const socketApiUrl = socketUrl.replace(/\/$/, "") + "/api/online-users";
+        console.log("[online-users] Querying socket server:", socketApiUrl);
+
+        const response = await fetch(socketApiUrl, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.users)) {
+            onlineUserIds = data.users.map((u) => u.userId || u.id);
+            dataSource = "socket-server";
+            console.log(
+              `[online-users] Socket server returned ${onlineUserIds.length} users`,
+            );
+          }
+        } else {
+          console.warn(
+            `[online-users] Socket server returned ${response.status}`,
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[online-users] Socket server fetch error:",
+          error.message,
+        );
+      }
+    }
+
+    // Method 2: Fallback to Redis if socket server failed
+    if (onlineUserIds.length === 0) {
+      try {
+        onlineUserIds = await redisHelpers.getOnlineUserIds();
+        dataSource = "redis";
+        console.log(
+          "[online-users] Redis returned",
+          onlineUserIds.length,
+          "users",
+        );
+      } catch (error) {
+        console.error("[online-users] Redis error:", error);
+      }
     }
 
     // Filter out current group members and current user
@@ -54,11 +99,13 @@ export async function GET(req, { params }) {
     );
 
     console.log(
-      "[online-users] Group members:",
+      "[online-users] Source:",
+      dataSource,
+      "| Group members:",
       memberIds.length,
-      "Online:",
+      "| Online:",
       onlineUserIds.length,
-      "Invitable:",
+      "| Invitable:",
       invitableUserIds.length,
     );
 
