@@ -5,7 +5,60 @@ const { Server } = require("socket.io");
 const path = require("path");
 const fs = require("fs");
 const { PrismaClient } = require("@prisma/client");
+const Redis = require("ioredis");
+
 const prisma = new PrismaClient({ log: ["error"] });
+
+// ── Redis client for online user tracking ───────────────────────────────────────
+const REDIS_PROVIDER = process.env.REDIS_PROVIDER || "railway";
+let redis = null;
+
+console.log(`[server-dev] 🔍 Checking Redis configuration...`);
+console.log(`[server-dev] REDIS_PROVIDER: ${REDIS_PROVIDER}`);
+
+// Initialize Redis based on provider
+if (REDIS_PROVIDER === "railway") {
+  const redisUrl = process.env.RAILWAY_REDIS_URL;
+  console.log(`[server-dev] RAILWAY_REDIS_URL exists: ${!!redisUrl}`);
+
+  if (redisUrl) {
+    const urlStart = redisUrl.substring(0, 10);
+    console.log(`[server-dev] URL starts with: ${urlStart}`);
+  }
+
+  // Check if Redis URL is valid (not empty and not placeholder)
+  if (redisUrl && redisUrl.startsWith("redis://")) {
+    console.log("[server-dev] 🔧 Initializing Redis connection...");
+    redis = new Redis(redisUrl, {
+      maxRetriesPerRequest: 3,
+      retryStrategy: (times) => Math.min(times * 50, 2000),
+      lazyConnect: false,
+    });
+
+    redis.on("error", (err) => {
+      console.error("[server-dev] ❌ Redis error:", err.message);
+    });
+
+    redis.on("connect", () => {
+      console.log("[server-dev] 🔄 Redis connecting...");
+    });
+
+    redis.on("ready", () => {
+      console.log("[server-dev] ✅ Redis ready - online tracking enabled");
+    });
+  } else {
+    console.warn(
+      "[server-dev] ⚠️  Railway Redis URL not configured or invalid",
+    );
+    console.warn("[server-dev] Expected format: redis://...");
+  }
+} else if (REDIS_PROVIDER === "upstash") {
+  console.warn(
+    "[server-dev] ⚠️  Upstash Redis not supported in dev server (use Railway)",
+  );
+} else {
+  console.warn("[server-dev] ⚠️  No Redis provider - online tracking disabled");
+}
 
 // This server script uses Next.js in dev mode as a workaround for production build issues
 
@@ -138,7 +191,7 @@ app.prepare().then(() => {
     console.log("[socket] connected:", socket.id);
 
     // Identify authenticated user
-    socket.on("identify", (userData) => {
+    socket.on("identify", async (userData) => {
       if (!userData?.id) return;
       // Remove old reverse-map entry for this user if they had a previous socket
       const existing = socketConnections.get(userData.id);
@@ -147,6 +200,29 @@ app.prepare().then(() => {
       }
       socketConnections.set(userData.id, { socketId: socket.id, userData });
       socketToUser.set(socket.id, userData.id);
+
+      // Track online user in Redis with 30-minute expiry
+      if (redis) {
+        try {
+          await redis.setex(
+            `user:online:${userData.id}`,
+            1800,
+            JSON.stringify({
+              id: userData.id,
+              name: userData.name,
+              image: userData.image,
+              email: userData.email,
+              lastSeen: new Date().toISOString(),
+            }),
+          );
+          console.log(
+            `[socket] ✓ Tracked online user in Redis: ${userData.id}`,
+          );
+        } catch (err) {
+          console.error("[socket] Redis setex error:", err);
+        }
+      }
+
       console.log(
         `[socket] user identified: ${userData.id} (${userData.name}) socketId: ${socket.id}`,
       );
@@ -359,13 +435,42 @@ app.prepare().then(() => {
     });
 
     // Disconnect
-    socket.on("disconnect", () => {
+    // Send notification to specific user
+    socket.on("sendNotification", ({ recipientId, notification }) => {
+      if (!recipientId || !notification) return;
+
+      const recipientConnection = socketConnections.get(recipientId);
+      if (recipientConnection?.socketId) {
+        io.to(recipientConnection.socketId).emit(
+          "newNotification",
+          notification,
+        );
+        console.log(
+          `[socket] 📨 Sent notification to user ${recipientId}:`,
+          notification.type,
+        );
+      } else {
+        console.log(`[socket] ⚠️  User ${recipientId} not connected`);
+      }
+    });
+
+    socket.on("disconnect", async () => {
       console.log("[socket] disconnected:", socket.id);
       const { userId } = findUser(socket.id);
       socketToUser.delete(socket.id);
       if (!userId) return;
 
       socketConnections.delete(userId);
+
+      // Remove user from online tracking in Redis
+      if (redis && userId) {
+        try {
+          await redis.del(`user:online:${userId}`);
+          console.log(`[socket] ✓ Removed user from Redis: ${userId}`);
+        } catch (err) {
+          console.error("[socket] Redis del error:", err);
+        }
+      }
 
       for (const [groupId, members] of groupRooms.entries()) {
         if (!members.has(userId)) continue;

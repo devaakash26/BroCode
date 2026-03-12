@@ -45,6 +45,8 @@ model User {
   ChallengeParticipant ChallengeParticipant[]
   helpQueries          HelpQuery[]
   queryReplies         QueryReply[]
+  notifications        Notification[]         @relation("NotificationReceiver")
+  notificationsSent    Notification[]         @relation("NotificationSender")
 }
 
 enum UserRole {
@@ -422,4 +424,36 @@ enum QueryStatus {
   OPEN
   IN_PROGRESS
   RESOLVED
+}
+
+// Notification model for real-time notifications
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String // Recipient
+  senderId  String? // Who triggered the notification (optional for system notifications)
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  metadata  Json? // Additional data (groupId, invitationId, etc.)
+  read      Boolean          @default(false)
+  actionUrl String? // URL to navigate when notification is clicked
+  createdAt DateTime         @default(now())
+  expiresAt DateTime? // Optional expiration for time-sensitive notifications
+
+  // Relations
+  user   User  @relation("NotificationReceiver", fields: [userId], references: [id], onDelete: Cascade)
+  sender User? @relation("NotificationSender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read, createdAt]) // unread notifications query
+  @@index([userId, createdAt]) // user notifications pagination
+}
+
+enum NotificationType {
+  GROUP_INVITATION
+  GROUP_JOIN_REQUEST
+  CHALLENGE_STARTED
+  CHALLENGE_REMINDER
+  ACHIEVEMENT
+  SYSTEM_ANNOUNCEMENT
+  MENTION
 }
