@@ -60,6 +60,7 @@ async function getSocket(sessionUser) {
         id: sessionUser.id,
         name: sessionUser.name,
         image: sessionUser.image,
+        email: sessionUser.email,
       });
     }
   });
@@ -92,6 +93,7 @@ async function getSocket(sessionUser) {
         id: sessionUser.id,
         name: sessionUser.name,
         image: sessionUser.image,
+        email: sessionUser.email,
       });
     }
   });
@@ -141,6 +143,7 @@ export default function useSocket(options = {}) {
             id: session.user.id,
             name: session.user.name,
             image: session.user.image,
+            email: session.user.email,
           });
         }
       })

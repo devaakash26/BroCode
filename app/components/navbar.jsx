@@ -6,6 +6,7 @@ import { NavLink } from './nav-link';
 import { useSession, signOut } from 'next-auth/react';
 import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List, HelpCircle, ShieldCheck } from 'lucide-react';
 import ThemeToggle from './theme-toggle';
+import NotificationBell from './NotificationBell';
 import { Button } from "../../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { usePathname } from 'next/navigation';
@@ -79,6 +80,7 @@ export default function Navbar({
           
           <div className="flex items-center space-x-4">
             <ThemeToggle />
+            <NotificationBell />
             
             {session ? (
               <DropdownMenu>

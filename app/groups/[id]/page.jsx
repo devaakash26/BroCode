@@ -17,6 +17,7 @@ import {
 import GroupChat from '@/app/components/GroupChat';
 import useSocket from '@/app/hooks/useSocket';
 import InviteMembersDialog from '@/components/InviteMembersDialog';
+import InviteUsersModal from '@/app/components/InviteUsersModal';
 import {
   fetchGroup,
   upsertActiveMember,
@@ -379,7 +380,8 @@ export default function GroupDetailPage({ params }) {
   const { data: group, isAdmin, isMember, status: groupStatus, leaderboard, activeMembers, lastFetched, status: groupSliceStatus } = useSelector(s => s.group);
   const { isConnected, joinGroup, subscribe, sendHeartbeat } = useSocket({ disableToasts: true });
   const heartbeatRef = useRef(null);
-  const hasJoinedRef = useRef(false);
+  const hasJoinedRef = useRef( false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   const fiveMinAgo = () => new Date(Date.now() - 5 * 60 * 1000);
 
@@ -535,6 +537,15 @@ export default function GroupDetailPage({ params }) {
         <div className="absolute top-4 right-4 md:top-5 md:right-6 flex items-center gap-2 z-10">
           <InviteMembersDialog group={group}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-xl bg-white text-gray-800 hover:bg-gray-50 transition-colors shadow-lg border-0" />
+          {(isAdmin || isMember) && (
+            <button
+              onClick={() => setInviteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Invite Online
+            </button>
+          )}
           {isAdmin && (
             <Link href={`/groups/${groupId}/settings`}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-lg">
@@ -647,6 +658,13 @@ export default function GroupDetailPage({ params }) {
           </div>
         </div>
       </div>
+
+      {/* Invite Users Modal */}
+      <InviteUsersModal
+        groupId={groupId}
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+      />
     </div>
   );
 }
