@@ -58,19 +58,58 @@ export default function QueryDetailPage() {
       return;
     }
     setIsReplying(true);
+    
+    // Optimistic update - add reply immediately to UI
+    const optimisticReply = {
+      id: `temp-${Date.now()}`,
+      message: replyMessage,
+      createdAt: new Date().toISOString(),
+      user: {
+        name: session.user.name,
+        image: session.user.image,
+        role: 'PLATFORM_ADMIN'
+      }
+    };
+    
+    // Update local state optimistically
+    setQuery(prev => ({
+      ...prev,
+      replies: [...prev.replies, optimisticReply]
+    }));
+    
+    // Clear input immediately for better UX
+    const messageCopy = replyMessage;
+    setReplyMessage('');
+    
     try {
       const response = await fetch(`/api/admin/queries/${queryId}/reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: replyMessage }),
+        body: JSON.stringify({ message: messageCopy }),
       });
+      
       if (!response.ok) {
         throw new Error('Failed to post reply');
       }
-      setReplyMessage('');
-      fetchQuery(); // Re-fetch to show new reply
+      
+      const data = await response.json();
+      
+      // Replace optimistic reply with actual reply from server
+      setQuery(prev => ({
+        ...prev,
+        replies: prev.replies.map(r => 
+          r.id === optimisticReply.id ? data.reply : r
+        )
+      }));
+      
       toast.success('Reply sent successfully!');
     } catch (error) {
+      // Rollback optimistic update on error
+      setQuery(prev => ({
+        ...prev,
+        replies: prev.replies.filter(r => r.id !== optimisticReply.id)
+      }));
+      setReplyMessage(messageCopy); // Restore message
       toast.error(error.message);
     } finally {
       setIsReplying(false);
@@ -78,17 +117,25 @@ export default function QueryDetailPage() {
   };
   
   const handleResolve = async () => {
-    setIsReplying(true); // Disable buttons while processing
+    setIsReplying(true);
+    
+    // Optimistic update - mark as resolved immediately
+    const previousStatus = query.status;
+    setQuery(prev => ({ ...prev, status: 'RESOLVED' }));
+    
     try {
       const response = await fetch(`/api/admin/queries/${queryId}/resolve`, {
         method: 'PATCH',
       });
+      
       if (!response.ok) {
         throw new Error('Failed to resolve query');
       }
-      fetchQuery(); // Re-fetch to update status
+      
       toast.success('Query marked as resolved!');
     } catch (error) {
+      // Rollback optimistic update on error
+      setQuery(prev => ({ ...prev, status: previousStatus }));
       toast.error(error.message);
     } finally {
       setIsReplying(false);
@@ -162,7 +209,7 @@ export default function QueryDetailPage() {
                       <span className="font-bold">{reply.user.role === 'PLATFORM_ADMIN' ? 'You' : reply.user.name}</span>
                       <span className="text-xs text-gray-500">{format(new Date(reply.createdAt), 'PPpp')}</span>
                     </div>
-                    <div className={`p-3 rounded-lg mt-1 inline-block ${reply.user.role === 'PLATFORM_ADMIN' ? 'bg-indigo-500 text-white' : 'bg-white dark:bg-gray-800'}`}>
+                    <div className={`p-3 rounded-lg mt-1 inline-block ${reply.user.role === 'PLATFORM_ADMIN' ? 'bg-orange-500 text-white' : 'bg-white dark:bg-gray-800'}`}>
                       {reply.message}
                     </div>
                   </div>
