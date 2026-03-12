@@ -42,7 +42,7 @@ export async function GET(req, { params }) {
     let onlineUserIds = [];
     let dataSource = "none";
 
-    // Method 1: Query Socket.io server directly (most reliable)
+    // Method 1: Query Socket.io server directly (most reliable - gets actual connected sockets)
     const socketUrl =
       process.env.NEXT_PUBLIC_SOCKET_URL || process.env.SOCKET_SERVER_URL;
     if (socketUrl) {
@@ -50,11 +50,17 @@ export async function GET(req, { params }) {
         const socketApiUrl = socketUrl.replace(/\/$/, "") + "/api/online-users";
         console.log("[online-users] Querying socket server:", socketApiUrl);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
         const response = await fetch(socketApiUrl, {
           method: "GET",
           headers: { "Content-Type": "application/json" },
           cache: "no-store",
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (response.ok) {
           const data = await response.json();
@@ -62,7 +68,7 @@ export async function GET(req, { params }) {
             onlineUserIds = data.users.map((u) => u.userId || u.id);
             dataSource = "socket-server";
             console.log(
-              `[online-users] Socket server returned ${onlineUserIds.length} users`,
+              `[online-users] Socket server returned ${onlineUserIds.length} users from ${data.connectedSockets} connected sockets`,
             );
           }
         } else {
@@ -71,25 +77,66 @@ export async function GET(req, { params }) {
           );
         }
       } catch (error) {
-        console.error(
-          "[online-users] Socket server fetch error:",
-          error.message,
-        );
+        if (error.name === "AbortError") {
+          console.warn("[online-users] Socket server request timed out");
+        } else {
+          console.error(
+            "[online-users] Socket server fetch error:",
+            error.message,
+          );
+        }
+      }
+    } else {
+      console.warn("[online-users] No socket server URL configured");
+    }
+
+    // Method 2: Fallback to Redis if socket server failed or returned no users
+    if (onlineUserIds.length === 0) {
+      console.log("[online-users] Falling back to Redis...");
+      try {
+        const redisIds = await redisHelpers.getOnlineUserIds();
+        if (redisIds && redisIds.length > 0) {
+          onlineUserIds = redisIds;
+          dataSource = "redis";
+          console.log(
+            "[online-users] Redis returned",
+            onlineUserIds.length,
+            "users",
+          );
+        }
+      } catch (error) {
+        console.error("[online-users] Redis error:", error);
       }
     }
 
-    // Method 2: Fallback to Redis if socket server failed
+    // Method 3: Final fallback - get recently active users from database (last 10 minutes)
     if (onlineUserIds.length === 0) {
+      console.log(
+        "[online-users] Falling back to database (recent activity)...",
+      );
       try {
-        onlineUserIds = await redisHelpers.getOnlineUserIds();
-        dataSource = "redis";
+        const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+        const recentUsers = await prisma.user.findMany({
+          where: {
+            lastSeen: {
+              gte: tenMinutesAgo,
+            },
+            id: {
+              notIn: memberIds, // exclude current group members
+            },
+          },
+          select: { id: true },
+          take: 50,
+        });
+        onlineUserIds = recentUsers.map((u) => u.id);
+        dataSource = "database-recent";
         console.log(
-          "[online-users] Redis returned",
+          "[online-users] Database returned",
           onlineUserIds.length,
-          "users",
+          "recently active users",
         );
       } catch (error) {
-        console.error("[online-users] Redis error:", error);
+        console.error("[online-users] Database fallback error:", error);
       }
     }
 
@@ -105,12 +152,21 @@ export async function GET(req, { params }) {
       memberIds.length,
       "| Online:",
       onlineUserIds.length,
-      "| Invitable:",
+      "| Invitable (after filter):",
       invitableUserIds.length,
+      "| Timestamp:",
+      new Date().toISOString(),
     );
 
     if (invitableUserIds.length === 0) {
-      return NextResponse.json({ users: [] });
+      return NextResponse.json({
+        users: [],
+        source: dataSource,
+        message:
+          dataSource === "none"
+            ? "No online users found across all sources"
+            : "No invitable users found",
+      });
     }
 
     // Fetch user details
@@ -128,11 +184,19 @@ export async function GET(req, { params }) {
       take: 50, // Limit to 50 users
     });
 
-    return NextResponse.json({ users });
+    console.log(
+      `[online-users] Returning ${users.length} user details to client`,
+    );
+
+    return NextResponse.json({
+      users,
+      source: dataSource,
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     console.error("[online-users] GET error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch online users" },
+      { error: "Failed to fetch online users", message: error.message },
       { status: 500 },
     );
   }

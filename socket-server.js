@@ -146,7 +146,7 @@ async function syncInMemoryToRedis() {
 
 // Track user as online in both memory and Redis (fault-proof)
 async function trackUserOnline(userId, userData) {
-  // Always store in memory first
+  // Always store in memory first with timestamp
   inMemoryOnlineUsers.set(userId, {
     userData,
     timestamp: Date.now(),
@@ -199,33 +199,114 @@ async function trackUserOffline(userId) {
   console.log(`[socket-server] ✓ User ${userId} removed from online tracking`);
 }
 
-// ── Maintenance Intervals ────────────────────────────────────────────────────────
+// Refresh user's online status (called by heartbeat)
+async function refreshUserOnline(userId) {
+  const userData = inMemoryOnlineUsers.get(userId);
+  if (!userData) return false;
 
-// Heartbeat: Refresh Redis TTL for all online users every 10 minutes
-setInterval(async () => {
-  if (!redis || !redisReady || inMemoryOnlineUsers.size === 0) return;
+  // Update timestamp in memory
+  userData.timestamp = Date.now();
 
-  console.log(
-    `[socket-server] ♥ Heartbeat: Refreshing TTL for ${inMemoryOnlineUsers.size} online users...`,
-  );
-  let refreshed = 0;
-
-  for (const [userId, data] of inMemoryOnlineUsers.entries()) {
+  // Refresh TTL in Redis
+  if (redis && redisReady) {
     try {
-      await redis.expire(`user:online:${userId}`, 1800); // Reset to 30 minutes
-      refreshed++;
+      await redis.expire(`user:online:${userId}`, 1800);
+      return true;
     } catch (err) {
       console.error(
-        `[socket-server] Heartbeat error for user ${userId}:`,
+        `[socket-server] Refresh TTL error for ${userId}:`,
         err.message,
       );
     }
   }
+  return false;
+}
+
+// Get all online users from actual socket connections (most accurate)
+function getOnlineUsersFromSockets() {
+  const onlineUsers = [];
+  const now = Date.now();
+
+  // Iterate through all connected sockets
+  for (const [userId, data] of socketConnections.entries()) {
+    const socket = io.sockets.sockets.get(data.socketId);
+    if (socket && socket.connected) {
+      // User has active connection
+      const memoryData = inMemoryOnlineUsers.get(userId);
+      onlineUsers.push({
+        userId,
+        ...data.userData,
+        socketId: data.socketId,
+        connected: true,
+        lastSeen: memoryData
+          ? new Date(memoryData.timestamp).toISOString()
+          : new Date().toISOString(),
+      });
+    }
+  }
+
+  // Also include users from memory who might have connections
+  for (const [userId, data] of inMemoryOnlineUsers.entries()) {
+    const timeSinceActive = now - data.timestamp;
+    // Include if active within last 5 minutes and not already added
+    if (
+      timeSinceActive < 300000 &&
+      !onlineUsers.find((u) => u.userId === userId)
+    ) {
+      onlineUsers.push({
+        userId,
+        ...data.userData,
+        connected: false,
+        lastSeen: new Date(data.timestamp).toISOString(),
+      });
+    }
+  }
+
+  return onlineUsers;
+}
+
+// ── Maintenance Intervals ────────────────────────────────────────────────────────
+
+// Heartbeat: Refresh Redis TTL for all online users every 5 minutes
+setInterval(async () => {
+  if (inMemoryOnlineUsers.size === 0) return;
 
   console.log(
-    `[socket-server] ♥ Heartbeat refreshed TTL for ${refreshed} users`,
+    `[socket-server] 💓 Heartbeat: Refreshing TTL for ${inMemoryOnlineUsers.size} online users...`,
   );
-}, 600_000); // 10 minutes
+  let refreshedRedis = 0;
+  let activeConnections = 0;
+
+  for (const [userId, data] of inMemoryOnlineUsers.entries()) {
+    // Check if user has active socket connection
+    const conn = socketConnections.get(userId);
+    if (conn) {
+      const socket = io.sockets.sockets.get(conn.socketId);
+      if (socket && socket.connected) {
+        activeConnections++;
+        // Update timestamp for active connections
+        data.timestamp = Date.now();
+      }
+    }
+
+    // Refresh Redis TTL
+    if (redis && redisReady) {
+      try {
+        await redis.expire(`user:online:${userId}`, 1800); // Reset to 30 minutes
+        refreshedRedis++;
+      } catch (err) {
+        console.error(
+          `[socket-server] Heartbeat error for user ${userId}:`,
+          err.message,
+        );
+      }
+    }
+  }
+
+  console.log(
+    `[socket-server] 💓 Heartbeat complete: ${activeConnections} active, ${refreshedRedis} refreshed in Redis`,
+  );
+}, 300_000); // 5 minutes
 
 // Cleanup: Remove stale entries from memory every 5 minutes
 setInterval(() => {
@@ -321,12 +402,18 @@ io.on("connection", (socket) => {
   console.log("[socket] connected:", socket.id);
 
   socket.on("identify", async (userData) => {
-    if (!userData?.id) return;
+    if (!userData?.id) {
+      console.warn("[socket] identify called without user ID");
+      return;
+    }
 
     // Remove old reverse-map entry for this user if they had a previous socket
     const existing = socketConnections.get(userData.id);
     if (existing?.socketId && existing.socketId !== socket.id) {
       socketToUser.delete(existing.socketId);
+      console.log(
+        `[socket] Replaced old socket ${existing.socketId} for user ${userData.id}`,
+      );
     }
     socketConnections.set(userData.id, { socketId: socket.id, userData });
     socketToUser.set(socket.id, userData.id);
@@ -347,7 +434,13 @@ io.on("connection", (socket) => {
       success: true,
       userId: userData.id,
       trackedInRedis,
+      socketId: socket.id,
+      timestamp: new Date().toISOString(),
     });
+
+    console.log(
+      `[socket] ✓ User ${userData.id} (${userData.name}) identified on socket ${socket.id}`,
+    );
 
     console.log(
       `[socket] identified: ${userData.id} (${userData.name}) socketId: ${socket.id}`,
@@ -504,31 +597,51 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("heartbeat", (data) => {
+  socket.on("heartbeat", async (data) => {
     try {
       const { groupId } = data || {};
-      if (!groupId) return;
       const { userId, userData } = findUser(socket.id);
       if (!userId) return;
 
-      if (!groupRooms.has(groupId)) groupRooms.set(groupId, new Set());
-      groupRooms.get(groupId).add(userId);
+      // Refresh online status
+      await refreshUserOnline(userId);
 
-      const room = `group:${groupId}`;
-      io.to(room).emit("memberActive", {
-        userId,
-        userName: userData?.name || "Unknown",
-        userImage: userData?.image || null,
-        groupId,
+      // Handle group-specific heartbeat
+      if (groupId) {
+        if (!groupRooms.has(groupId)) groupRooms.set(groupId, new Set());
+        groupRooms.get(groupId).add(userId);
+
+        const room = `group:${groupId}`;
+        io.to(room).emit("memberActive", {
+          userId,
+          userName: userData?.name || "Unknown",
+          userImage: userData?.image || null,
+          groupId,
+          timestamp: new Date().toISOString(),
+        });
+
+        io.to(room).emit("memberCountUpdate", {
+          groupId,
+          count: groupRooms.get(groupId).size,
+        });
+      }
+
+      // Acknowledge heartbeat
+      socket.emit("heartbeatAck", {
+        success: true,
         timestamp: new Date().toISOString(),
-      });
-
-      io.to(room).emit("memberCountUpdate", {
-        groupId,
-        count: groupRooms.get(groupId).size,
       });
     } catch (err) {
       console.error("[socket] heartbeat error:", err);
+    }
+  });
+
+  // User online status ping (for maintaining online presence)
+  socket.on("ping", async () => {
+    const { userId } = findUser(socket.id);
+    if (userId) {
+      await refreshUserOnline(userId);
+      socket.emit("pong", { timestamp: Date.now() });
     }
   });
 
@@ -650,29 +763,24 @@ expressApp.get("/health", (req, res) => {
   });
 });
 
-// ── Get online users ─────────────────────────────────────────────────────────────
+// ── Get online users (real-time from actual socket connections) ─────────────────
 expressApp.get("/api/online-users", (req, res) => {
   try {
-    const onlineUsers = [];
-
-    // Get from in-memory storage (always available)
-    for (const [userId, data] of inMemoryOnlineUsers.entries()) {
-      onlineUsers.push({
-        userId,
-        ...data.userData,
-        timestamp: data.timestamp,
-      });
-    }
+    // Get online users from actual socket connections (most accurate)
+    const onlineUsers = getOnlineUsersFromSockets();
 
     console.log(
-      `[socket-server] /api/online-users - Returning ${onlineUsers.length} users`,
+      `[socket-server] /api/online-users - Returning ${onlineUsers.length} users (${socketConnections.size} connected sockets)`,
     );
 
     res.json({
       success: true,
       count: onlineUsers.length,
       users: onlineUsers,
-      source: redisReady ? "redis+memory" : "memory",
+      source: "active-connections",
+      connectedSockets: socketConnections.size,
+      memorySize: inMemoryOnlineUsers.size,
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error("[socket-server] /api/online-users error:", error);
@@ -680,6 +788,21 @@ expressApp.get("/api/online-users", (req, res) => {
       success: false,
       error: "Failed to fetch online users",
     });
+  }
+});
+
+// ── Get online user count ────────────────────────────────────────────────────────
+expressApp.get("/api/online-count", (req, res) => {
+  try {
+    const onlineUsers = getOnlineUsersFromSockets();
+    res.json({
+      success: true,
+      count: onlineUsers.length,
+      connectedSockets: socketConnections.size,
+    });
+  } catch (error) {
+    console.error("[socket-server] /api/online-count error:", error);
+    res.status(500).json({ success: false, error: "Failed to get count" });
   }
 });
 

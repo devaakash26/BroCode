@@ -152,6 +152,20 @@ export default function useSocket(options = {}) {
       });
   }, [session?.user?.id]);
 
+  // Online presence heartbeat - ping server every 2 minutes to maintain online status
+  useEffect(() => {
+    if (!session?.user || !_isConnected) return;
+
+    const heartbeatInterval = setInterval(() => {
+      if (_socket?.connected) {
+        _socket.emit("ping");
+        console.log("[socket] Sent online presence ping");
+      }
+    }, 120_000); // 2 minutes
+
+    return () => clearInterval(heartbeatInterval);
+  }, [session?.user?.id, _isConnected]);
+
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   const joinGroup = useCallback((groupId) => {
