@@ -12,6 +12,10 @@ const prisma = new PrismaClient({ log: ["error"] });
 // ── Redis client for online user tracking ───────────────────────────────────────
 const REDIS_PROVIDER = process.env.REDIS_PROVIDER || "railway";
 let redis = null;
+let redisReady = false;
+
+// In-memory fallback for online users (when Redis is unavailable)
+const inMemoryOnlineUsers = new Map();
 
 console.log(`[server-dev] 🔍 Checking Redis configuration...`);
 console.log(`[server-dev] REDIS_PROVIDER: ${REDIS_PROVIDER}`);
@@ -31,12 +35,22 @@ if (REDIS_PROVIDER === "railway") {
     console.log("[server-dev] 🔧 Initializing Redis connection...");
     redis = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
-      retryStrategy: (times) => Math.min(times * 50, 2000),
+      retryStrategy: (times) => {
+        const delay = Math.min(times * 50, 2000);
+        console.log(`[server-dev] Redis retry attempt ${times}, waiting ${delay}ms`);
+        return delay;
+      },
       lazyConnect: false,
+      enableOfflineQueue: true,
+      reconnectOnError: (err) => {
+        console.error(`[server-dev] Redis reconnect on error: ${err.message}`);
+        return true;
+      },
     });
 
     redis.on("error", (err) => {
       console.error("[server-dev] ❌ Redis error:", err.message);
+      redisReady = false;
     });
 
     redis.on("connect", () => {
@@ -45,6 +59,22 @@ if (REDIS_PROVIDER === "railway") {
 
     redis.on("ready", () => {
       console.log("[server-dev] ✅ Redis ready - online tracking enabled");
+      redisReady = true;
+      
+      // Sync in-memory users to Redis when connection is restored
+      if (inMemoryOnlineUsers.size > 0) {
+        console.log(`[server-dev] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`);
+        syncInMemoryToRedis();
+      }
+    });
+
+    redis.on("close", () => {
+      console.warn("[server-dev] ⚠️  Redis connection closed");
+      redisReady = false;
+    });
+
+    redis.on("reconnecting", () => {
+      console.log("[server-dev] 🔄 Redis reconnecting...");
     });
   } else {
     console.warn(
@@ -59,6 +89,122 @@ if (REDIS_PROVIDER === "railway") {
 } else {
   console.warn("[server-dev] ⚠️  No Redis provider - online tracking disabled");
 }
+
+// Helper: Sync in-memory users to Redis
+async function syncInMemoryToRedis() {
+  if (!redis || !redisReady) return;
+  
+  try {
+    for (const [userId, userData] of inMemoryOnlineUsers.entries()) {
+      await redis.setex(
+        `user:online:${userId}`,
+        1800,
+        JSON.stringify(userData)
+      );
+    }
+    console.log(`[server-dev] ✅ Synced ${inMemoryOnlineUsers.size} users to Redis`);
+  } catch (err) {
+    console.error("[server-dev] Sync to Redis failed:", err);
+  }
+}
+
+// Helper: Track user as online (with fallback)
+async function trackUserOnline(userId, userData) {
+  const userInfo = {
+    id: userData.id,
+    name: userData.name,
+    image: userData.image,
+    email: userData.email,
+    lastSeen: new Date().toISOString(),
+  };
+
+  // Always store in memory as fallback
+  inMemoryOnlineUsers.set(userId, userInfo);
+
+  // Try to store in Redis
+  if (redis && redisReady) {
+    try {
+      await redis.setex(
+        `user:online:${userId}`,
+        1800, // 30 minutes
+        JSON.stringify(userInfo)
+      );
+      console.log(`[socket] ✅ Tracked user in Redis: ${userId}`);
+      return true;
+    } catch (err) {
+      console.error(`[socket] ⚠️  Redis tracking failed for ${userId}:`, err.message);
+      console.log(`[socket] 📝 User ${userId} stored in memory (fallback)`);
+      return false;
+    }
+  } else {
+    console.log(`[socket] 📝 User ${userId} stored in memory (Redis not ready)`);
+    return false;
+  }
+}
+
+// Helper: Remove user from tracking
+async function trackUserOffline(userId) {
+  // Remove from memory
+  inMemoryOnlineUsers.delete(userId);
+
+  // Try to remove from Redis
+  if (redis && redisReady) {
+    try {
+      await redis.del(`user:online:${userId}`);
+      console.log(`[socket] ✅ Removed user from Redis: ${userId}`);
+      return true;
+    } catch (err) {
+      console.error(`[socket] ⚠️  Redis removal failed for ${userId}:`, err.message);
+      return false;
+    }
+  }
+  return false;
+}
+
+// Heartbeat mechanism: Refresh Redis TTL every 10 minutes
+setInterval(async () => {
+  if (!redis || !redisReady || inMemoryOnlineUsers.size === 0) return;
+
+  console.log(`[heartbeat] 💓 Refreshing TTL for ${inMemoryOnlineUsers.size} online users...`);
+  
+  let successCount = 0;
+  for (const [userId, userData] of inMemoryOnlineUsers.entries()) {
+    try {
+      await redis.setex(
+        `user:online:${userId}`,
+        1800,
+        JSON.stringify({
+          ...userData,
+          lastSeen: new Date().toISOString(),
+        })
+      );
+      successCount++;
+    } catch (err) {
+      console.error(`[heartbeat] Failed to refresh ${userId}:`, err.message);
+    }
+  }
+  
+  console.log(`[heartbeat] ✅ Refreshed ${successCount}/${inMemoryOnlineUsers.size} users`);
+}, 600000); // Every 10 minutes
+
+// Cleanup stale in-memory entries (older than 35 minutes)
+setInterval(() => {
+  const now = Date.now();
+  const staleThreshold = 35 * 60 * 1000; // 35 minutes
+  let removedCount = 0;
+
+  for (const [userId, userData] of inMemoryOnlineUsers.entries()) {
+    const lastSeen = new Date(userData.lastSeen).getTime();
+    if (now - lastSeen > staleThreshold) {
+      inMemoryOnlineUsers.delete(userId);
+      removedCount++;
+    }
+  }
+
+  if (removedCount > 0) {
+    console.log(`[cleanup] 🧹 Removed ${removedCount} stale entries from memory`);
+  }
+}, 300000); // Every 5 minutes
 
 // This server script uses Next.js in dev mode as a workaround for production build issues
 
@@ -192,40 +338,34 @@ app.prepare().then(() => {
 
     // Identify authenticated user
     socket.on("identify", async (userData) => {
-      if (!userData?.id) return;
+      if (!userData?.id) {
+        console.warn(`[socket] Identify called without user ID for socket ${socket.id}`);
+        return;
+      }
+      
       // Remove old reverse-map entry for this user if they had a previous socket
       const existing = socketConnections.get(userData.id);
       if (existing?.socketId && existing.socketId !== socket.id) {
         socketToUser.delete(existing.socketId);
+        console.log(`[socket] Replaced old socket for user ${userData.id}`);
       }
+      
       socketConnections.set(userData.id, { socketId: socket.id, userData });
       socketToUser.set(socket.id, userData.id);
 
-      // Track online user in Redis with 30-minute expiry
-      if (redis) {
-        try {
-          await redis.setex(
-            `user:online:${userData.id}`,
-            1800,
-            JSON.stringify({
-              id: userData.id,
-              name: userData.name,
-              image: userData.image,
-              email: userData.email,
-              lastSeen: new Date().toISOString(),
-            }),
-          );
-          console.log(
-            `[socket] ✓ Tracked online user in Redis: ${userData.id}`,
-          );
-        } catch (err) {
-          console.error("[socket] Redis setex error:", err);
-        }
-      }
-
+      // Track online user with fallback
+      const tracked = await trackUserOnline(userData.id, userData);
+      
       console.log(
-        `[socket] user identified: ${userData.id} (${userData.name}) socketId: ${socket.id}`,
+        `[socket] ✓ User identified: ${userData.id} (${userData.name}) - Socket: ${socket.id} - Redis: ${tracked ? 'YES' : 'FALLBACK'}`,
       );
+      
+      // Send confirmation back to client
+      socket.emit('identified', { 
+        success: true, 
+        userId: userData.id,
+        trackedInRedis: tracked 
+      });
     });
 
     // Join a group chat room
@@ -454,23 +594,17 @@ app.prepare().then(() => {
       }
     });
 
-    socket.on("disconnect", async () => {
-      console.log("[socket] disconnected:", socket.id);
+    socket.on("disconnect", async (reason) => {
+      console.log(`[socket] disconnected: ${socket.id} - Reason: ${reason}`);
       const { userId } = findUser(socket.id);
       socketToUser.delete(socket.id);
       if (!userId) return;
 
       socketConnections.delete(userId);
 
-      // Remove user from online tracking in Redis
-      if (redis && userId) {
-        try {
-          await redis.del(`user:online:${userId}`);
-          console.log(`[socket] ✓ Removed user from Redis: ${userId}`);
-        } catch (err) {
-          console.error("[socket] Redis del error:", err);
-        }
-      }
+      // Remove user from online tracking
+      await trackUserOffline(userId);
+      console.log(`[socket] ✓ User ${userId} marked offline`);
 
       for (const [groupId, members] of groupRooms.entries()) {
         if (!members.has(userId)) continue;
