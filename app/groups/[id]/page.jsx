@@ -546,7 +546,7 @@ export default function GroupDetailPage({ params }) {
               Invite Online
             </button>
           )}
-          {isAdmin && (
+          {isMember && (
             <Link href={`/groups/${groupId}/settings`}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors shadow-lg">
               <Settings className="h-3.5 w-3.5" />Settings

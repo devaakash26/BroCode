@@ -134,7 +134,7 @@ export default function AdminProblemsPage() {
         <h1 className="text-2xl font-bold">Problem Management</h1>
         <Link 
           href="/admin/problems/new" 
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+          className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md"
         >
           <PlusCircle className="h-5 w-5" />
           Add Problem
@@ -150,7 +150,7 @@ export default function AdminProblemsPage() {
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-orange-500 focus:border-orange-500"
               placeholder="Search problems..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -160,7 +160,7 @@ export default function AdminProblemsPage() {
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <select
-              className="block pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="block pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-orange-500 focus:border-orange-500"
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
             >
@@ -174,7 +174,7 @@ export default function AdminProblemsPage() {
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <select
-              className="block pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="block pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-orange-500 focus:border-orange-500"
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
@@ -207,7 +207,7 @@ export default function AdminProblemsPage() {
       {/* Loading state */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 dark:border-orange-400"></div>
         </div>
       ) : (
         /* Problems table */
@@ -225,7 +225,7 @@ export default function AdminProblemsPage() {
                 <div className="mt-6">
                   <Link
                     href="/admin/problems/new"
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                   >
                     <PlusCircle className="-ml-1 mr-2 h-5 w-5" />
                     Create new problem
@@ -315,7 +315,7 @@ export default function AdminProblemsPage() {
                           </Link>
                           <Link
                             href={`/admin/problems/${problem.id}`}
-                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                            className="text-orange-600 dark:text-orange-400 hover:text-orange-900 dark:hover:text-orange-300"
                           >
                             <Edit className="h-5 w-5" />
                           </Link>
@@ -368,7 +368,7 @@ export default function AdminProblemsPage() {
                         onClick={() => setCurrentPage(index + 1)}
                         className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                           currentPage === index + 1
-                            ? 'z-10 bg-indigo-50 dark:bg-indigo-900 border-indigo-500 dark:border-indigo-500 text-indigo-600 dark:text-indigo-200'
+                            ? 'z-10 bg-orange-50 dark:bg-orange-900 border-orange-500 dark:border-orange-500 text-orange-600 dark:text-orange-200'
                             : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >

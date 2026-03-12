@@ -4,7 +4,12 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sendEmail } from "@/app/lib/email";
 
-const queryReplyEmailTemplate = ({ userName, querySubject, replyMessage, queryLink }) => `
+const queryReplyEmailTemplate = ({
+  userName,
+  querySubject,
+  replyMessage,
+  queryLink,
+}) => `
 <!DOCTYPE html>
 <html>
 <head>
@@ -50,7 +55,7 @@ const queryReplyEmailTemplate = ({ userName, querySubject, replyMessage, queryLi
 export async function POST(req, { params }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user || session.user.role !== 'PLATFORM_ADMIN') {
+    if (!session || !session.user || session.user.role !== "PLATFORM_ADMIN") {
       return NextResponse.json({ message: "Not authorized" }, { status: 403 });
     }
 
@@ -58,7 +63,10 @@ export async function POST(req, { params }) {
     const { message } = await req.json();
 
     if (!message) {
-      return NextResponse.json({ message: "Reply message is required" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Reply message is required" },
+        { status: 400 },
+      );
     }
 
     // Create the reply
@@ -68,13 +76,22 @@ export async function POST(req, { params }) {
         queryId,
         userId: session.user.id,
       },
+      include: {
+        user: {
+          select: {
+            name: true,
+            image: true,
+            role: true,
+          },
+        },
+      },
     });
 
     // Update the query status to "IN_PROGRESS"
     const updatedQuery = await prisma.helpQuery.update({
       where: { id: queryId },
-      data: { status: 'IN_PROGRESS' },
-      include: { user: true }
+      data: { status: "IN_PROGRESS" },
+      include: { user: true },
     });
 
     // Send email to user
@@ -85,14 +102,16 @@ export async function POST(req, { params }) {
         userName: updatedQuery.user.name,
         querySubject: updatedQuery.subject,
         replyMessage: message,
-        queryLink: `${process.env.NEXT_PUBLIC_APP_URL}/profile/queries/${queryId}` // This page does not exist yet
+        queryLink: `${process.env.NEXT_PUBLIC_APP_URL}/profile/queries/${queryId}`, // This page does not exist yet
       }),
     });
 
-    return NextResponse.json(reply, { status: 201 });
-
+    return NextResponse.json({ reply }, { status: 201 });
   } catch (error) {
     console.error("Error replying to query:", error);
-    return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Something went wrong" },
+      { status: 500 },
+    );
   }
-} 
+}

@@ -14,7 +14,8 @@ import {
   XCircle,
   Eye,
   Mail,
-  UserPlus
+  UserPlus,
+  Download
 } from 'lucide-react';
 import Link from 'next/link';
 import UserDetailsModal from '@/app/components/admin/UserDetailsModal';
@@ -178,6 +179,37 @@ export default function AdminUsersPage() {
     setUsers(users.filter(user => user.id !== userId));
     toast.success('User deleted successfully');
   };
+
+  const handleExportCSV = () => {
+    // Prepare CSV data
+    const headers = ['Name', 'Email', 'Role', 'Status', 'Joined Date'];
+    const csvData = filteredUsers.map(user => [
+      user.name || 'N/A',
+      user.email,
+      user.role === 'PLATFORM_ADMIN' ? 'Platform Admin' : 
+      user.role === 'GROUP_ADMIN' ? 'Group Admin' : 'User',
+      user.isVerified ? 'Verified' : 'Unverified',
+      new Date(user.createdAt).toLocaleDateString()
+    ]);
+
+    // Create CSV string
+    const csvString = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `users_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Users exported to CSV successfully');
+  };
   
   return (
     <>
@@ -185,6 +217,13 @@ export default function AdminUsersPage() {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold">User Management</h1>
           <div className="flex gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-md"
+            >
+              <Download className="h-5 w-5" />
+              Export CSV
+            </button>
             <button
               onClick={() => setIsInviteModalOpen(true)}
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
@@ -194,7 +233,7 @@ export default function AdminUsersPage() {
             </button>
             <Link 
               href="/admin/users/new" 
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md"
+              className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md"
             >
               <PlusCircle className="h-5 w-5" />
               Add User
@@ -211,7 +250,7 @@ export default function AdminUsersPage() {
               </div>
               <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-orange-500 focus:border-orange-500"
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -221,7 +260,7 @@ export default function AdminUsersPage() {
             <div className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
               <select
-                className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
               >
@@ -296,11 +335,11 @@ export default function AdminUsersPage() {
                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center">
+                          <div className="flex-shrink-0 h-10 w-10 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center">
                             {user.image ? (
                               <img src={user.image} alt={user.name} className="h-10 w-10 rounded-full" />
                             ) : (
-                              <span className="text-indigo-600 dark:text-indigo-400 font-medium text-sm">
+                              <span className="text-orange-600 dark:text-orange-400 font-medium text-sm">
                                 {user.name?.charAt(0) || user.email.charAt(0).toUpperCase()}
                               </span>
                             )}
@@ -360,7 +399,7 @@ export default function AdminUsersPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button 
                           onClick={() => handleViewUser(user.id)}
-                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 mr-3"
+                          className="text-orange-600 hover:text-orange-900 dark:text-orange-400 dark:hover:text-orange-300 mr-3"
                         >
                           <Eye className="h-5 w-5" />
                         </button>
@@ -510,7 +549,7 @@ export default function AdminUsersPage() {
               <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all duration-300 sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                 <div className="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white sm:mx-0 sm:h-10 sm:w-10">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-600 text-white sm:mx-0 sm:h-10 sm:w-10">
                       <UserPlus className="h-6 w-6" />
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
@@ -535,7 +574,7 @@ export default function AdminUsersPage() {
                             <input
                               type="email"
                               id="email"
-                              className="pl-10 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="pl-10 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                               placeholder="user@example.com"
                               value={inviteEmail}
                               onChange={(e) => setInviteEmail(e.target.value)}
@@ -555,7 +594,7 @@ export default function AdminUsersPage() {
                             </div>
                             <select
                               id="role"
-                              className="pl-10 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              className="pl-10 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                               value={inviteRole}
                               onChange={(e) => setInviteRole(e.target.value)}
                               disabled={inviteLoading}
@@ -580,7 +619,7 @@ export default function AdminUsersPage() {
                 <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button
                     type="button"
-                    className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-base font-medium text-white hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm transition-all duration-200 ${inviteLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm transition-all duration-200 ${inviteLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
                     onClick={handleInviteUser}
                     disabled={inviteLoading}
                   >

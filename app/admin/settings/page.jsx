@@ -135,11 +135,11 @@ export default function AdminSettingsPage() {
   const ToggleSwitch = ({ checked, onChange, disabled = false }) => (
     <button
       type="button"
-      className={`relative inline-flex flex-shrink-0 h-6 w-11 items-center rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+      className={`relative inline-flex flex-shrink-0 h-6 w-11 items-center rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
         disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       } ${
         checked
-          ? 'bg-indigo-600'
+          ? 'bg-orange-600'
           : 'bg-gray-200 dark:bg-gray-700'
       }`}
       onClick={disabled ? undefined : onChange}
@@ -157,7 +157,7 @@ export default function AdminSettingsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 text-indigo-600 dark:text-indigo-400 animate-spin" />
+        <RefreshCw className="h-8 w-8 text-orange-600 dark:text-orange-400 animate-spin" />
       </div>
     );
   }
@@ -186,7 +186,7 @@ export default function AdminSettingsPage() {
               {field.type === 'text' && (
                 <input
                   type="text"
-                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                   value={settings[field.category][field.key]}
                   onChange={(e) => updateSetting(field.category, field.key, e.target.value)}
                 />
@@ -194,7 +194,7 @@ export default function AdminSettingsPage() {
               {field.type === 'password' && (
                 <input
                   type="password"
-                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                   value={settings[field.category][field.key]}
                   onChange={(e) => updateSetting(field.category, field.key, e.target.value)}
                 />
@@ -202,7 +202,7 @@ export default function AdminSettingsPage() {
               {field.type === 'number' && (
                 <input
                   type="number"
-                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-gray-900 dark:text-white bg-white dark:bg-gray-700 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                   value={settings[field.category][field.key]}
                   onChange={(e) => updateSetting(field.category, field.key, parseInt(e.target.value, 10))}
                   min={field.min}
@@ -234,7 +234,7 @@ export default function AdminSettingsPage() {
           className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
             !settingsChanged
               ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
-              : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+              : 'bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500'
           }`}
         >
           {saving ? (
@@ -278,7 +278,7 @@ export default function AdminSettingsPage() {
         {/* General Settings */}
         {renderSettingsPanel(
           'General Settings',
-          <Settings className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
+          <Settings className="h-6 w-6 text-orange-600 dark:text-orange-400" />,
           'Configure basic platform settings',
           [
             { category: 'general', key: 'siteName', label: 'Site Name', type: 'text' },
@@ -311,7 +311,7 @@ export default function AdminSettingsPage() {
         {/* Security Settings */}
         {renderSettingsPanel(
           'Security Settings',
-          <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
+          <Shield className="h-6 w-6 text-green-600 dark:text-green-400" />,
           'Configure security and authentication settings',
           [
             { 
@@ -361,7 +361,7 @@ export default function AdminSettingsPage() {
         {/* Problem Settings */}
         {renderSettingsPanel(
           'Problem Settings',
-          <FileCode className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />,
+          <FileCode className="h-6 w-6 text-amber-600 dark:text-amber-400" />,
           'Configure settings for problems and submissions',
           [
             { 

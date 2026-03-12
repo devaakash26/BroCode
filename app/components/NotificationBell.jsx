@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Bell, Check, X, UserPlus, Trophy, MessageCircle, Info, Loader2 } from 'lucide-react';
+import { Bell, Check, X, UserPlus, Trophy, MessageCircle, Info, Loader2, ChevronLeft } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -54,28 +54,57 @@ export default function NotificationBell() {
         if (latestNotification.id !== lastNotificationIdRef.current) {
           const { type, metadata, message } = latestNotification;
           
-          // Show toast for new notification
-          if (type === 'GROUP_INVITATION') {
-            const inviterName = metadata?.inviterName || 'Someone';
-            const groupName = metadata?.groupName || 'a group';
-            toast.success(
-              `${inviterName} invited you to join "${groupName}"`,
-              {
-                duration: 5000,
-                icon: '👥',
-                style: {
-                  borderRadius: '8px',
-                  background: '#333',
-                  color: '#fff',
-                },
-              }
-            );
-          } else {
-            toast.success(message || latestNotification.title, {
-              duration: 4000,
-              icon: '🔔',
-            });
+          // Show professional toast for new notification
+          const IconComponent = NOTIFICATION_ICONS[type] || Bell;
+          const isSuccess = type === 'ACHIEVEMENT';
+          
+          let iconColorClass = 'text-indigo-600 dark:text-indigo-400';
+          let iconBgClass = 'bg-indigo-100 dark:bg-indigo-900/40';
+          
+          if (isSuccess) {
+            iconColorClass = 'text-amber-600 dark:text-amber-400';
+            iconBgClass = 'bg-amber-100 dark:bg-amber-900/30';
+          } else if (type === 'GROUP_INVITATION') {
+            iconColorClass = 'text-blue-600 dark:text-blue-400';
+            iconBgClass = 'bg-blue-100 dark:bg-blue-900/30';
+          } else if (type === 'CHALLENGE_STARTED') {
+            iconColorClass = 'text-emerald-600 dark:text-emerald-400';
+            iconBgClass = 'bg-emerald-100 dark:bg-emerald-900/30';
           }
+
+          toast.custom((t) => (
+            <div
+              className={`${
+                t.visible ? 'animate-in fade-in slide-in-from-top-4' : 'animate-out fade-out'
+              } max-w-sm w-full bg-white dark:bg-gray-900 shadow-lg rounded-xl pointer-events-auto flex border border-gray-100 dark:border-gray-800 overflow-hidden`}
+            >
+              <div className="flex-1 p-4">
+                <div className="flex items-start gap-4">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mt-0.5 ${iconBgClass}`}>
+                    <IconComponent className={`w-5 h-5 ${iconColorClass}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {latestNotification.title || (type === 'GROUP_INVITATION' ? 'Group Invitation' : 'New Notification')}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                      {type === 'GROUP_INVITATION' && metadata?.inviterName && metadata?.groupName
+                        ? `${metadata.inviterName} invited you to join "${metadata.groupName}"`
+                        : message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex border-l border-gray-100 dark:border-gray-800">
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="w-full h-full px-3.5 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors focus:outline-none"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ), { duration: 5000, position: 'top-right' });
         }
       }
 
@@ -150,30 +179,59 @@ export default function NotificationBell() {
       setNotifications((prev) => [notification, ...prev]);
       setUnreadCount((prev) => prev + 1);
 
-      // Show toast for new notification with custom message
+      // Show professional toast notification
       const { type, metadata, message } = notification;
       
-      if (type === 'GROUP_INVITATION') {
-        const inviterName = metadata?.inviterName || 'Someone';
-        const groupName = metadata?.groupName || 'a group';
-        toast.success(
-          `${inviterName} invited you to join "${groupName}"`,
-          {
-            duration: 5000,
-            icon: '👥',
-            style: {
-              borderRadius: '8px',
-              background: '#333',
-              color: '#fff',
-            },
-          }
-        );
-      } else {
-        toast.success(message || notification.title, {
-          duration: 4000,
-          icon: '🔔',
-        });
+      const IconComponent = NOTIFICATION_ICONS[type] || Bell;
+      const isSuccess = type === 'ACHIEVEMENT';
+      
+      let iconColorClass = 'text-indigo-600 dark:text-indigo-400';
+      let iconBgClass = 'bg-indigo-100 dark:bg-indigo-900/40';
+      
+      if (isSuccess) {
+        iconColorClass = 'text-amber-600 dark:text-amber-400';
+        iconBgClass = 'bg-amber-100 dark:bg-amber-900/30';
+      } else if (type === 'GROUP_INVITATION') {
+        iconColorClass = 'text-blue-600 dark:text-blue-400';
+        iconBgClass = 'bg-blue-100 dark:bg-blue-900/30';
+      } else if (type === 'CHALLENGE_STARTED') {
+        iconColorClass = 'text-emerald-600 dark:text-emerald-400';
+        iconBgClass = 'bg-emerald-100 dark:bg-emerald-900/30';
       }
+
+      toast.custom((t) => (
+        <div
+          className={`${
+            t.visible ? 'animate-in fade-in slide-in-from-top-4' : 'animate-out fade-out'
+          } max-w-sm w-full bg-white dark:bg-gray-900 shadow-lg rounded-xl pointer-events-auto flex border border-gray-100 dark:border-gray-800 overflow-hidden`}
+        >
+          <div className="flex-1 p-4">
+            <div className="flex items-start gap-4">
+              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center mt-0.5 ${iconBgClass}`}>
+                <IconComponent className={`w-5 h-5 ${iconColorClass}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {notification.title || (type === 'GROUP_INVITATION' ? 'Group Invitation' : 'New Notification')}
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                  {type === 'GROUP_INVITATION' && metadata?.inviterName && metadata?.groupName
+                    ? `${metadata.inviterName} invited you to join "${metadata.groupName}"`
+                    : message}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex border-l border-gray-100 dark:border-gray-800">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="w-full h-full px-3.5 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors focus:outline-none"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      ), { duration: 5000, position: 'top-right' });
     });
 
     return unsubscribe;
@@ -316,6 +374,11 @@ export default function NotificationBell() {
   // Handle notification click
   const handleNotificationClick = useCallback(
     (notification) => {
+      // Never navigate for GROUP_INVITATION - user must use Accept/Decline buttons
+      if (notification.type === 'GROUP_INVITATION') {
+        return;
+      }
+
       if (!notification.read) {
         markAsRead(notification.id);
       }
@@ -343,58 +406,86 @@ export default function NotificationBell() {
 
   return (
     <div className="relative">
-      {/* Bell Icon */}
+      {/* Bell Icon - Simple with green dot indicator */}
       <button
         ref={bellRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+        className={`relative p-2.5 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200 ${
+          isOpen ? 'bg-gray-100 dark:bg-gray-800 ring-2 ring-indigo-500 dark:ring-indigo-400' : ''
+        }`}
         aria-label="Notifications"
       >
-        <Bell className="w-5 h-5" />
-        {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full animate-pulse">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
-        )}
+        <div className="relative">
+          <Bell className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'scale-110' : ''}`} />
+          {unreadCount > 0 && (
+            <>
+              {/* Pulsing ring effect */}
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full animate-ping" />
+              {/* Solid green dot */}
+              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800 shadow-lg" />
+            </>
+          )}
+        </div>
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown - Enhanced Design */}
       {isOpen && (
-        <div
-          ref={dropdownRef}
-          className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-[calc(100vh-120px)] flex flex-col"
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Notifications
-              </h3>
-              {/* <span className="text-xs text-gray-400 dark:text-gray-500" title="Auto-refreshes every 15 seconds">
-                🔄
-              </span> */}
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          
+          <div
+            ref={dropdownRef}
+            className="absolute right-[-60px] sm:right-0 mt-3 w-[calc(100vw-2rem)] sm:w-[420px] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 z-50 max-h-[calc(100vh-100px)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          >
+            {/* Header - Simple */}
+            <div className="relative p-4 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Bell className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    Notifications
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {unreadCount > 0 ? (
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                        {unreadCount} unread message{unreadCount !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      "You're all caught up!"
+                    )}
+                  </p>
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700/80 rounded-lg transition-colors border border-gray-200 dark:border-gray-700"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
             </div>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllAsRead}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
-              >
-                Mark all read
-              </button>
-            )}
-          </div>
 
-          {/* Notifications List */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Notifications List - Enhanced Scrollbar */}
+          <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-700 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-600">
             {loading && notifications.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center">
+                  <Loader2 className="w-10 h-10 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Loading notifications...</p>
+                </div>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <Bell className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
-                <p className="text-gray-500 dark:text-gray-400">No notifications yet</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+              <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 rounded-2xl flex items-center justify-center mb-4">
+                  <Bell className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
+                  No notifications yet
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
                   We'll notify you when something important happens
                 </p>
               </div>
@@ -407,20 +498,23 @@ export default function NotificationBell() {
                   return (
                     <div
                       key={notification.id}
-                      className={`p-4 transition-colors ${
+                      className={`group p-4 transition-all duration-200 ${
                         !notification.read
-                          ? 'bg-blue-50 dark:bg-blue-900/10'
+                          ? 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
                       }`}
                     >
                       <div className="flex gap-3">
-                        {/* Icon */}
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                        {/* Icon - Simple */}
+                        <div className={`relative flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
                           !notification.read
-                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text- blue-400'
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
                         }`}>
-                          <IconComponent className="w-5 h-5" />
+                          <IconComponent className="w-4 h-4" />
+                          {!notification.read && (
+                            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900" />
+                          )}
                         </div>
 
                         {/* Content */}
@@ -429,18 +523,25 @@ export default function NotificationBell() {
                             onClick={() => handleNotificationClick(notification)}
                             className="cursor-pointer"
                           >
-                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
                               {notification.title}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed mb-2">
                               {notification.message}
                             </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                              {formatTimeAgo(notification.createdAt)}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-500 font-medium">
+                                {formatTimeAgo(notification.createdAt)}
+                              </p>
+                              {!notification.read && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 rounded-full">
+                                  NEW
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Action Buttons for Group Invitations */}
+                          {/* Action Buttons for Group Invitations - Simple */}
                           {notification.type === 'GROUP_INVITATION' && !notification.read && (
                             <div className="flex gap-2 mt-3">
                               <button
@@ -449,7 +550,7 @@ export default function NotificationBell() {
                                   handleAccept(notification.id, notification.metadata);
                                 }}
                                 disabled={isProcessing}
-                                className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center gap-2"
+                                className="flex-1 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
                               >
                                 {isProcessing ? (
                                   <>
@@ -469,7 +570,7 @@ export default function NotificationBell() {
                                   handleDecline(notification.id);
                                 }}
                                 disabled={isProcessing}
-                                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-gray-300 dark:border-gray-600 transition-all duration-200 flex items-center justify-center gap-2"
+                                className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg border border-gray-200 dark:border-gray-700 transition-colors flex items-center justify-center gap-2"
                               >
                                 {isProcessing ? (
                                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -491,21 +592,23 @@ export default function NotificationBell() {
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer - Simple */}
           {notifications.length > 0 && (
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700 text-center">
+            <div className="p-3 border-t border-gray-100 dark:border-gray-800">
               <button
                 onClick={() => {
                   router.push('/notifications');
                   setIsOpen(false);
                 }}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+                className="w-full py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors flex items-center justify-center gap-1.5"
               >
                 View all notifications
+                <ChevronLeft className="w-4 h-4 rotate-180" />
               </button>
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );

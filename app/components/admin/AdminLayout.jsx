@@ -30,10 +30,8 @@ export default function AdminLayout({ children, user }) {
       <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden md:block">
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">
-                BroCode Admin
-              </span>
+            <h2 className="text-xl font-bold text-orange-600 dark:text-orange-400">
+              BroCode Admin
             </h2>
           </div>
           <nav className="flex-1 p-4 space-y-1">
@@ -43,7 +41,7 @@ export default function AdminLayout({ children, user }) {
                 href={link.href}
                 className={`flex items-center px-4 py-3 rounded-md transition-colors ${
                   isActive(link.href) 
-                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' 
+                    ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400' 
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                 }`}
               >
@@ -54,7 +52,7 @@ export default function AdminLayout({ children, user }) {
           </nav>
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
-              <div className="h-8 w-8 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold mr-3">
+              <div className="h-8 w-8 bg-orange-600 rounded-full flex items-center justify-center text-white font-semibold mr-3">
                 {user?.name?.charAt(0) || 'A'}
               </div>
               <div>
@@ -70,10 +68,8 @@ export default function AdminLayout({ children, user }) {
       <main className="flex-1 overflow-y-auto p-6">
         <header className="bg-white dark:bg-gray-800 shadow">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">
-                BroCode Admin
-              </span>
+            <h1 className="text-3xl font-bold text-orange-600 dark:text-orange-400">
+              BroCode Admin
             </h1>
             <div className="flex items-center space-x-4">
               <ThemeToggle />

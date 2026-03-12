@@ -74,6 +74,7 @@ export default function GroupSettingsPage() {
 
   // Leave modal
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const groupId = params.id;
   const group = groupState.data;
@@ -205,15 +206,23 @@ export default function GroupSettingsPage() {
   };
 
   const handleLeaveGroup = async () => {
+    setIsLeaving(true);
     try {
       const res = await fetch(`/api/groups/${groupId}/leave`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.message || 'Failed to leave'); return; }
+      if (!res.ok) { 
+        toast.error(data.message || 'Failed to leave'); 
+        setIsLeaving(false);
+        return; 
+      }
       toast.success('Left group');
-      router.push('/groups');
+      
+      // Force reload to completely clear all caches (Redux, Next.js Router cache)
+      // and prevent the left group from briefly reappearing
+      window.location.href = '/groups';
     } catch {
       toast.error('Something went wrong');
-    } finally {
+      setIsLeaving(false);
       setShowLeaveConfirm(false);
     }
   };
@@ -504,13 +513,14 @@ export default function GroupSettingsPage() {
                 You will lose access to all group content and will need an invite to rejoin.
               </p>
               <div className="flex gap-2 justify-end">
-                <button onClick={() => setShowLeaveConfirm(false)}
-                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                <button onClick={() => setShowLeaveConfirm(false)} disabled={isLeaving}
+                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50">
                   Cancel
                 </button>
-                <button onClick={handleLeaveGroup}
-                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors">
-                  Leave
+                <button onClick={handleLeaveGroup} disabled={isLeaving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-50">
+                  {isLeaving ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                  {isLeaving ? 'Leaving...' : 'Leave'}
                 </button>
               </div>
             </motion.div>
