@@ -37,7 +37,9 @@ if (REDIS_PROVIDER === "railway") {
       maxRetriesPerRequest: 3,
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
-        console.log(`[server-dev] Redis retry attempt ${times}, waiting ${delay}ms`);
+        console.log(
+          `[server-dev] Redis retry attempt ${times}, waiting ${delay}ms`,
+        );
         return delay;
       },
       lazyConnect: false,
@@ -60,10 +62,12 @@ if (REDIS_PROVIDER === "railway") {
     redis.on("ready", () => {
       console.log("[server-dev] ✅ Redis ready - online tracking enabled");
       redisReady = true;
-      
+
       // Sync in-memory users to Redis when connection is restored
       if (inMemoryOnlineUsers.size > 0) {
-        console.log(`[server-dev] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`);
+        console.log(
+          `[server-dev] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`,
+        );
         syncInMemoryToRedis();
       }
     });
@@ -93,16 +97,18 @@ if (REDIS_PROVIDER === "railway") {
 // Helper: Sync in-memory users to Redis
 async function syncInMemoryToRedis() {
   if (!redis || !redisReady) return;
-  
+
   try {
     for (const [userId, userData] of inMemoryOnlineUsers.entries()) {
       await redis.setex(
         `user:online:${userId}`,
         1800,
-        JSON.stringify(userData)
+        JSON.stringify(userData),
       );
     }
-    console.log(`[server-dev] ✅ Synced ${inMemoryOnlineUsers.size} users to Redis`);
+    console.log(
+      `[server-dev] ✅ Synced ${inMemoryOnlineUsers.size} users to Redis`,
+    );
   } catch (err) {
     console.error("[server-dev] Sync to Redis failed:", err);
   }
@@ -127,17 +133,22 @@ async function trackUserOnline(userId, userData) {
       await redis.setex(
         `user:online:${userId}`,
         1800, // 30 minutes
-        JSON.stringify(userInfo)
+        JSON.stringify(userInfo),
       );
       console.log(`[socket] ✅ Tracked user in Redis: ${userId}`);
       return true;
     } catch (err) {
-      console.error(`[socket] ⚠️  Redis tracking failed for ${userId}:`, err.message);
+      console.error(
+        `[socket] ⚠️  Redis tracking failed for ${userId}:`,
+        err.message,
+      );
       console.log(`[socket] 📝 User ${userId} stored in memory (fallback)`);
       return false;
     }
   } else {
-    console.log(`[socket] 📝 User ${userId} stored in memory (Redis not ready)`);
+    console.log(
+      `[socket] 📝 User ${userId} stored in memory (Redis not ready)`,
+    );
     return false;
   }
 }
@@ -154,7 +165,10 @@ async function trackUserOffline(userId) {
       console.log(`[socket] ✅ Removed user from Redis: ${userId}`);
       return true;
     } catch (err) {
-      console.error(`[socket] ⚠️  Redis removal failed for ${userId}:`, err.message);
+      console.error(
+        `[socket] ⚠️  Redis removal failed for ${userId}:`,
+        err.message,
+      );
       return false;
     }
   }
@@ -165,8 +179,10 @@ async function trackUserOffline(userId) {
 setInterval(async () => {
   if (!redis || !redisReady || inMemoryOnlineUsers.size === 0) return;
 
-  console.log(`[heartbeat] 💓 Refreshing TTL for ${inMemoryOnlineUsers.size} online users...`);
-  
+  console.log(
+    `[heartbeat] 💓 Refreshing TTL for ${inMemoryOnlineUsers.size} online users...`,
+  );
+
   let successCount = 0;
   for (const [userId, userData] of inMemoryOnlineUsers.entries()) {
     try {
@@ -176,15 +192,17 @@ setInterval(async () => {
         JSON.stringify({
           ...userData,
           lastSeen: new Date().toISOString(),
-        })
+        }),
       );
       successCount++;
     } catch (err) {
       console.error(`[heartbeat] Failed to refresh ${userId}:`, err.message);
     }
   }
-  
-  console.log(`[heartbeat] ✅ Refreshed ${successCount}/${inMemoryOnlineUsers.size} users`);
+
+  console.log(
+    `[heartbeat] ✅ Refreshed ${successCount}/${inMemoryOnlineUsers.size} users`,
+  );
 }, 600000); // Every 10 minutes
 
 // Cleanup stale in-memory entries (older than 35 minutes)
@@ -202,7 +220,9 @@ setInterval(() => {
   }
 
   if (removedCount > 0) {
-    console.log(`[cleanup] 🧹 Removed ${removedCount} stale entries from memory`);
+    console.log(
+      `[cleanup] 🧹 Removed ${removedCount} stale entries from memory`,
+    );
   }
 }, 300000); // Every 5 minutes
 
@@ -339,32 +359,34 @@ app.prepare().then(() => {
     // Identify authenticated user
     socket.on("identify", async (userData) => {
       if (!userData?.id) {
-        console.warn(`[socket] Identify called without user ID for socket ${socket.id}`);
+        console.warn(
+          `[socket] Identify called without user ID for socket ${socket.id}`,
+        );
         return;
       }
-      
+
       // Remove old reverse-map entry for this user if they had a previous socket
       const existing = socketConnections.get(userData.id);
       if (existing?.socketId && existing.socketId !== socket.id) {
         socketToUser.delete(existing.socketId);
         console.log(`[socket] Replaced old socket for user ${userData.id}`);
       }
-      
+
       socketConnections.set(userData.id, { socketId: socket.id, userData });
       socketToUser.set(socket.id, userData.id);
 
       // Track online user with fallback
       const tracked = await trackUserOnline(userData.id, userData);
-      
+
       console.log(
-        `[socket] ✓ User identified: ${userData.id} (${userData.name}) - Socket: ${socket.id} - Redis: ${tracked ? 'YES' : 'FALLBACK'}`,
+        `[socket] ✓ User identified: ${userData.id} (${userData.name}) - Socket: ${socket.id} - Redis: ${tracked ? "YES" : "FALLBACK"}`,
       );
-      
+
       // Send confirmation back to client
-      socket.emit('identified', { 
-        success: true, 
+      socket.emit("identified", {
+        success: true,
         userId: userData.id,
-        trackedInRedis: tracked 
+        trackedInRedis: tracked,
       });
     });
 
