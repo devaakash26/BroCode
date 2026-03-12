@@ -650,6 +650,39 @@ expressApp.get("/health", (req, res) => {
   });
 });
 
+// ── Get online users ─────────────────────────────────────────────────────────────
+expressApp.get("/api/online-users", (req, res) => {
+  try {
+    const onlineUsers = [];
+
+    // Get from in-memory storage (always available)
+    for (const [userId, data] of inMemoryOnlineUsers.entries()) {
+      onlineUsers.push({
+        userId,
+        ...data.userData,
+        timestamp: data.timestamp,
+      });
+    }
+
+    console.log(
+      `[socket-server] /api/online-users - Returning ${onlineUsers.length} users`,
+    );
+
+    res.json({
+      success: true,
+      count: onlineUsers.length,
+      users: onlineUsers,
+      source: redisReady ? "redis+memory" : "memory",
+    });
+  } catch (error) {
+    console.error("[socket-server] /api/online-users error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch online users",
+    });
+  }
+});
+
 expressApp.get("/", (req, res) => {
   res.json({ service: "BroCode Socket Server", status: "running" });
 });
