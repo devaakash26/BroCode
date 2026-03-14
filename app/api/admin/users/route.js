@@ -71,17 +71,86 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, error: 'Cannot delete your own account' }, { status: 400 });
     }
 
-    // Delete the user
-    await prisma.user.delete({
-      where: {
-        id: userId,
-      },
+    // Delete the user and all related data in a transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Delete all group memberships
+      await tx.userGroup.deleteMany({
+        where: { userId },
+      });
+
+      // 2. Delete all submissions
+      await tx.submission.deleteMany({
+        where: { userId },
+      });
+
+      // 3. Delete all problems created by this user
+      await tx.problem.deleteMany({
+        where: { creatorId: userId },
+      });
+
+      // 4. Delete all groups created by this user
+      await tx.group.deleteMany({
+        where: { creatorId: userId },
+      });
+
+      // 5. Delete all help queries and replies
+      await tx.queryReply.deleteMany({
+        where: { userId },
+      });
+
+      await tx.helpQuery.deleteMany({
+        where: { userId },
+      });
+
+      // 6. Delete all notifications sent to or from this user
+      await tx.notification.deleteMany({
+        where: {
+          OR: [
+            { recipientId: userId },
+            { senderId: userId },
+          ],
+        },
+      });
+
+      // 7. Delete all accounts (OAuth providers)
+      await tx.account.deleteMany({
+        where: { userId },
+      });
+
+      // 8. Delete all sessions
+      await tx.session.deleteMany({
+        where: { userId },
+      });
+
+      // 9. Finally, delete the user
+      await tx.user.delete({
+        where: { id: userId },
+      });
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting user:', error);
-    return NextResponse.json({ success: false, error: 'Failed to delete user' }, { status: 500 });
+    
+    // Provide more specific error messages
+    if (error.code === 'P2003') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Unable to delete user due to existing dependencies. Please try again or contact support.' 
+      }, { status: 500 });
+    }
+    
+    if (error.code === 'P2025') {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'User not found' 
+      }, { status: 404 });
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message || 'Failed to delete user' 
+    }, { status: 500 });
   } finally {
     await disconnectPrisma();
   }
