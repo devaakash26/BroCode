@@ -42,7 +42,19 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    const confirmMessage = `Are you sure you want to delete this user?
+
+This will permanently delete:
+• User account and profile
+• All submissions and solutions
+• All groups created by this user
+• All problems created by this user
+• All help queries and replies
+• All notifications
+
+This action CANNOT be undone.`;
+
+    if (window.confirm(confirmMessage)) {
       setIsDeleting(true);
       
       try {
@@ -53,7 +65,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
         const data = await response.json();
         
         if (data.success) {
-          toast.success('User deleted successfully');
+          toast.success('User and all related data deleted successfully');
           onClose();
           if (onUserDeleted) onUserDeleted(userId);
         } else {
@@ -82,7 +94,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
           <div className={`w-screen max-w-md transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
             <div className="h-full flex flex-col bg-white dark:bg-gray-900 shadow-xl rounded-l-xl overflow-hidden">
               {/* Header with improved styling */}
-              <div className="px-6 py-6 bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-800 dark:to-purple-800 sm:px-6">
+              <div className="px-6 py-6 bg-orange-600 dark:bg-orange-700 sm:px-6">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-white">
                     User Details
@@ -104,8 +116,8 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
               <div className="relative flex-1 px-6 py-6 sm:px-6 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center h-full">
-                    <div className="animate-spin rounded-full h-14 w-14 border-4 border-indigo-200 border-t-indigo-600 dark:border-t-indigo-400 dark:border-indigo-700"></div>
-                    <p className="mt-4 text-indigo-600 dark:text-indigo-400">Loading user details...</p>
+                    <div className="animate-spin rounded-full h-14 w-14 border-4 border-orange-200 border-t-orange-600 dark:border-t-orange-400 dark:border-orange-700"></div>
+                    <p className="mt-4 text-orange-600 dark:text-orange-400">Loading user details...</p>
                   </div>
                 ) : error ? (
                   <div className="flex flex-col items-center justify-center text-center text-red-500 py-12">
@@ -113,7 +125,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                     <p className="text-lg font-medium">{error}</p>
                     <button 
                       onClick={fetchUserDetails}
-                      className="mt-4 px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                      className="mt-4 px-4 py-2 rounded-md bg-orange-600 text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2"
                     >
                       Try Again
                     </button>
@@ -122,7 +134,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                   <div className="space-y-8">
                     {/* User profile header with improved styling */}
                     <div className="flex flex-col items-center pb-6 border-b border-gray-200 dark:border-gray-700">
-                      <div className="h-24 w-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-semibold mb-4 shadow-lg">
+                      <div className="h-24 w-24 rounded-full bg-orange-600 flex items-center justify-center text-white text-3xl font-semibold mb-4 shadow-lg">
                         {userData.image ? (
                           <img src={userData.image} alt={userData.name} className="h-24 w-24 rounded-full object-cover" />
                         ) : (
@@ -162,7 +174,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                           onClick={() => setActiveTab('overview')}
                           className={`pb-4 px-1 transition-colors duration-200 ${
                             activeTab === 'overview'
-                              ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                              ? 'border-b-2 border-orange-500 text-orange-600 dark:text-orange-400'
                               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'
                           } font-medium text-sm`}
                         >
@@ -172,7 +184,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                           onClick={() => setActiveTab('submissions')}
                           className={`pb-4 px-1 transition-colors duration-200 ${
                             activeTab === 'submissions'
-                              ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                              ? 'border-b-2 border-orange-500 text-orange-600 dark:text-orange-400'
                               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'
                           } font-medium text-sm`}
                         >
@@ -182,7 +194,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                           onClick={() => setActiveTab('groups')}
                           className={`pb-4 px-1 transition-colors duration-200 ${
                             activeTab === 'groups'
-                              ? 'border-b-2 border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                              ? 'border-b-2 border-orange-500 text-orange-600 dark:text-orange-400'
                               : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'
                           } font-medium text-sm`}
                         >
@@ -198,8 +210,8 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
                               <div className="flex items-center">
-                                <div className="p-3 rounded-full bg-indigo-100 dark:bg-indigo-900">
-                                  <ClipboardList className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                <div className="p-3 rounded-full bg-orange-100 dark:bg-orange-900">
+                                  <ClipboardList className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                                 </div>
                                 <div className="ml-4">
                                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Total Submissions</p>
@@ -375,7 +387,7 @@ export default function UserDetailsModal({ userId, isOpen, onClose, onUserDelete
                   </button>
                   <button
                     type="button"
-                    className="inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                    className="inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors duration-200"
                     onClick={onClose}
                   >
                     Close
