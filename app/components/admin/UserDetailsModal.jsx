@@ -48,8 +48,12 @@ This will permanently delete:
 • User account and profile
 • All submissions and solutions
 • All groups created by this user
+• All challenges created by this user
 • All problems created by this user
 • All help queries and replies
+• All chat messages
+• All bookmarks
+• All invitations sent
 • All notifications
 
 This action CANNOT be undone.`;
