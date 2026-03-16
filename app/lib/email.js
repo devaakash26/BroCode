@@ -94,66 +94,159 @@ const passwordResetEmailTemplate = ({ name, resetLink }) => `
 // Email template for welcome email
 const welcomeEmailTemplate = ({ name }) => `
 <!DOCTYPE html>
-<html>
+<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome to BroCode!</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>Welcome to the BroCode | System Access Granted</title>
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #4f46e5; color: white; padding: 20px; text-align: center; }
-    .content { padding: 20px; background-color: #f9fafb; border-radius: 0 0 5px 5px; }
-    .button { display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 20px 0; }
-    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-    .feature { margin-bottom: 15px; }
-    .feature-title { font-weight: bold; margin-bottom: 5px; }
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    
+    /* Reset & Basics */
+    body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f5; color: #18181b; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    
+    /* Light Mode (Default) */
+    .email-bg { background-color: #f4f4f5; }
+    .card-bg { background-color: #ffffff; border: 1px solid #e4e4e7; }
+    .text-primary { color: #18181b; }
+    .text-secondary { color: #52525b; }
+    .accent-bg { background-color: #4f46e5; } /* Indigo-600 */
+    .accent-text { color: #4f46e5; }
+    .code-block { background-color: #f4f4f5; border: 1px solid #e4e4e7; color: #db2777; font-family: 'Courier New', Courier, monospace; }
+    .divider { border-top: 1px solid #e4e4e7; }
+    
+    /* Dark Mode Overrides */
+    @media (prefers-color-scheme: dark) {
+      body { background-color: #09090b !important; color: #e4e4e7 !important; }
+      .email-bg { background-color: #09090b !important; }
+      .card-bg { background-color: #18181b !important; border-color: #27272a !important; }
+      .text-primary { color: #f4f4f5 !important; }
+      .text-secondary { color: #a1a1aa !important; }
+      .accent-bg { background-color: #6366f1 !important; } /* Indigo-500 */
+      .accent-text { color: #818cf8 !important; }
+      .code-block { background-color: #27272a !important; border-color: #3f3f46 !important; color: #f472b6 !important; }
+      .divider { border-top-color: #27272a !important; }
+    }
+    
+    /* Utilities */
+    .wrapper { width: 100%; table-layout: fixed; padding-bottom: 40px; }
+    .main-table { margin: 0 auto; max-width: 600px; width: 100%; border-spacing: 0; font-family: sans-serif; }
+    .btn { display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 8px; color: #ffffff !important; transition: all 0.2s; text-align: center; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    
+    /* Responsiveness */
+    @media only screen and (max-width: 600px) {
+      .main-table { width: 100% !important; padding: 0 10px; }
+      .content-padding { padding: 20px !important; }
+      .mobile-stack { display: block !important; width: 100% !important; margin-bottom: 15px; }
+    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Welcome to BroCode!</h1>
-    </div>
-    <div class="content">
-      <p>Hello ${name},</p>
-      <p>Thank you for joining BroCode! We're excited to have you on board.</p>
+<body class="email-bg">
+  <center class="wrapper email-bg">
+    <table class="main-table" role="presentation">
+      <!-- Spacer -->
+      <tr><td height="40"></td></tr>
       
-      <p>BroCode is a platform designed to help you master coding interviews and improve your problem-solving skills. Here are some features to get you started:</p>
-      
-      <div class="feature">
-        <div class="feature-title">🧩 Curated Problems</div>
-        <div>Access a carefully selected collection of coding problems organized by topic and difficulty.</div>
-      </div>
-      
-      <div class="feature">
-        <div class="feature-title">👥 Join Groups</div>
-        <div>Collaborate with other developers, join study groups, and participate in group challenges.</div>
-      </div>
-      
-      <div class="feature">
-        <div class="feature-title">🏆 Challenges</div>
-        <div>Test your skills with timed challenges and track your progress over time.</div>
-      </div>
-      
-      <div class="feature">
-        <div class="feature-title">📊 Progress Tracking</div>
-        <div>Monitor your growth with detailed statistics and performance metrics.</div>
-      </div>
-      
-      <p style="text-align: center; margin-top: 30px;">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="button">Start Coding Now</a>
-      </p>
-      
-      <p>If you have any questions or need assistance, feel free to reach out to our support team.</p>
-      
-      <p>Happy coding!</p>
-      <p>The BroCode Team</p>
-    </div>
-    <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
-    </div>
-  </div>
+      <!-- Logo / Brand Header -->
+      <tr>
+        <td style="text-align: center; padding-bottom: 24px;">
+          <h1 class="text-primary" style="margin: 0; font-size: 28px; letter-spacing: -0.5px; font-weight: 800;">
+            <span class="accent-text">&lt;/&gt;</span> BroCode
+          </h1>
+        </td>
+      </tr>
+
+      <!-- Main Card -->
+      <tr>
+        <td class="card-bg" style="border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+          
+          <!-- Banner / Graphic Area -->
+          <div class="accent-bg" style="height: 6px; width: 100%;"></div>
+          
+          <div class="content-padding" style="padding: 40px;">
+            <!-- Greeting -->
+            <h2 class="text-primary" style="margin-top: 0; margin-bottom: 16px; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+              System Initialized. <br>
+              Welcome, <span class="accent-text">${name}</span>!
+            </h2>
+            
+            <p class="text-secondary" style="margin: 0 0 24px; font-size: 16px; line-height: 1.6;">
+              Your sleek new development environment is ready. You've just joined the most robust community for mastering the art of code.
+            </p>
+
+            <!-- Code Snippet Visual -->
+            <div class="code-block" style="padding: 20px; border-radius: 12px; margin-bottom: 28px; font-size: 13px; line-height: 1.5; overflow-x: auto;">
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">1</span><span style="color: #a855f7;">const</span> <span style="color: #3b82f6;">developer</span> = <span style="color: #a855f7;">new</span> <span style="color: #eab308;">User</span>({</div>
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">2</span>&nbsp;&nbsp;name: <span style="color: #10b981;">"${name}"</span>,</div>
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">3</span>&nbsp;&nbsp;status: <span style="color: #10b981;">"READY_TO_CODE"</span>,</div>
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">4</span>&nbsp;&nbsp;skills: [<span style="color: #10b981;">"Algorithms"</span>, <span style="color: #10b981;">"System Design"</span>]</div>
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">5</span>});</div>
+              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">6</span></div>
+              <div><span style="opacity: 0.5; margin-right: 12px;">7</span><span style="color: #3b82f6;">developer</span>.<span style="color: #eab308;">startJourney</span>();</div>
+            </div>
+
+            <p class="text-secondary" style="margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
+              We've curated everything you need to level up. From complex algorithm challenges to real-time collaborative coding sessions—it's all here.
+            </p>
+
+            <!-- CTA Button -->
+            <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="width: 100%;">
+              <tr>
+                <td align="center">
+                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="btn accent-bg">
+                    Launch Dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Feature Grid (2 Cols) -->
+          <div class="divider"></div>
+          
+          <div class="content-padding" style="padding: 30px 40px; background-color: rgba(128, 128, 128, 0.03);">
+             <table width="100%" border="0" cellspacing="0" cellpadding="0">
+               <tr>
+                 <td class="mobile-stack" width="48%" style="vertical-align: top;">
+                   <h3 class="text-primary" style="margin: 0 0 8px; font-size: 16px; font-weight: 700;">🔥 Daily Challenges</h3>
+                   <p class="text-secondary" style="margin: 0; font-size: 14px; line-height: 1.5;">Keep your streak alive and sharpen your logic every single day.</p>
+                 </td>
+                 <td class="mobile-stack" width="4%" style="font-size: 0;">&nbsp;</td>
+                 <td class="mobile-stack" width="48%" style="vertical-align: top;">
+                   <h3 class="text-primary" style="margin: 0 0 8px; font-size: 16px; font-weight: 700;">👥 Peer Programming</h3>
+                   <p class="text-secondary" style="margin: 0; font-size: 14px; line-height: 1.5;">Code live with friends or random peers to simulate real interviews.</p>
+                 </td>
+               </tr>
+             </table>
+          </div>
+
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td style="text-align: center; padding-top: 32px;">
+          <p class="text-secondary" style="font-size: 12px; margin-bottom: 12px; opacity: 0.7;">
+            &copy; ${new Date().getFullYear()} BroCode Inc. <br>
+            Designed for Developers.
+          </p>
+          <div style="font-size: 12px; opacity: 0.7;">
+            <a href="#" class="text-secondary" style="text-decoration: underline; margin: 0 8px;">Privacy</a>
+            <span class="text-secondary">•</span>
+            <a href="#" class="text-secondary" style="text-decoration: underline; margin: 0 8px;">Unsubscribe</a>
+          </div>
+        </td>
+      </tr>
+      <tr><td height="40"></td></tr>
+    </table>
+  </center>
 </body>
 </html>
 `;
