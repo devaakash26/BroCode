@@ -16,14 +16,28 @@ const verificationEmailTemplate = ({ name, verificationLink }) => `
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>Verify Your Email Address</title>
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #e5e7eb; margin: 0; padding: 0; background-color: #0c0c0c; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #4f46e5; color: white; padding: 20px; text-align: center; }
-    .content { padding: 20px; background-color: #f9fafb; border-radius: 0 0 5px 5px; }
-    .button { display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 20px 0; }
-    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+    .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { padding: 20px; background-color: #1a1a1a; border-radius: 0 0 8px 8px; }
+    .content p { color: #9ca3af; }
+    .button { display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; }
+    
+    @media (prefers-color-scheme: light) {
+      body { background-color: #ffffff !important; color: #1f2937 !important; }
+      .content { background-color: #f9fafb !important; }
+      .content p { color: #4b5563 !important; }
+      .footer { color: #6b7280 !important; }
+    }
   </style>
 </head>
 <body>
@@ -57,14 +71,28 @@ const passwordResetEmailTemplate = ({ name, resetLink }) => `
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>Reset Your Password</title>
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #e5e7eb; margin: 0; padding: 0; background-color: #0c0c0c; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #4f46e5; color: white; padding: 20px; text-align: center; }
-    .content { padding: 20px; background-color: #f9fafb; border-radius: 0 0 5px 5px; }
-    .button { display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 20px 0; }
-    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+    .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { padding: 20px; background-color: #1a1a1a; border-radius: 0 0 8px 8px; }
+    .content p { color: #9ca3af; }
+    .button { display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; }
+    
+    @media (prefers-color-scheme: light) {
+      body { background-color: #ffffff !important; color: #1f2937 !important; }
+      .content { background-color: #f9fafb !important; }
+      .content p { color: #4b5563 !important; }
+      .footer { color: #6b7280 !important; }
+    }
   </style>
 </head>
 <body>
@@ -92,237 +120,180 @@ const passwordResetEmailTemplate = ({ name, resetLink }) => `
 `;
 
 // Email template for welcome email
-const welcomeEmailTemplate = ({ name }) => `
+const welcomeEmailTemplate = ({ name }) => {
+  const date = new Date();
+  const month = date.toLocaleString("default", { month: "long" });
+  const year = date.getFullYear();
+
+  return `
 <!DOCTYPE html>
-<html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
-  <title>Welcome to the BroCode | System Access Granted</title>
+  <title>Welcome to BroCode</title>
   <style>
+    /* Reset & Basics */
+    body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0c0c0c; color: #e5e7eb; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    
     :root {
       color-scheme: light dark;
       supported-color-schemes: light dark;
     }
-    
-    /* Reset & Basics */
-    body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f5; color: #18181b; }
-    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
-    
-    /* Light Mode (Default) */
-    .email-bg { background-color: #f4f4f5; }
-    .card-bg { background-color: #ffffff; border: 1px solid #e4e4e7; }
-    .text-primary { color: #18181b; }
-    .text-secondary { color: #52525b; }
-    .accent-bg { background-color: #4f46e5; } /* Indigo-600 */
-    .accent-text { color: #4f46e5; }
-    .code-block { background-color: #f4f4f5; border: 1px solid #e4e4e7; color: #db2777; font-family: 'Courier New', Courier, monospace; }
-    .divider { border-top: 1px solid #e4e4e7; }
-    
-    /* Dark Mode Overrides */
-    @media (prefers-color-scheme: dark) {
-      body { background-color: #09090b !important; color: #e4e4e7 !important; }
-      .email-bg { background-color: #09090b !important; }
-      .card-bg { background-color: #18181b !important; border-color: #27272a !important; }
-      .text-primary { color: #f4f4f5 !important; }
-      .text-secondary { color: #a1a1aa !important; }
-      .accent-bg { background-color: #6366f1 !important; } /* Indigo-500 */
-      .accent-text { color: #818cf8 !important; }
-      .code-block { background-color: #27272a !important; border-color: #3f3f46 !important; color: #f472b6 !important; }
-      .divider { border-top-color: #27272a !important; }
+
+    /* Light Mode Overrides with !important to ensure they work when supported */
+    @media (prefers-color-scheme: light) {
+      body, .bg-body { background-color: #ffffff !important; color: #1f2937 !important; }
+      .container { border-color: #e5e7eb !important; }
+      .headline { color: #111827 !important; }
+      .intro, .main-text, .list-desc, .cta-text, .date { color: #4b5563 !important; }
+      .intro strong, .main-text strong { color: #111827 !important; }
+      .list-title { color: #111827 !important; }
+      .list-section, .list-item, .cta-section, .header-table { border-color: #e5e7eb !important; }
+      .list-num { color: #9ca3af !important; }
+      .btn { border-color: #1f2937 !important; color: #1f2937 !important; background-color: transparent !important; }
+      .btn:hover { background-color: #1f2937 !important; color: #ffffff !important; }
+      .footer-brand { color: #374151 !important; }
+      .footer-links a { color: #4b5563 !important; }
     }
-    
-    /* Utilities */
-    .wrapper { width: 100%; table-layout: fixed; padding-bottom: 40px; }
-    .main-table { margin: 0 auto; max-width: 600px; width: 100%; border-spacing: 0; font-family: sans-serif; }
-    .btn { display: inline-block; padding: 14px 28px; font-size: 16px; font-weight: bold; text-decoration: none; border-radius: 8px; color: #ffffff !important; transition: all 0.2s; text-align: center; }
-    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    
-    /* Responsiveness */
+
+    /* Responsive */
     @media only screen and (max-width: 600px) {
-      .main-table { width: 100% !important; padding: 0 10px; }
-      .content-padding { padding: 20px !important; }
-      .mobile-stack { display: block !important; width: 100% !important; margin-bottom: 15px; }
+      .headline { font-size: 32px !important; }
+      .intro { font-size: 16px !important; }
+      .cta-text { display: block !important; width: 100% !important; margin-bottom: 20px !important; }
+      .cta-btn-cell { display: block !important; text-align: left !important; }
+      .footer-links { text-align: left !important; margin-top: 15px !important; }
+      .footer-links a { margin-left: 0 !important; margin-right: 15px !important; }
     }
   </style>
 </head>
-<body class="email-bg">
-  <center class="wrapper email-bg">
-    <table class="main-table" role="presentation">
-      <!-- Spacer -->
-      <tr><td height="40"></td></tr>
-      
-      <!-- Logo / Brand Header -->
+<body class="bg-body" style="margin: 0; padding: 0; width: 100% !important; background-color: #0c0c0c; color: #e5e7eb; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <div class="container" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    
+    <!-- Top Bar -->
+    <table class="header-table" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 60px; border-bottom: 1px solid #333333; padding-bottom: 20px;">
       <tr>
-        <td style="text-align: center; padding-bottom: 24px;">
-          <h1 class="text-primary" style="margin: 0; font-size: 28px; letter-spacing: -0.5px; font-weight: 800;">
-            <span class="accent-text">&lt;/&gt;</span> BroCode
-          </h1>
+        <td class="brand" style="font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; font-size: 14px; font-weight: 700; color: #e5e7eb; text-transform: uppercase;">
+          Bro<span class="dot" style="color: #4f46e5;">.</span>Code
+        </td>
+        <td class="date" style="text-align: right; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px;">
+          Welcome — ${month} ${year}
         </td>
       </tr>
-
-      <!-- Main Card -->
-      <tr>
-        <td class="card-bg" style="border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
-          
-          <!-- Banner / Graphic Area -->
-          <div class="accent-bg" style="height: 6px; width: 100%;"></div>
-          
-          <div class="content-padding" style="padding: 40px;">
-            <!-- Greeting -->
-            <h2 class="text-primary" style="margin-top: 0; margin-bottom: 16px; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
-              System Initialized. <br>
-              Welcome, <span class="accent-text">${name}</span>!
-            </h2>
-            
-            <p class="text-secondary" style="margin: 0 0 24px; font-size: 16px; line-height: 1.6;">
-              Your sleek new development environment is ready. You've just joined the most robust community for mastering the art of code.
-            </p>
-
-            <!-- Code Snippet Visual -->
-            <div class="code-block" style="padding: 20px; border-radius: 12px; margin-bottom: 28px; font-size: 13px; line-height: 1.5; overflow-x: auto;">
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">1</span><span style="color: #a855f7;">const</span> <span style="color: #3b82f6;">developer</span> = <span style="color: #a855f7;">new</span> <span style="color: #eab308;">User</span>({</div>
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">2</span>&nbsp;&nbsp;name: <span style="color: #10b981;">"${name}"</span>,</div>
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">3</span>&nbsp;&nbsp;status: <span style="color: #10b981;">"READY_TO_CODE"</span>,</div>
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">4</span>&nbsp;&nbsp;skills: [<span style="color: #10b981;">"Algorithms"</span>, <span style="color: #10b981;">"System Design"</span>]</div>
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">5</span>});</div>
-              <div style="margin-bottom: 4px;"><span style="opacity: 0.5; margin-right: 12px;">6</span></div>
-              <div><span style="opacity: 0.5; margin-right: 12px;">7</span><span style="color: #3b82f6;">developer</span>.<span style="color: #eab308;">startJourney</span>();</div>
-            </div>
-
-            <p class="text-secondary" style="margin: 0 0 32px; font-size: 16px; line-height: 1.6;">
-              We've curated everything you need to level up. From complex algorithm challenges to real-time collaborative coding sessions—it's all here.
-            </p>
-
-            <!-- CTA Button -->
-            <table role="presentation" border="0" cellspacing="0" cellpadding="0" style="width: 100%;">
-              <tr>
-                <td align="center">
-                  <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="btn accent-bg">
-                    Launch Dashboard &rarr;
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <!-- Feature Grid (2 Cols) -->
-          <div class="divider"></div>
-          
-          <div class="content-padding" style="padding: 30px 40px; background-color: rgba(128, 128, 128, 0.03);">
-             <table width="100%" border="0" cellspacing="0" cellpadding="0">
-               <tr>
-                 <td class="mobile-stack" width="48%" style="vertical-align: top;">
-                   <h3 class="text-primary" style="margin: 0 0 8px; font-size: 16px; font-weight: 700;">🔥 Daily Challenges</h3>
-                   <p class="text-secondary" style="margin: 0; font-size: 14px; line-height: 1.5;">Keep your streak alive and sharpen your logic every single day.</p>
-                 </td>
-                 <td class="mobile-stack" width="4%" style="font-size: 0;">&nbsp;</td>
-                 <td class="mobile-stack" width="48%" style="vertical-align: top;">
-                   <h3 class="text-primary" style="margin: 0 0 8px; font-size: 16px; font-weight: 700;">👥 Peer Programming</h3>
-                   <p class="text-secondary" style="margin: 0; font-size: 14px; line-height: 1.5;">Code live with friends or random peers to simulate real interviews.</p>
-                 </td>
-               </tr>
-             </table>
-          </div>
-
-        </td>
-      </tr>
-
-      <!-- Footer -->
-      <tr>
-        <td style="text-align: center; padding-top: 32px;">
-          <p class="text-secondary" style="font-size: 12px; margin-bottom: 12px; opacity: 0.7;">
-            &copy; ${new Date().getFullYear()} BroCode Inc. <br>
-            Designed for Developers.
-          </p>
-          <div style="font-size: 12px; opacity: 0.7;">
-            <a href="#" class="text-secondary" style="text-decoration: underline; margin: 0 8px;">Privacy</a>
-            <span class="text-secondary">•</span>
-            <a href="#" class="text-secondary" style="text-decoration: underline; margin: 0 8px;">Unsubscribe</a>
-          </div>
-        </td>
-      </tr>
-      <tr><td height="40"></td></tr>
     </table>
-  </center>
-</body>
-</html>
-`;
 
-// Email template for user invitation
-const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You've Been Invited to BroCode</title>
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
-    .content { padding: 30px; background-color: #f9fafb; border-radius: 0 0 5px 5px; border: 1px solid #e5e7eb; border-top: none; }
-    .button { display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; margin: 20px 0; font-weight: bold; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.25); }
-    .button:hover { background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%); }
-    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-    .role-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 14px; font-weight: bold; margin-bottom: 15px; }
-    .platform-admin { background-color: #9333ea; color: white; }
-    .group-admin { background-color: #3b82f6; color: white; }
-    .user { background-color: #6b7280; color: white; }
-    .divider { height: 1px; background-color: #e5e7eb; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>You've Been Invited to BroCode</h1>
-    </div>
-    <div class="content">
-      <p>Hello,</p>
-      <p><strong>${inviterName}</strong> has invited you to join BroCode as a:</p>
-      
-      <div style="text-align: center;">
-        <span class="role-badge ${role === "PLATFORM_ADMIN" ? "platform-admin" : role === "GROUP_ADMIN" ? "group-admin" : "user"}">
-          ${role === "PLATFORM_ADMIN" ? "Platform Admin" : role === "GROUP_ADMIN" ? "Group Admin" : "User"}
-        </span>
+    <!-- Hero Section -->
+    <div class="hero" style="margin-bottom: 50px;">
+      <div class="eyebrow" style="font-family: 'Courier New', Courier, monospace; color: #6366f1; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 20px;">
+        ACCOUNT ACTIVATED
       </div>
       
-      <div class="divider"></div>
+      <h1 class="headline" style="font-family: Georgia, 'Times New Roman', serif; font-size: 42px; line-height: 1.1; margin: 0 0 30px; font-weight: 400; color: #e5e7eb;">
+        Good to have <br>
+        you, <span class="name-accent" style="color: #818cf8; font-style: italic;">${name}</span>.
+      </h1>
       
-      <p>BroCode is a platform designed to help developers master coding interviews and improve their problem-solving skills with:</p>
+      <div class="hero-divider" style="width: 40px; height: 2px; background-color: #4f46e5; margin-bottom: 30px;"></div>
       
-      <ul>
-        <li>Curated coding problems organized by topic and difficulty</li>
-        <li>Collaborative study groups and challenges</li>
-        <li>Performance tracking and analytics</li>
-        <li>Community discussions and support</li>
-      </ul>
-      
-      <p style="text-align: center;">
-        <a href="${invitationLink}" class="button">Accept Invitation</a>
+      <p class="intro" style="font-size: 18px; line-height: 1.6; color: #9ca3af; margin: 0; max-width: 90%;">
+        Your account is live. Below is everything you need to know — read it once, then go build something <strong style="color: #e5e7eb;">worth shipping</strong>.
       </p>
-      
-      <p><strong>This invitation link will expire in 7 days.</strong></p>
-      
-      <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-      <p style="word-break: break-all; font-size: 14px; color: #4f46e5;">${invitationLink}</p>
     </div>
-    <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
+
+    <!-- Main Text -->
+    <div class="main-text" style="font-size: 16px; line-height: 1.6; margin-bottom: 50px; color: #9ca3af;">
+      BroCode is built for engineers who are <strong style="color: #e5e7eb;">serious about the craft</strong> — not just grinding LeetCode, but understanding the depth behind every problem you solve.
     </div>
+
+    <!-- Features List -->
+    <div class="list-section" style="margin-bottom: 60px; padding-top: 20px; border-top: 1px solid #1f2937;">
+      <!-- Item 01 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">01</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">CURATED PROBLEMS</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Hand-picked problems grouped by topic and difficulty — signal, not noise. No filler.</p>
+          </td>
+        </tr>
+      </table>
+      
+      <!-- Item 02 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">02</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">STUDY GROUPS</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Pair up with engineers at your level. Review together, sharpen together.</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Item 03 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">03</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">TIMED CHALLENGES</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Pressure is practice. Enter challenges and track where you hold — and where you fold.</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Item 04 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: none;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">04</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">PROGRESS METRICS</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Detailed stats on every session. Know your weak spots before the interview does.</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- CTA Area -->
+    <div class="cta-section" style="margin-bottom: 60px; padding: 40px 0; border-top: 1px solid #1f2937; border-bottom: 1px solid #1f2937;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="cta-text" style="font-size: 16px; color: #9ca3af; line-height: 1.5; padding-right: 20px; width: 60%;">
+            Your dashboard is ready. First problem's already waiting for you.
+          </td>
+          <td class="cta-btn-cell" style="text-align: right; vertical-align: middle;">
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard" class="btn" style="display: inline-block; padding: 12px 24px; border: 1px solid #e5e7eb; color: #e5e7eb; text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; border-radius: 4px; white-space: nowrap; transition: all 0.2s; font-family: 'Courier New', Courier, monospace;">START CODING &rarr;</a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <table class="footer" width="100%" cellpadding="0" cellspacing="0" style="padding-top: 20px;">
+      <tr>
+        <td class="footer-brand" style="font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #4b5563; font-size: 14px;">The BroCode Team</td>
+        <td class="footer-links" style="text-align: right;">
+          <a href="#" style="color: #4b5563; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">UNSUBSCRIBE</a>
+          <a href="#" style="color: #4b5563; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">SUPPORT</a>
+          <a href="#" style="color: #4b5563; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">PRIVACY</a>
+        </td>
+      </tr>
+    </table>
+
   </div>
 </body>
 </html>
 `;
+};
 
 // Send verification email
-export async function sendVerificationEmail({ to, name, verificationLink }) {
+export async function sendVerificationEmail({ name, to, verificationLink }) {
   const mailOptions = {
     from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "Verify Your Email Address",
+    subject: "Verify Your Email Address - BroCode",
     html: verificationEmailTemplate({ name, verificationLink }),
   };
 
@@ -332,37 +303,17 @@ export async function sendVerificationEmail({ to, name, verificationLink }) {
     console.log(`Verification email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error("Error sending verification email:", error);
-    return { success: false, error };
-  }
-}
-
-// Send password reset email
-export async function sendPasswordResetEmail({ to, name, resetLink }) {
-  const mailOptions = {
-    from: `"BroCode" <${process.env.EMAIL_USER}>`,
-    to,
-    subject: "Reset Your Password",
-    html: passwordResetEmailTemplate({ name, resetLink }),
-  };
-
-  try {
-    const transporter = await getTransporter();
-    await transporter.sendMail(mailOptions);
-    console.log(`Password reset email sent to ${to}`);
-    return { success: true };
-  } catch (error) {
-    console.error("Error sending password reset email:", error);
+    console.error(`Error sending verification email to ${to}:`, error);
     return { success: false, error };
   }
 }
 
 // Send welcome email
-export async function sendWelcomeEmail({ to, name }) {
+export async function sendWelcomeEmail({ name, to }) {
   const mailOptions = {
     from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "Welcome to BroCode!",
+    subject: "Welcome to BroCode",
     html: welcomeEmailTemplate({ name }),
   };
 
@@ -372,7 +323,86 @@ export async function sendWelcomeEmail({ to, name }) {
     console.log(`Welcome email sent to ${to}`);
     return { success: true };
   } catch (error) {
-    console.error("Error sending welcome email:", error);
+    console.error(`Error sending welcome email to ${to}:`, error);
+    return { success: false, error };
+  }
+}
+
+// Email template for invitation
+const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>You've Been Invited to BroCode</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #e5e7eb; margin: 0; padding: 0; background-color: #0c0c0c; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 10px 10px 0 0; }
+    .header h1 { margin: 0 0 10px 0; font-size: 24px; }
+    .content { padding: 30px; background-color: #1a1a1a; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
+    .content p { color: #9ca3af; }
+    .button { display: inline-block; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; padding: 20px; }
+    
+    @media (prefers-color-scheme: light) {
+      body { background-color: #f3f4f6 !important; color: #1f2937 !important; }
+      .content { background-color: white !important; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important; }
+      .content p { color: #4b5563 !important; }
+      .footer { color: #6b7280 !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎉 You've Been Invited!</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p><strong>${inviterName}</strong> has invited you to join BroCode${role ? ` as a <strong>${role}</strong>` : ""}.</p>
+      <p>BroCode is a platform for engineers who are serious about mastering coding problems and improving their technical skills.</p>
+      <p style="text-align: center;">
+        <a href="${invitationLink}" class="button">Accept Invitation</a>
+      </p>
+      <p>This invitation link will expire in 7 days.</p>
+      <p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>
+      <p style="word-break: break-all;">${invitationLink}</p>
+    </div>
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} BroCode. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+// Send challenge report card email
+export async function sendChallengeReportCard(data) {
+  const mailOptions = {
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
+    to: data.userEmail,
+    subject: `Challenge Completed: ${data.challengeTitle} - Your Report Card`,
+    html: challengeReportCardTemplate(data),
+  };
+
+  try {
+    const transporter = await getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`Challenge report card sent to ${data.userEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error(
+      `Error sending challenge report card to ${data.userEmail}:`,
+      error,
+    );
     return { success: false, error };
   }
 }
@@ -461,33 +491,55 @@ const challengeReportCardTemplate = ({
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
   <title>Challenge Completed - ${challengeTitle}</title>
   <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f3f4f6; }
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #e5e7eb; margin: 0; padding: 0; background-color: #0c0c0c; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; padding: 30px 20px; text-align: center; border-radius: 10px 10px 0 0; }
     .header h1 { margin: 0 0 10px 0; font-size: 24px; }
     .header p { margin: 0; opacity: 0.9; font-size: 14px; }
-    .content { padding: 30px; background-color: white; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    .content { padding: 30px; background-color: #1a1a1a; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); }
     .congrats { text-align: center; padding: 20px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; margin-bottom: 20px; }
     .congrats h2 { margin: 0 0 5px 0; color: #92400e; font-size: 20px; }
     .congrats p { margin: 0; color: #78350f; font-size: 14px; }
     .rank-badge { display: inline-block; font-size: 48px; margin: 10px 0; }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0; }
-    .stat-card { background-color: #f9fafb; border: 2px solid #e5e7eb; border-radius: 8px; padding: 15px; text-align: center; }
-    .stat-card.highlight { border-color: ${rankColor}; background-color: ${rank <= 3 ? "#fef3c7" : "#f9fafb"}; }
-    .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
-    .stat-value { font-size: 24px; font-weight: bold; color: #111827; }
-    .stat-subtext { font-size: 12px; color: #9ca3af; margin-top: 3px; }
-    .progress-bar { background-color: #e5e7eb; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+    .stat-card { background-color: #262626; border: 2px solid #404040; border-radius: 8px; padding: 15px; text-align: center; }
+    .stat-card.highlight { border-color: ${rankColor}; background-color: ${rank <= 3 ? "#422006" : "#262626"}; }
+    .stat-label { font-size: 12px; color: #9ca3af; text-transform: uppercase; font-weight: bold; margin-bottom: 5px; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #f3f4f6; }
+    .stat-subtext { font-size: 12px; color: #6b7280; margin-top: 3px; }
+    .progress-bar { background-color: #404040; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px; }
     .progress-fill { height: 100%; background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%); transition: width 0.3s ease; }
-    .info-section { margin: 20px 0; padding: 15px; background-color: #f9fafb; border-left: 4px solid #4f46e5; border-radius: 4px; }
-    .info-section h3 { margin: 0 0 10px 0; font-size: 14px; color: #4f46e5; text-transform: uppercase; }
+    .info-section { margin: 20px 0; padding: 15px; background-color: #262626; border-left: 4px solid #4f46e5; border-radius: 4px; }
+    .info-section h3 { margin: 0 0 10px 0; font-size: 14px; color: #818cf8; text-transform: uppercase; }
     .info-row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
-    .info-label { color: #6b7280; }
-    .info-value { font-weight: bold; color: #111827; }
+    .info-label { color: #9ca3af; }
+    .info-value { font-weight: bold; color: #f3f4f6; }
     .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; padding: 20px; }
-    .message { text-align: center; padding: 20px; color: #4b5563; font-size: 14px; line-height: 1.6; }
+    .message { text-align: center; padding: 20px; color: #9ca3af; font-size: 14px; line-height: 1.6; }
+    
+    @media (prefers-color-scheme: light) {
+      body { background-color: #f3f4f6 !important; color: #1f2937 !important; }
+      .content { background-color: white !important; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important; }
+      .stat-card { background-color: #f9fafb !important; border-color: #e5e7eb !important; }
+      .stat-card.highlight { background-color: ${rank <= 3 ? "#fef3c7" : "#f9fafb"} !important; }
+      .stat-label { color: #6b7280 !important; }
+      .stat-value { color: #111827 !important; }
+      .stat-subtext { color: #9ca3af !important; }
+      .progress-bar { background-color: #e5e7eb !important; }
+      .info-section { background-color: #f9fafb !important; }
+      .info-section h3 { color: #4f46e5 !important; }
+      .info-label { color: #6b7280 !important; }
+      .info-value { color: #111827 !important; }
+      .message { color: #4b5563 !important; }
+    }
   </style>
 </head>
 <body>
@@ -582,26 +634,3 @@ const challengeReportCardTemplate = ({
 </html>
 `;
 };
-
-// Send challenge report card email
-export async function sendChallengeReportCard(data) {
-  const mailOptions = {
-    from: `"BroCode" <${process.env.EMAIL_USER}>`,
-    to: data.userEmail,
-    subject: `Challenge Completed: ${data.challengeTitle} - Your Report Card`,
-    html: challengeReportCardTemplate(data),
-  };
-
-  try {
-    const transporter = await getTransporter();
-    await transporter.sendMail(mailOptions);
-    console.log(`Challenge report card sent to ${data.userEmail}`);
-    return { success: true };
-  } catch (error) {
-    console.error(
-      `Error sending challenge report card to ${data.userEmail}:`,
-      error,
-    );
-    return { success: false, error };
-  }
-}
