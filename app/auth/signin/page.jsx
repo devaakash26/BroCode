@@ -1,4 +1,5 @@
 import SignInForm from '@/app/components/auth/signin-form';
+import InteractiveBackground from '@/app/components/auth/interactive-background';
 
 export const metadata = {
   title: 'Sign In - BroCode',
@@ -7,8 +8,15 @@ export const metadata = {
 
 export default function SignInPage() {
   return (
-    <div className="container relative flex h-[calc(100vh-5rem)] flex-col items-center justify-center">
-      <SignInForm />
+    <div className="min-h-screen relative">
+      <InteractiveBackground>
+        <div className="min-h-screen flex items-center justify-center p-8">
+          <div className="w-full max-w-md">
+            <SignInForm />
+          </div>
+        </div>
+      </InteractiveBackground>
     </div>
   );
-} 
+}
+
