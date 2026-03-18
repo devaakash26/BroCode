@@ -58,26 +58,27 @@ export default function SignInForm() {
   };
 
   return (
-    <div className="mx-auto max-w-sm space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Sign In</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Enter your credentials to access your account
+    <div className="w-full space-y-8 bg-background/80 dark:bg-slate-900/80 backdrop-blur-xl p-8 rounded-2xl border border-border shadow-2xl">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+        <p className="mt-2 text-muted-foreground">
+          Sign in to continue your coding journey
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <label
             htmlFor="email"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm font-medium text-foreground"
           >
-            Email
+            Email address
           </label>
           <input
             id="email"
             type="email"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="you@example.com"
+            className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-sm transition-colors placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -87,13 +88,13 @@ export default function SignInForm() {
           <div className="flex items-center justify-between">
             <label
               htmlFor="password"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="text-sm font-medium text-foreground"
             >
               Password
             </label>
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-primary underline-offset-4 hover:underline"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors"
             >
               Forgot password?
             </Link>
@@ -101,7 +102,8 @@ export default function SignInForm() {
           <input
             id="password"
             type="password"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="••••••••"
+            className="flex h-11 w-full rounded-lg border border-input bg-background px-4 py-2 text-sm transition-colors placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -109,7 +111,7 @@ export default function SignInForm() {
         </div>
         <button
           type="submit"
-          className="w-full rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+          className="w-full h-11 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 active:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           disabled={isLoading}
         >
           {isLoading ? 'Signing in...' : 'Sign in'}
@@ -118,10 +120,10 @@ export default function SignInForm() {
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
+          <span className="w-full border-t border-border" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">
+        <div className="relative flex justify-center text-sm">
+          <span className="bg-background px-3 text-muted-foreground">
             Or continue with
           </span>
         </div>
@@ -130,7 +132,7 @@ export default function SignInForm() {
       <button
         type="button"
         onClick={handleGoogleSignIn}
-        className="flex w-full items-center justify-center gap-2 rounded-md border border-gray-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-300"
+        className="flex w-full h-11 items-center justify-center gap-3 rounded-lg border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -157,16 +159,16 @@ export default function SignInForm() {
             />
           </g>
         </svg>
-        Sign in with Google
+        <span>Sign in with Google</span>
       </button>
 
-      <div className="text-center text-sm">
+      <div className="text-center text-sm text-muted-foreground">
         Don&apos;t have an account?{' '}
         <Link
           href="/auth/signup"
-          className="font-medium text-primary underline-offset-4 hover:underline"
+          className="font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors"
         >
-          Sign up
+          Sign up for free
         </Link>
       </div>
     </div>
