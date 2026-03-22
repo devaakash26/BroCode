@@ -384,6 +384,178 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
 </html>
 `;
 
+// Group invitation email template
+const groupInvitationEmailTemplate = ({ 
+  inviterName, 
+  groupName, 
+  groupDescription,
+  joinLink 
+}) => {
+  const now = new Date();
+  const month = now.toLocaleString('en', { month: 'short' }).toUpperCase();
+  const year = now.getFullYear();
+  
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <title>Join ${groupName} on BroCode</title>
+  <style>
+    /* Reset & Basics */
+    body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #0c0c0c; color: #e5e7eb; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    
+    :root {
+      color-scheme: light dark;
+      supported-color-schemes: light dark;
+    }
+
+    /* Light Mode Overrides */
+    @media (prefers-color-scheme: light) {
+      body, .bg-body { background-color: #ffffff !important; color: #1f2937 !important; }
+      .container { border-color: #e5e7eb !important; }
+      .headline { color: #111827 !important; }
+      .intro, .main-text, .list-desc, .date { color: #4b5563 !important; }
+      .intro strong, .main-text strong { color: #111827 !important; }
+      .list-title { color: #111827 !important; }
+      .list-section, .list-item, .cta-section, .header-table { border-color: #e5e7eb !important; }
+      .list-num { color: #9ca3af !important; }
+      .btn { border-color: #1f2937 !important; color: #1f2937 !important; background-color: transparent !important; }
+      .btn:hover { background-color: #1f2937 !important; color: #ffffff !important; }
+      .footer-brand { color: #374151 !important; }
+      .footer-links a { color: #4b5563 !important; }
+      .group-name { color: #4f46e5 !important; }
+    }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      .headline { font-size: 28px !important; }
+      .intro { font-size: 16px !important; }
+      .footer-links { text-align: left !important; margin-top: 15px !important; }
+      .footer-links a { margin-left: 0 !important; margin-right: 15px !important; }
+    }
+  </style>
+</head>
+<body class="bg-body" style="margin: 0; padding: 0; width: 100% !important; background-color: #0c0c0c; color: #e5e7eb; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+  <div class="container" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    
+    <!-- Top Bar -->
+    <table class="header-table" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; margin-bottom: 60px; border-bottom: 1px solid #333333; padding-bottom: 20px;">
+      <tr>
+        <td class="brand" style="font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; font-size: 14px; font-weight: 700; color: #e5e7eb; text-transform: uppercase;">
+          Bro<span class="dot" style="color: #4f46e5;">.</span>Code
+        </td>
+        <td class="date" style="text-align: right; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px;">
+          Invitation — ${month} ${year}
+        </td>
+      </tr>
+    </table>
+
+    <!-- Hero Section -->
+    <div class="hero" style="margin-bottom: 50px;">
+      <div class="eyebrow" style="font-family: 'Courier New', Courier, monospace; color: #6366f1; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700; margin-bottom: 20px;">
+        GROUP INVITATION
+      </div>
+      
+      <h1 class="headline" style="font-family: Georgia, 'Times New Roman', serif; font-size: 36px; line-height: 1.2; margin: 0 0 30px; font-weight: 400; color: #e5e7eb;">
+        <span class="inviter-name" style="color: #818cf8; font-style: italic;">${inviterName}</span><br>
+        invited you to<br>
+        <span class="group-name" style="color: #818cf8; font-style: italic;">${groupName}</span>
+      </h1>
+      
+      <div class="hero-divider" style="width: 40px; height: 2px; background-color: #4f46e5; margin-bottom: 30px;"></div>
+      
+      <p class="intro" style="font-size: 18px; line-height: 1.6; color: #9ca3af; margin: 0; max-width: 90%;">
+        ${groupDescription || 'Join this study group to collaborate with fellow engineers, compete in challenges, and sharpen your skills together.'}
+      </p>
+    </div>
+
+    <!-- Main Text -->
+    <div class="main-text" style="font-size: 16px; line-height: 1.6; margin-bottom: 50px; color: #9ca3af;">
+      Study groups are where engineers <strong style="color: #e5e7eb;">level up together</strong> — solving curated problems, competing in real-time, and pushing each other to improve.
+    </div>
+
+    <!-- Features List -->
+    <div class="list-section" style="margin-bottom: 60px; padding-top: 20px; border-top: 1px solid #1f2937;">
+      <!-- Item 01 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">01</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">SOLVE TOGETHER</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Work through curated coding challenges as a team. Share approaches and learn from each other.</p>
+          </td>
+        </tr>
+      </table>
+      
+      <!-- Item 02 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">02</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">COMPETE LIVE</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Join timed coding competitions. See where you rank and what needs work under pressure.</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Item 03 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: 1px solid #1f2937;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">03</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">REAL-TIME CHAT</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">Discuss strategies, debug together, and share solutions in the group chat.</p>
+          </td>
+        </tr>
+      </table>
+
+      <!-- Item 04 -->
+      <table class="list-item" cellpadding="0" cellspacing="0" style="width: 100%; border-bottom: none;">
+        <tr>
+          <td class="list-num" style="width: 40px; font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #4b5563; padding-right: 20px; vertical-align: top; padding: 25px 0;">04</td>
+          <td class="list-content" style="vertical-align: top; padding: 25px 0;">
+            <div class="list-title" style="font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; color: #e5e7eb;">TRACK PROGRESS</div>
+            <p class="list-desc" style="font-size: 14px; color: #9ca3af; line-height: 1.5; margin: 0;">See your rankings, stats, and improvement over time within the group leaderboard.</p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- CTA Area -->
+    <div class="cta-section" style="margin-bottom: 40px; padding: 40px 30px; border-top: 1px solid #1f2937; border-bottom: 1px solid #1f2937; text-align: center;">
+      <p style="font-size: 16px; color: #9ca3af; margin-bottom: 24px;">
+        This invitation is valid for 7 days.
+      </p>
+      <a href="${joinLink}" class="btn" style="display: inline-block; padding: 12px 24px; border: 1px solid #e5e7eb; color: #e5e7eb; text-decoration: none; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; border-radius: 4px; white-space: nowrap; transition: all 0.2s; font-family: 'Courier New', Courier, monospace;">JOIN ${groupName.toUpperCase()} &rarr;</a>
+      
+      <p style="font-size: 12px; color: #6b7280; margin-top: 24px; line-height: 1.4;">
+        If the button doesn't work, copy this link:<br>
+        <span style="word-break: break-all;">${joinLink}</span>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <table class="footer" width="100%" cellpadding="0" cellspacing="0" style="padding-top: 20px;">
+      <tr>
+        <td class="footer-brand" style="font-family: Georgia, 'Times New Roman', serif; font-style: italic; color: #4b5563; font-size: 14px;">The BroCode Team</td>
+        <td class="footer-links" style="text-align: right;">
+          <a href="#" style="color: #4b5563; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">SUPPORT</a>
+          <a href="#" style="color: #4b5563; text-decoration: none; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-left: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">PRIVACY</a>
+        </td>
+      </tr>
+    </table>
+
+  </div>
+</body>
+</html>
+`;
+};
+
 // Send challenge report card email
 export async function sendChallengeReportCard(data) {
   const mailOptions = {
@@ -428,6 +600,37 @@ export async function sendInvitationEmail({
     return { success: true };
   } catch (error) {
     console.error("Error sending invitation email:", error);
+    return { success: false, error };
+  }
+}
+
+// Send group invitation email
+export async function sendGroupInvitationEmail({
+  to,
+  inviterName,
+  groupName,
+  groupDescription,
+  joinLink,
+}) {
+  const mailOptions = {
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `${inviterName} invited you to join ${groupName} on BroCode`,
+    html: groupInvitationEmailTemplate({ 
+      inviterName, 
+      groupName, 
+      groupDescription,
+      joinLink 
+    }),
+  };
+
+  try {
+    const transporter = await getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`Group invitation email sent to ${to} for group "${groupName}"`);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending group invitation email to ${to}:`, error);
     return { success: false, error };
   }
 }

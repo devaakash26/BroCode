@@ -41,6 +41,10 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
   // Build WHERE clause for the user search
   const userWhere = {
     email: { not: 'system@neetcode.io' },
+    NOT: [
+      { name: { contains: 'test', mode: 'insensitive' } },
+      { email: { contains: 'test', mode: 'insensitive' } },
+    ],
     ...(searchQuery ? {
       OR: [
         { name: { contains: searchQuery, mode: 'insensitive' } },

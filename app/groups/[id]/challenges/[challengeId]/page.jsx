@@ -9,6 +9,8 @@ import {
   ChevronRight, BarChart3, AlertTriangle, Loader2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
+import MobileRestriction from '@/app/components/MobileRestriction';
 
 const DIFF = {
   EASY:   { label: 'Easy',   cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
@@ -192,6 +194,8 @@ export default function ChallengeDetailsPage({ params }) {
     );
   }
 
+  const isMobile = useIsMobile();
+
   if (!challenge) {
     return (
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
@@ -199,6 +203,16 @@ export default function ChallengeDetailsPage({ params }) {
         <Link href={`/groups/${groupId}/challenges`}
           className="text-sm text-indigo-600 hover:underline">Back to challenges</Link>
       </div>
+    );
+  }
+
+  // Show mobile restriction for active/live challenges only
+  if (isMobile && (timing?.phase === 'active' || timing?.phase === 'entry-open')) {
+    return (
+      <MobileRestriction
+        title="Challenge Requires Desktop"
+        message="Participating in coding challenges requires a desktop environment with a full code editor. Please switch to a laptop or desktop computer to start this challenge."
+      />
     );
   }
 
