@@ -27,7 +27,16 @@ export async function GET(req) {
         orderBy: { createdAt: "desc" },
         take: limit,
         skip: (page - 1) * limit,
-        include: {
+        select: {
+          id: true,
+          type: true,
+          title: true,
+          message: true,
+          metadata: true,
+          actionUrl: true,
+          read: true,
+          createdAt: true,
+          expiresAt: true,
           sender: {
             select: {
               id: true,

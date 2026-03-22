@@ -37,10 +37,6 @@ export async function GET(request, { params }) {
           challengeId: null,
           ...(before ? { sentAt: { lt: new Date(before) } } : {}),
         },
-        orderBy: {
-          sentAt: "desc",
-        },
-        take: limit,
         select: {
           id: true,
           content: true,
@@ -57,6 +53,10 @@ export async function GET(request, { params }) {
             },
           },
         },
+        orderBy: {
+          sentAt: "desc",
+        },
+        take: limit,
       }),
     ]);
 

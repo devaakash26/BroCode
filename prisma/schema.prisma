@@ -47,6 +47,8 @@ model User {
   queryReplies         QueryReply[]
   notifications        Notification[]         @relation("NotificationReceiver")
   notificationsSent    Notification[]         @relation("NotificationSender")
+
+  @@index([lastSeen]) // online users query
 }
 
 enum UserRole {
@@ -113,6 +115,9 @@ model Group {
   members    UserGroup[]
   challenges Challenge[]
   messages   ChatMessage[]
+
+  @@index([isActive, visibility]) // filtered groups listing
+  @@index([createdAt])            // newest groups first
 }
 
 enum GroupVisibility {
@@ -137,8 +142,10 @@ model UserGroup {
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([userId, groupId])
-  @@index([userId])  // user's groups lookup
-  @@index([groupId]) // group member listing
+  @@index([userId])               // user's groups lookup
+  @@index([groupId])              // group member listing
+  @@index([groupId, score])       // leaderboard by score
+  @@index([groupId, lastActive])  // recently active members
 }
 
 enum GroupRole {
@@ -184,6 +191,10 @@ model Problem {
   submissions  Submission[]
   categories   ProblemCategory[]
   bookmarks    Bookmark[]
+
+  @@index([difficulty, isPublic]) // filtered problem queries
+  @@index([isPublic, isFeatured]) // featured problems listing
+  @@index([groupId])              // group custom problems
 }
 
 // ProblemCategory model (many-to-many relationship)
@@ -248,7 +259,10 @@ model Challenge {
   messages             ChatMessage[]
   ChallengeParticipant ChallengeParticipant[]
 
-  @@index([groupId, endTime]) // active challenges query
+  @@index([groupId, endTime])  // active challenges query
+  @@index([startTime])         // upcoming challenges
+  @@index([endTime])           // completed challenges
+  @@index([isActive])          // live challenges
 }
 
 // ChallengeProblems model (many-to-many relationship)
@@ -392,7 +406,9 @@ model ChallengeParticipant {
   challenge Challenge @relation(fields: [challengeId], references: [id])
 
   @@unique([userId, challengeId])
-  @@index([challengeId]) // challenge participant listing
+  @@index([challengeId])             // challenge participant listing
+  @@index([challengeId, status])     // filter participants by status
+  @@index([challengeId, score])      // challenge leaderboard sorting
 }
 
 // Help Query model

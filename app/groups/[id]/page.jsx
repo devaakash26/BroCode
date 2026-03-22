@@ -496,7 +496,15 @@ export default function GroupDetailPage({ params }) {
 
   const totalMembers = group?._count?.members ?? group?.members?.length ?? 0;
   const onlineCount = activeMembers.filter(m => new Date(m.timestamp) > fiveMinAgo()).length;
-  const activeChallenges = group?.challenges?.filter(c => new Date(c.endTime) > new Date()) ?? [];
+  
+  // Show only active challenges (not yet ended)
+  const now = new Date();
+  const activeChallenges = group?.challenges
+    ?.filter(c => new Date(c.endTime) > now) // Only show challenges that haven't ended
+    .sort((a, b) => new Date(a.startTime) - new Date(b.startTime)) // Soonest first
+    ?? [];
+  
+  const totalChallenges = group?.challenges?.length ?? 0;
 
   if (groupStatus === 'loading' || groupStatus === 'idle' || status === 'loading') return <GroupSkeleton />;
 
@@ -601,18 +609,32 @@ export default function GroupDetailPage({ params }) {
               {activeChallenges.length > 0 ? (
                 <div className="space-y-3">
                   {activeChallenges.map(c => <ChallengeCard key={c.id} challenge={c} groupId={groupId} />)}
-                  <div className="text-center pt-1">
-                    <Link href={`/groups/${groupId}/challenges`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">View all challenges →</Link>
-                  </div>
+                  {totalChallenges > activeChallenges.length && (
+                    <div className="text-center pt-2">
+                      <Link href={`/groups/${groupId}/challenges`}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-gray-700 dark:text-gray-300">
+                        <Calendar className="h-4 w-4" />
+                        View All Challenges ({totalChallenges})
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <EmptyState icon={<Zap className="h-8 w-8 text-gray-400" />} title="No active challenges"
-                  subtitle={isAdmin ? "Create the first challenge to get started." : "Check back soon!"}
-                  action={isAdmin && (
-                    <Link href={`/groups/${groupId}/create-challenge`} className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-sm hover:underline">
-                      <PlusCircle className="h-4 w-4" />Create the first challenge
-                    </Link>
-                  )} />
+                  subtitle={totalChallenges > 0 ? "All challenges have ended." : (isAdmin ? "Create the first challenge to get started." : "Check back soon!")}
+                  action={
+                    totalChallenges > 0 ? (
+                      <Link href={`/groups/${groupId}/challenges`}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
+                        <Calendar className="h-4 w-4" />View Past Challenges
+                      </Link>
+                    ) : isAdmin ? (
+                      <Link href={`/groups/${groupId}/create-challenge`} className="inline-flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 text-sm hover:underline">
+                        <PlusCircle className="h-4 w-4" />Create the first challenge
+                      </Link>
+                    ) : null
+                  } />
               )}
             </Section>
 
