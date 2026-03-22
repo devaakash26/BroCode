@@ -41,7 +41,15 @@ async function getGroupCached(id) {
           solvedCount: true,
           joinedAt: true,
           lastActive: true,
-          user: { select: { id: true, name: true, image: true } },
+          user: { select: { id: true, name: true, image: true, email: true } },
+        },
+        where: {
+          user: {
+            NOT: [
+              { name: { contains: 'test', mode: 'insensitive' } },
+              { email: { contains: 'test', mode: 'insensitive' } },
+            ],
+          },
         },
         orderBy: { score: "desc" },
         take: 10, // Reduced from 20 to 10 for faster queries

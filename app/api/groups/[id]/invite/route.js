@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/app/lib/db";
+import { sendGroupInvitationEmail } from "@/app/lib/email";
 
 // POST /api/groups/[id]/invite - Send group invitation to a user
 export async function POST(req, { params }) {
@@ -151,6 +152,63 @@ export async function POST(req, { params }) {
         "[group-invite] 📋 Notifications saved to DB - recipients will receive via polling (15s interval)",
       );
     }
+
+    // Send email invitations (fire-and-forget, don't block response)
+    (async () => {
+      try {
+        console.log("[group-invite] Sending email invitations...");
+        
+        // Fetch user emails for invited users
+        const invitedUsers = await prisma.user.findMany({
+          where: {
+            id: { in: finalInviteeIds },
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        });
+
+        // Get group details including description
+        const group = await prisma.group.findUnique({
+          where: { id: groupId },
+          select: {
+            description: true,
+          },
+        });
+
+        // Send emails in parallel
+        const emailPromises = invitedUsers.map((user) => {
+          if (!user.email) {
+            console.log(`[group-invite] ⚠️  Skipping email for user ${user.id} (no email)`);
+            return Promise.resolve({ success: false, reason: 'no email' });
+          }
+
+          const joinLink = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/groups/${groupId}`;
+          
+          return sendGroupInvitationEmail({
+            to: user.email,
+            inviterName: session.user.name || 'A BroCode member',
+            groupName: userGroup.group.name,
+            groupDescription: group?.description || undefined,
+            joinLink,
+          }).catch((error) => {
+            console.error(`[group-invite] Failed to send email to ${user.email}:`, error);
+            return { success: false, error };
+          });
+        });
+
+        const emailResults = await Promise.all(emailPromises);
+        const successCount = emailResults.filter(r => r.success).length;
+        console.log(
+          `[group-invite] ✓ Sent ${successCount}/${invitedUsers.length} invitation emails`,
+        );
+      } catch (error) {
+        console.error("[group-invite] Error sending invitation emails:", error);
+        // Don't throw - this is fire-and-forget
+      }
+    })();
 
     return NextResponse.json({
       success: true,

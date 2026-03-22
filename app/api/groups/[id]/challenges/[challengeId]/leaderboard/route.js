@@ -78,12 +78,15 @@ export async function GET(request, { params }) {
           p.difficulty,
           s."submittedAt",
           u.name as "userName",
-          u.image as "userImage"
+          u.image as "userImage",
+          u.email as "userEmail"
         FROM "Submission" s
         INNER JOIN "User" u ON s."userId" = u.id
         INNER JOIN "Problem" p ON s."problemId" = p.id
         WHERE s."challengeId" = ${challengeId}
           AND s.status = 'ACCEPTED'
+          AND LOWER(u.name) NOT LIKE '%test%'
+          AND LOWER(u.email) NOT LIKE '%test%'
         ORDER BY s."userId", s."problemId", s."submittedAt" ASC
       ),
       user_scores AS (
@@ -127,15 +130,17 @@ export async function GET(request, { params }) {
       problemsSolved: entry.problemsSolved,
     }));
 
-    // Get total participant count for pagination
-    const totalParticipants = await prisma.submission.groupBy({
-      by: ["userId"],
-      where: {
-        challengeId,
-        status: "ACCEPTED",
-      },
-      _count: true,
-    });
+    // Get total participant count for pagination (excluding test users)
+    const totalParticipantsData = await prisma.$queryRaw`
+      SELECT COUNT(DISTINCT s."userId")::int as count
+      FROM "Submission" s
+      INNER JOIN "User" u ON s."userId" = u.id
+      WHERE s."challengeId" = ${challengeId}
+        AND s.status = 'ACCEPTED'
+        AND LOWER(u.name) NOT LIKE '%test%'
+        AND LOWER(u.email) NOT LIKE '%test%'
+    `;
+    const totalCount = totalParticipantsData[0]?.count || 0;
 
     // Check if the challenge has started
     const now = new Date();
@@ -144,7 +149,6 @@ export async function GET(request, { params }) {
 
     // Only return real data if challenge has started or if real-time leaderboard is enabled
     if (hasStarted || challenge.realTimeLeaderboard) {
-      const totalCount = totalParticipants.length;
       const responseData = {
         leaderboard,
         pagination: {

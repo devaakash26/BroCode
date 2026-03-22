@@ -9,6 +9,8 @@ import {
   Users, Shield, Mail, ChevronDown, ChevronUp, UserPlus, Link2,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useIsMobile } from '@/app/hooks/useIsMobile';
+import MobileRestriction from '@/app/components/MobileRestriction';
 
 const DIFF = {
   EASY:   { label: 'Easy',   text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10', dot: 'bg-emerald-500' },
@@ -218,11 +220,23 @@ export default function CreateChallengePage({ params }) {
     return null;
   }
 
+  const isMobile = useIsMobile();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
       </div>
+    );
+  }
+
+  // Show mobile restriction
+  if (isMobile) {
+    return (
+      <MobileRestriction
+        title="Create Challenges on Desktop"
+        message="Creating and managing challenges requires a desktop experience for the best functionality. Please switch to a laptop or desktop computer to create challenges."
+      />
     );
   }
 

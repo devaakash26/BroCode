@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "cross-env NODE_OPTIONS='--max-old-space-size=8192' node server-dev.js",
+        "dev": "cross-env NODE_OPTIONS='--max-old-space-size=8192 --no-deprecation' node server-dev.js",
         "build": "cross-env NODE_OPTIONS='--max-old-space-size=8192' prisma generate && next build",
         "build:safe": "cross-env NODE_OPTIONS='--max-old-space-size=8192' prisma generate && next build && echo 'If build fails, use npm run start-dev as a workaround'",
         "postinstall": "prisma generate",
