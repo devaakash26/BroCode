@@ -14,6 +14,15 @@ export async function GET(request, { params }) {
 
     const { id: groupId, challengeId } = params;
 
+    // Parse query parameters for pagination
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = Math.min(
+      parseInt(searchParams.get("limit") || "50", 10),
+      100,
+    ); // Max 100 per page
+    const skip = (page - 1) * limit;
+
     // Check if the challenge exists and belongs to the group
     const challenge = await prisma.challenge.findFirst({
       where: {
@@ -51,101 +60,81 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Check cache first
-    const cachedLeaderboard = await redisHelpers.getLeaderboard(challengeId);
-    if (cachedLeaderboard) {
-      return NextResponse.json(cachedLeaderboard);
+    // Check cache first (only cache page 1 with default limit)
+    if (page === 1 && limit === 50) {
+      const cachedLeaderboard = await redisHelpers.getLeaderboard(challengeId);
+      if (cachedLeaderboard) {
+        return NextResponse.json(cachedLeaderboard);
+      }
     }
 
-    // Get all submissions for this challenge
-    const submissions = await prisma.submission.findMany({
+    // Optimized leaderboard calculation using database aggregation
+    // Use raw SQL for better performance with aggregations
+    const leaderboardData = await prisma.$queryRaw`
+      WITH user_problems AS (
+        SELECT DISTINCT ON (s."userId", s."problemId")
+          s."userId",
+          s."problemId",
+          p.difficulty,
+          s."submittedAt",
+          u.name as "userName",
+          u.image as "userImage"
+        FROM "Submission" s
+        INNER JOIN "User" u ON s."userId" = u.id
+        INNER JOIN "Problem" p ON s."problemId" = p.id
+        WHERE s."challengeId" = ${challengeId}
+          AND s.status = 'ACCEPTED'
+        ORDER BY s."userId", s."problemId", s."submittedAt" ASC
+      ),
+      user_scores AS (
+        SELECT 
+          "userId",
+          "userName",
+          "userImage",
+          SUM(
+            CASE 
+              WHEN difficulty = 'EASY' THEN 100
+              WHEN difficulty = 'MEDIUM' THEN 200
+              WHEN difficulty = 'HARD' THEN 300
+              ELSE 100
+            END
+          ) as score,
+          COUNT(DISTINCT "problemId") as "problemsSolved"
+        FROM user_problems
+        GROUP BY "userId", "userName", "userImage"
+      )
+      SELECT 
+        "userId" as "id",
+        "userName" as name,
+        "userImage" as image,
+        score::int,
+        "problemsSolved"::int as "problemsSolved"
+      FROM user_scores
+      ORDER BY score DESC, "problemsSolved" DESC
+      LIMIT ${limit}
+      OFFSET ${skip}
+    `;
+
+    // Format leaderboard with ranks
+    const leaderboard = leaderboardData.map((entry, index) => ({
+      rank: skip + index + 1,
+      user: {
+        id: entry.id,
+        name: entry.name,
+        image: entry.image,
+      },
+      score: entry.score,
+      problemsSolved: entry.problemsSolved,
+    }));
+
+    // Get total participant count for pagination
+    const totalParticipants = await prisma.submission.groupBy({
+      by: ["userId"],
       where: {
         challengeId,
-        status: "ACCEPTED", // Only count accepted submissions
+        status: "ACCEPTED",
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-          },
-        },
-        problem: {
-          select: {
-            id: true,
-            title: true,
-            difficulty: true,
-          },
-        },
-      },
-      orderBy: {
-        submittedAt: "asc", // Earlier submissions first
-      },
-    });
-
-    // Process submissions to create the leaderboard
-    const userMap = new Map();
-
-    submissions.forEach((submission) => {
-      const userId = submission.user.id;
-
-      // Calculate points based on difficulty
-      let points = 0;
-      switch (submission.problem.difficulty) {
-        case "EASY":
-          points = 100;
-          break;
-        case "MEDIUM":
-          points = 200;
-          break;
-        case "HARD":
-          points = 300;
-          break;
-        default:
-          points = 100;
-      }
-
-      // Add bonus points for early submission
-      // This could be refined based on your scoring algorithm
-
-      // If this user is already in the map
-      if (userMap.has(userId)) {
-        const userData = userMap.get(userId);
-
-        // If this problem is not already solved by this user
-        if (!userData.solvedProblems.has(submission.problem.id)) {
-          userData.solvedProblems.add(submission.problem.id);
-          userData.score += points;
-          userData.problemsSolved += 1;
-        }
-      } else {
-        // First time seeing this user
-        userMap.set(userId, {
-          user: {
-            id: userId,
-            name: submission.user.name,
-            image: submission.user.image,
-          },
-          score: points,
-          problemsSolved: 1,
-          solvedProblems: new Set([submission.problem.id]),
-        });
-      }
-    });
-
-    // Convert the map to an array and sort by score
-    const leaderboard = Array.from(userMap.values())
-      .map((entry) => ({
-        user: entry.user,
-        score: entry.score,
-        problemsSolved: entry.problemsSolved,
-      }))
-      .sort((a, b) => b.score - a.score || b.problemsSolved - a.problemsSolved);
-
-    // Add ranks
-    leaderboard.forEach((entry, index) => {
-      entry.rank = index + 1;
+      _count: true,
     });
 
     // Check if the challenge has started
@@ -155,22 +144,37 @@ export async function GET(request, { params }) {
 
     // Only return real data if challenge has started or if real-time leaderboard is enabled
     if (hasStarted || challenge.realTimeLeaderboard) {
+      const totalCount = totalParticipants.length;
       const responseData = {
         leaderboard,
+        pagination: {
+          page,
+          limit,
+          total: totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+        },
         status: {
           hasStarted,
           hasEnded,
         },
       };
 
-      // Cache the leaderboard
-      await redisHelpers.cacheLeaderboard(challengeId, responseData);
+      // Cache the leaderboard (only cache page 1)
+      if (page === 1 && limit === 50) {
+        await redisHelpers.cacheLeaderboard(challengeId, responseData);
+      }
 
       return NextResponse.json(responseData);
     } else {
       // Return empty leaderboard if challenge hasn't started
       return NextResponse.json({
         leaderboard: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
         status: {
           hasStarted: false,
           hasEnded: false,

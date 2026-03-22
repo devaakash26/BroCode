@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/app/lib/db";
 import { sendEmail } from "@/app/lib/email";
+import { redisHelpers } from "@/lib/redis";
 
 // Create a new challenge in a group
 export async function POST(request, { params }) {
@@ -177,6 +178,9 @@ export async function POST(request, { params }) {
           update: {},
         });
 
+        // Invalidate group cache so new challenge appears immediately
+        await redisHelpers.invalidateGroup(groupId);
+
         return NextResponse.json({
           id: challenge.id,
           title: challenge.title,
@@ -304,6 +308,9 @@ export async function POST(request, { params }) {
         }
       }
 
+      // Invalidate group cache so new challenge appears immediately
+      await redisHelpers.invalidateGroup(groupId);
+
       return NextResponse.json({
         id: challenge.id,
         title: challenge.title,
@@ -335,26 +342,48 @@ export async function GET(request, { params }) {
     }
 
     const groupId = params.id;
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const skip = (page - 1) * limit;
+    const status = searchParams.get("status"); // 'active', 'upcoming', 'past'
 
-    // First, check if the user is the creator of the group
-    const group = await prisma.group.findUnique({
-      where: { id: groupId },
-      select: { creatorId: true },
-    });
+    // Check cache first (only for page 1 with no filters)
+    const cacheKey = `challenges-${groupId}-${status || "all"}-${page}-${limit}`;
+    if (page === 1 && limit <= 20 && !status) {
+      try {
+        const cached = await redisHelpers.cache.get(cacheKey);
+        if (cached) {
+          return NextResponse.json(cached);
+        }
+      } catch (e) {
+        console.warn("[Challenges] Cache get error:", e.message);
+      }
+    }
+
+    // Parallel authorization checks
+    const [group, userGroup] = await Promise.all([
+      prisma.group.findUnique({
+        where: { id: groupId },
+        select: { creatorId: true },
+      }),
+      prisma.userGroup.findUnique({
+        where: {
+          userId_groupId: {
+            userId: session.user.id,
+            groupId,
+          },
+        },
+        select: { role: true },
+      }),
+    ]);
 
     if (!group) {
       return NextResponse.json({ message: "Group not found" }, { status: 404 });
     }
 
     const isCreator = group.creatorId === session.user.id;
-
-    // Check if the user is a member of the group
-    const userGroup = await prisma.userGroup.findFirst({
-      where: {
-        userId: session.user.id,
-        groupId,
-      },
-    });
+    const isAdmin = isCreator || userGroup?.role === "ADMIN";
 
     if (!userGroup && !isCreator) {
       return NextResponse.json(
@@ -363,23 +392,11 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const skip = (page - 1) * limit;
-    const status = searchParams.get("status"); // 'active', 'upcoming', 'past'
-
     // Build the where clause
     const where = {
       groupId,
+      ...(!isAdmin && { visibleToParticipants: true }),
     };
-
-    // If the user is not an admin or creator, only show public challenges
-    const isAdmin = isCreator || userGroup?.role === "ADMIN";
-    if (!isAdmin) {
-      where.visibleToParticipants = true;
-    }
 
     // Filter by status
     const now = new Date();
@@ -392,69 +409,77 @@ export async function GET(request, { params }) {
       where.endTime = { lt: now };
     }
 
-    // Get challenges
-    const challenges = await prisma.challenge.findMany({
-      where,
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        startTime: true,
-        endTime: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        maxScore: true,
-        realTimeLeaderboard: true,
-        allowLateSubmissions: true,
-        visibleToParticipants: true,
-        groupId: true,
-        creatorId: true,
-        creator: {
-          select: {
-            name: true,
+    // Parallel fetch challenges and count
+    const [challenges, totalCount] = await Promise.all([
+      prisma.challenge.findMany({
+        where,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          startTime: true,
+          endTime: true,
+          isActive: true,
+          createdAt: true,
+          maxScore: true,
+          realTimeLeaderboard: true,
+          visibleToParticipants: true,
+          strictMode: true,
+          inviteOnly: true,
+          lateEntryMinutes: true,
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+            },
           },
-        },
-        problems: {
-          select: {
-            problem: {
-              select: {
-                id: true,
-                title: true,
-                difficulty: true,
-              },
+          _count: {
+            select: {
+              problems: true,
+              ChallengeParticipant: true,
             },
           },
         },
-        _count: {
-          select: {
-            problems: true,
-            submissions: true,
-          },
+        orderBy: {
+          startTime: "desc",
         },
-        ChallengeParticipant: {
-          where: { userId: session.user.id },
-          select: { status: true },
-          take: 1,
-        },
-      },
-      orderBy: {
-        startTime: "desc",
-      },
-      take: limit,
-      skip,
-    });
+        take: limit,
+        skip,
+      }),
+      prisma.challenge.count({ where }),
+    ]);
 
-    // Get total count for pagination
-    const totalCount = await prisma.challenge.count({
-      where,
-    });
+    // Fetch user participation status separately (more efficient than nested query)
+    const challengeIds = challenges.map((c) => c.id);
+    const userParticipation =
+      challengeIds.length > 0
+        ? await prisma.challengeParticipant.findMany({
+            where: {
+              userId: session.user.id,
+              challengeId: { in: challengeIds },
+            },
+            select: {
+              challengeId: true,
+              status: true,
+              score: true,
+              problemsSolved: true,
+            },
+          })
+        : [];
 
-    return NextResponse.json({
+    // Map participation to challenges
+    const participationMap = new Map(
+      userParticipation.map((p) => [p.challengeId, p]),
+    );
+
+    const responseData = {
       challenges: challenges.map((c) => ({
         ...c,
-        userParticipant: c.ChallengeParticipant?.[0] || null,
-        ChallengeParticipant: undefined,
+        participantCount: c._count.ChallengeParticipant,
+        problemCount: c._count.problems,
+        userParticipant: participationMap.get(c.id) || null,
+        _count: undefined, // Remove _count from response
       })),
       pagination: {
         total: totalCount,
@@ -462,7 +487,18 @@ export async function GET(request, { params }) {
         limit,
         totalPages: Math.ceil(totalCount / limit),
       },
-    });
+    };
+
+    // Cache the result (30 second TTL)
+    if (page === 1 && limit <= 20 && !status) {
+      try {
+        await redisHelpers.cache.set(cacheKey, responseData, 30);
+      } catch (e) {
+        console.warn("[Challenges] Cache set error:", e.message);
+      }
+    }
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Error fetching challenges:", error);
     return NextResponse.json(

@@ -44,7 +44,7 @@ async function getGroupCached(id) {
           user: { select: { id: true, name: true, image: true } },
         },
         orderBy: { score: "desc" },
-        take: 20,
+        take: 10, // Reduced from 20 to 10 for faster queries
       },
       challenges: {
         select: {
@@ -56,7 +56,7 @@ async function getGroupCached(id) {
           isActive: true,
         },
         orderBy: { startTime: "desc" },
-        take: 10,
+        take: 5, // Reduced from 10 to 5 - only show recent challenges
       },
     },
   });
