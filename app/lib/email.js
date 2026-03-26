@@ -385,16 +385,16 @@ const invitationEmailTemplate = ({ inviterName, invitationLink, role }) => `
 `;
 
 // Group invitation email template
-const groupInvitationEmailTemplate = ({ 
-  inviterName, 
-  groupName, 
+const groupInvitationEmailTemplate = ({
+  inviterName,
+  groupName,
   groupDescription,
-  joinLink 
+  joinLink,
 }) => {
   const now = new Date();
-  const month = now.toLocaleString('en', { month: 'short' }).toUpperCase();
+  const month = now.toLocaleString("en", { month: "short" }).toUpperCase();
   const year = now.getFullYear();
-  
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -470,7 +470,7 @@ const groupInvitationEmailTemplate = ({
       <div class="hero-divider" style="width: 40px; height: 2px; background-color: #4f46e5; margin-bottom: 30px;"></div>
       
       <p class="intro" style="font-size: 18px; line-height: 1.6; color: #9ca3af; margin: 0; max-width: 90%;">
-        ${groupDescription || 'Join this study group to collaborate with fellow engineers, compete in challenges, and sharpen your skills together.'}
+        ${groupDescription || "Join this study group to collaborate with fellow engineers, compete in challenges, and sharpen your skills together."}
       </p>
     </div>
 
@@ -616,18 +616,20 @@ export async function sendGroupInvitationEmail({
     from: `"BroCode" <${process.env.EMAIL_USER}>`,
     to,
     subject: `${inviterName} invited you to join ${groupName} on BroCode`,
-    html: groupInvitationEmailTemplate({ 
-      inviterName, 
-      groupName, 
+    html: groupInvitationEmailTemplate({
+      inviterName,
+      groupName,
       groupDescription,
-      joinLink 
+      joinLink,
     }),
   };
 
   try {
     const transporter = await getTransporter();
     await transporter.sendMail(mailOptions);
-    console.log(`Group invitation email sent to ${to} for group "${groupName}"`);
+    console.log(
+      `Group invitation email sent to ${to} for group "${groupName}"`,
+    );
     return { success: true };
   } catch (error) {
     console.error(`Error sending group invitation email to ${to}:`, error);

@@ -11,7 +11,7 @@
     "WHATSAPP_PHONE_ID": "957092127495614",
     "WHATSAPP_NOTIFY_NUMBER": "917599579985"
   },
-  "regions": ["iad1"],
+  "regions": ["sin1"],
   "functions": {
     "app/api/**/*": {
       "memory": 1024,

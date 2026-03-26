@@ -46,8 +46,8 @@ async function getGroupCached(id) {
         where: {
           user: {
             NOT: [
-              { name: { contains: 'test', mode: 'insensitive' } },
-              { email: { contains: 'test', mode: 'insensitive' } },
+              { name: { contains: "test", mode: "insensitive" } },
+              { email: { contains: "test", mode: "insensitive" } },
             ],
           },
         },
