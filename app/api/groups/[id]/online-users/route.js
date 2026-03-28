@@ -124,10 +124,6 @@ export async function GET(req, { params }) {
             id: {
               notIn: memberIds, // exclude current group members
             },
-            NOT: [
-              { name: { contains: 'test', mode: 'insensitive' } },
-              { email: { contains: 'test', mode: 'insensitive' } },
-            ],
           },
           select: { id: true },
           take: 50,
@@ -177,10 +173,6 @@ export async function GET(req, { params }) {
     const users = await prisma.user.findMany({
       where: {
         id: { in: invitableUserIds },
-        NOT: [
-          { name: { contains: 'test', mode: 'insensitive' } },
-          { email: { contains: 'test', mode: 'insensitive' } },
-        ],
       },
       select: {
         id: true,
