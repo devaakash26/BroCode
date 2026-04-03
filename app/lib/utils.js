@@ -19,6 +19,13 @@ export function formatDate(date) {
 }
 
 export async function notifyWhatsApp(userName, userEmail) {
+  await Promise.all([
+    _sendWhatsAppNotification(userName, userEmail),
+    _sendSlackNotification(userName, userEmail),
+  ]);
+}
+
+async function _sendWhatsAppNotification(userName, userEmail) {
   try {
     const token = process.env.WHATSAPP_API_TOKEN;
     const phoneId = process.env.WHATSAPP_PHONE_ID;
@@ -56,9 +63,63 @@ export async function notifyWhatsApp(userName, userEmail) {
     if (!res.ok) {
       console.error("WhatsApp API error:", JSON.stringify(data, null, 2));
     } else {
-      console.log("WhatsApp sent successfully:", JSON.stringify(data));
+      console.log("WhatsApp notification sent successfully");
     }
   } catch (err) {
     console.error("WhatsApp notification error:", err);
+  }
+}
+
+async function _sendSlackNotification(userName, userEmail) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    const channelId = process.env.SLACK_CHANNEL_ID;
+    if (!token || !channelId) return;
+
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "🚀 New BroCode Member!",
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: `*Name:*\n${userName}` },
+              { type: "mrkdwn", text: `*Email:*\n${userEmail}` },
+            ],
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "💡 A new coder just joined the community! · <https://brocode-ai.vercel.app|BroCode>",
+              },
+            ],
+          },
+        ],
+        text: `New member joined: ${userName} (${userEmail})`,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      console.error("Slack API error:", data.error);
+    } else {
+      console.log("Slack notification sent successfully");
+    }
+  } catch (err) {
+    console.error("Slack notification error:", err);
   }
 }

@@ -63,6 +63,7 @@
         "react-hot-toast": "^2.4.1",
         "react-redux": "^9.2.0",
         "react-split": "^2.0.14",
+        "recharts": "^3.8.1",
         "socket.io": "^4.7.2",
         "socket.io-client": "^4.8.1",
         "streamifier": "^0.1.1",

@@ -83,7 +83,6 @@ export async function GET(request, { params }) {
                 id: true,
                 title: true,
                 difficulty: true,
-                tags: true,
                 description: true,
                 exampleInput: true,
                 exampleOutput: true,
@@ -142,12 +141,26 @@ export async function GET(request, { params }) {
       }),
     ]);
 
+    // Fetch tags for the problems via raw SQL — works regardless of generated client version
+    const problemIds = challenge.problems.map((p) => p.problem.id);
+    let tagsMap = {};
+    if (problemIds.length > 0) {
+      try {
+        const rows = await prisma.$queryRaw`
+          SELECT id, tags FROM "Problem" WHERE id = ANY(${problemIds}::text[])
+        `;
+        rows.forEach((r) => { tagsMap[r.id] = r.tags || []; });
+      } catch (_) {
+        // tags column may not exist on this deployment — default to empty
+      }
+    }
+
     // Format problems
     const formattedProblems = challenge.problems.map((p) => ({
       id: p.problem.id,
       title: p.problem.title,
       difficulty: p.problem.difficulty,
-      tags: p.problem.tags || [],
+      tags: tagsMap[p.problem.id] || [],
       description: p.problem.description || "",
       examples: p.problem.exampleInput
         ? [

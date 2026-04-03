@@ -657,6 +657,207 @@ export async function sendEmail({ to, subject, html }) {
   }
 }
 
+// Maintenance complete notification email
+const maintenanceCompleteTemplate = () => {
+  const year = new Date().getFullYear();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://brocode.dev';
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="color-scheme" content="dark light">
+  <meta name="supported-color-schemes" content="dark light">
+  <title>BroCode is back online</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
+  <style>
+    :root { color-scheme: dark light; supported-color-schemes: dark light; }
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    body { margin: 0 !important; padding: 0 !important; width: 100% !important; background-color: #0a0a0f; }
+    .email-wrapper { background-color: #0a0a0f; }
+
+    /* Light mode */
+    @media (prefers-color-scheme: light) {
+      body, .email-wrapper { background-color: #f4f4f5 !important; }
+      .outer-card { background-color: #ffffff !important; border: 1px solid #e4e4e7 !important; }
+      .brand-name { color: #18181b !important; }
+      .brand-dot { color: #16a34a !important; }
+      .divider-top { border-top-color: #e4e4e7 !important; }
+      .status-badge-text { color: #374151 !important; }
+      .status-card { background-color: #f0fdf4 !important; border-color: #bbf7d0 !important; }
+      .status-label { color: #6b7280 !important; }
+      .body-text { color: #52525b !important; }
+      .heading { color: #18181b !important; }
+      .eyebrow { color: #16a34a !important; }
+      .cta-btn { background-color: #16a34a !important; }
+      .footer-td { border-top-color: #e4e4e7 !important; }
+      .footer-text { color: #a1a1aa !important; }
+      .footer-link { color: #71717a !important; }
+      .divider-line { background-color: #16a34a !important; }
+      .time-label { color: #71717a !important; }
+      .time-val { color: #18181b !important; }
+      .icon-row-bg { background-color: #dcfce7 !important; }
+    }
+
+    @media only screen and (max-width: 600px) {
+      .outer-card { border-radius: 0 !important; }
+      .card-padding { padding: 32px 20px !important; }
+      .heading { font-size: 28px !important; }
+      .cta-btn { display: block !important; text-align: center !important; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0a0a0f;" class="email-wrapper">
+
+  <!-- Outer wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #0a0a0f;" class="email-wrapper">
+    <tr>
+      <td align="center" style="padding: 40px 16px;">
+
+        <!-- Card -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="560" style="max-width: 560px; width: 100%; background-color: #111118; border-radius: 16px; border: 1px solid #1f1f2e; overflow: hidden;" class="outer-card">
+
+          <!-- Top accent bar -->
+          <tr>
+            <td style="height: 3px; background: linear-gradient(90deg, #16a34a 0%, #22c55e 50%, #4ade80 100%); line-height: 3px; font-size: 1px;">&nbsp;</td>
+          </tr>
+
+          <!-- Card body -->
+          <tr>
+            <td style="padding: 48px 48px 40px;" class="card-padding">
+
+              <!-- Brand header -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 40px; border-bottom: 1px solid #1f1f2e; padding-bottom: 20px;" class="divider-top">
+                <tr>
+                  <td>
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #e4e4e7; text-transform: uppercase;" class="brand-name">
+                      BRO<span style="color: #22c55e;" class="brand-dot">.</span>CODE
+                    </span>
+                  </td>
+                  <td align="right">
+                    <!-- Status pill -->
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="background-color: #052e16; border: 1px solid #166534; border-radius: 100px; padding: 4px 10px 4px 8px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td style="width: 6px; height: 6px; background-color: #22c55e; border-radius: 50%; vertical-align: middle;">&nbsp;</td>
+                              <td style="padding-left: 6px; font-family: 'Courier New', Courier, monospace; font-size: 10px; font-weight: 700; letter-spacing: 1px; color: #4ade80; text-transform: uppercase; white-space: nowrap; vertical-align: middle;" class="status-badge-text">ONLINE</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Icon -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 28px;" class="icon-row-bg" bgcolor="transparent">
+                <tr>
+                  <td style="width: 52px; height: 52px; background-color: #052e16; border-radius: 12px; text-align: center; vertical-align: middle; border: 1px solid #166534;">
+                    <span style="font-size: 24px; line-height: 52px; display: block;">✓</span>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Eyebrow -->
+              <p style="margin: 0 0 10px; font-family: 'Courier New', Courier, monospace; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #22c55e;" class="eyebrow">System Restored</p>
+
+              <!-- Heading -->
+              <h1 style="margin: 0 0 16px; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 34px; font-weight: 400; line-height: 1.15; color: #fafafa;" class="heading">
+                BroCode is back<br>online.
+              </h1>
+
+              <!-- Green divider -->
+              <div style="width: 32px; height: 2px; background-color: #22c55e; margin-bottom: 24px;" class="divider-line"></div>
+
+              <!-- Body text -->
+              <p style="margin: 0 0 32px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.75; color: #a1a1aa;" class="body-text">
+                Our maintenance window has ended and all systems are running at full capacity. You can hop back in and continue exactly where you left off.
+              </p>
+
+              <!-- Status card -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 36px; background-color: #0a1f0e; border: 1px solid #166534; border-radius: 10px;" class="status-card">
+                <tr>
+                  <td style="padding: 20px 24px;">
+                    <p style="margin: 0 0 6px; font-family: 'Courier New', Courier, monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #4b5563;" class="status-label">PLATFORM STATUS</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; vertical-align: middle;">&nbsp;</td>
+                        <td style="padding-left: 8px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; color: #4ade80; vertical-align: middle;">All systems operational</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 40px;">
+                <tr>
+                  <td style="background-color: #16a34a; border-radius: 8px;" class="cta-btn">
+                    <a href="${appUrl}" style="display: inline-block; padding: 14px 28px; background-color: #16a34a; color: #ffffff; text-decoration: none; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; border-radius: 8px; white-space: nowrap;">
+                      Open BroCode &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 20px 48px 28px; border-top: 1px solid #1f1f2e;" class="footer-td card-padding">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td>
+                    <p style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #3f3f46; line-height: 1.6;" class="footer-text">
+                      You received this because you subscribed to maintenance alerts on BroCode.
+                    </p>
+                  </td>
+                  <td align="right" style="white-space: nowrap;">
+                    <span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; color: #3f3f46;" class="footer-link">&copy; ${year} BroCode</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>`;
+};
+
+export async function sendMaintenanceCompleteEmail({ to }) {
+  const mailOptions = {
+    from: `"BroCode" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: '✅ BroCode is back online — maintenance complete',
+    html: maintenanceCompleteTemplate(),
+  };
+  try {
+    const transporter = await getTransporter();
+    await transporter.sendMail(mailOptions);
+    console.log(`Maintenance complete email sent to ${to}`);
+    return { success: true };
+  } catch (error) {
+    console.error(`Error sending maintenance email to ${to}:`, error);
+    return { success: false, error };
+  }
+}
+
 // Email template for challenge report card
 const challengeReportCardTemplate = ({
   userName,
