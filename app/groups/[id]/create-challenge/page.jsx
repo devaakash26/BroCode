@@ -99,6 +99,7 @@ export default function CreateChallengePage({ params }) {
   const [invitedMembers, setInvitedMembers] = useState(new Set());
   const [memberSearch, setMemberSearch] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (!session) return;
@@ -219,8 +220,6 @@ export default function CreateChallengePage({ params }) {
     router.push(`/auth/signin?callbackUrl=/groups/${groupId}/create-challenge`);
     return null;
   }
-
-  const isMobile = useIsMobile();
 
   if (loading) {
     return (

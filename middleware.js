@@ -30,6 +30,8 @@ export default withAuth(
           "/problems", // Let's make problems public
           "/leaderboard", // Public leaderboard
           "/help",
+          "/maintenance", // Maintenance page is always public
+          "/api/maintenance", // Public maintenance status/subscribe API
         ];
 
         if (publicPaths.some((path) => pathname.startsWith(path))) {

@@ -73,6 +73,7 @@ export default function ChallengeDetailsPage({ params }) {
 
   const [leaderboard, setLeaderboard] = useState([]);
   const [lbLoading, setLbLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   // Compute challenge timing — plain variable so it re-evaluates each render (driven by setTick)
   const timing = (() => {
@@ -193,8 +194,6 @@ export default function ChallengeDetailsPage({ params }) {
       </div>
     );
   }
-
-  const isMobile = useIsMobile();
 
   if (!challenge) {
     return (
