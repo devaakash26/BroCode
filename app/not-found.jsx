@@ -9,19 +9,19 @@ export default function NotFound() {
   const [countdown, setCountdown] = useState(TOTAL);
   const router = useRouter();
 
+  // Tick every second
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          router.push('/');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [router]);
+    if (countdown === 0) return;
+    const timeout = setTimeout(() => setCountdown(prev => prev - 1), 1000);
+    return () => clearTimeout(timeout);
+  }, [countdown]);
+
+  // Redirect once countdown reaches 0
+  useEffect(() => {
+    if (countdown === 0) {
+      router.push('/');
+    }
+  }, [countdown, router]);
 
   const circumference = 2 * Math.PI * 20;
   const progress = circumference * (countdown / TOTAL);
