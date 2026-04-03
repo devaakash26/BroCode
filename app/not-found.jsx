@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 const TOTAL = 5;
 
 export default function NotFound() {
   const [countdown, setCountdown] = useState(TOTAL);
-  const router = useRouter();
 
   // Tick every second
   useEffect(() => {
@@ -16,12 +14,13 @@ export default function NotFound() {
     return () => clearTimeout(timeout);
   }, [countdown]);
 
-  // Redirect once countdown reaches 0
+  // Redirect once countdown reaches 0 — window.location works reliably
+  // on Vercel where useRouter() has no navigation history in 404 context
   useEffect(() => {
     if (countdown === 0) {
-      router.push('/');
+      window.location.href = '/';
     }
-  }, [countdown, router]);
+  }, [countdown]);
 
   const circumference = 2 * Math.PI * 20;
   const progress = circumference * (countdown / TOTAL);
@@ -78,7 +77,7 @@ export default function NotFound() {
       </div>
 
       <button
-        onClick={() => router.push('/')}
+        onClick={() => { window.location.href = '/'; }}
         className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors underline underline-offset-2"
       >
         Go now →
