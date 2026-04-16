@@ -55,6 +55,7 @@ enum UserRole {
   USER
   GROUP_ADMIN
   PLATFORM_ADMIN
+  TEMP_ADMIN
 }
 
 // NextAuth Models

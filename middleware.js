@@ -7,7 +7,11 @@ export default withAuth(
     const { pathname } = req.nextUrl;
 
     // Role-based access control for admin routes
-    if (pathname.startsWith("/admin") && token?.role !== "PLATFORM_ADMIN") {
+    if (
+      pathname.startsWith("/admin") &&
+      token?.role !== "PLATFORM_ADMIN" &&
+      token?.role !== "TEMP_ADMIN"
+    ) {
       const url = req.nextUrl.clone();
       url.pathname = "/unauthorized"; // Redirect to a generic unauthorized page
       return NextResponse.redirect(url);

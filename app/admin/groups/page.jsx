@@ -1,119 +1,134 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  Users, 
-  PlusCircle, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Filter, 
-  ChevronLeft, 
+import { useState, useEffect } from "react";
+import {
+  Users,
+  PlusCircle,
+  Search,
+  Edit,
+  Trash2,
+  Filter,
+  ChevronLeft,
   ChevronRight,
   Eye,
   Lock,
   Globe,
   AlertCircle,
-  X
-} from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+  X,
+} from "lucide-react";
+import Link from "next/link";
+import { format } from "date-fns";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 export default function AdminGroupsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMembersModal, setViewMembersModal] = useState(false);
   const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
-  const [selectedGroupName, setSelectedGroupName] = useState('');
+  const [selectedGroupName, setSelectedGroupName] = useState("");
   const [loadingMembers, setLoadingMembers] = useState(false);
   const groupsPerPage = 10;
-  
+
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
       return;
     }
 
-    if (session?.user?.role !== 'PLATFORM_ADMIN') {
-      router.push('/');
+    if (
+      session?.user?.role !== "PLATFORM_ADMIN" &&
+      session?.user?.role !== "TEMP_ADMIN"
+    ) {
+      router.push("/");
       return;
     }
 
     const fetchGroups = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/admin/groups');
+        const response = await fetch("/api/admin/groups");
         const data = await response.json();
-        
+
         if (data.success) {
           setGroups(data.groups);
         } else {
-          console.error('Failed to fetch groups:', data.error);
-          toast.error(data.error || 'Failed to fetch groups');
+          console.error("Failed to fetch groups:", data.error);
+          toast.error(data.error || "Failed to fetch groups");
         }
       } catch (error) {
-        console.error('Error fetching groups:', error);
-        toast.error('Failed to connect to the server');
+        console.error("Error fetching groups:", error);
+        toast.error("Failed to connect to the server");
       } finally {
         setLoading(false);
       }
     };
-    
-    if (status === 'authenticated') {
+
+    if (status === "authenticated") {
       fetchGroups();
     }
   }, [status, session, router]);
-  
+
   // Filter groups based on search term and visibility filter
-  const filteredGroups = groups.filter(group => {
-    const matchesSearch = 
-      searchTerm === '' || 
+  const filteredGroups = groups.filter((group) => {
+    const matchesSearch =
+      searchTerm === "" ||
       group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.creatorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       group.creatorEmail?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesVisibility = 
-      visibilityFilter === '' || 
-      group.visibility === visibilityFilter;
-    
+
+    const matchesVisibility =
+      visibilityFilter === "" || group.visibility === visibilityFilter;
+
     return matchesSearch && matchesVisibility;
   });
-  
+
   // Pagination
   const indexOfLastGroup = currentPage * groupsPerPage;
   const indexOfFirstGroup = indexOfLastGroup - groupsPerPage;
-  const currentGroups = filteredGroups.slice(indexOfFirstGroup, indexOfLastGroup);
+  const currentGroups = filteredGroups.slice(
+    indexOfFirstGroup,
+    indexOfLastGroup,
+  );
   const totalPages = Math.ceil(filteredGroups.length / groupsPerPage);
 
   const handleDeleteGroup = async (groupId) => {
-    if (!confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
+    if (session?.user?.role === "TEMP_ADMIN") {
+      toast.error(
+        "You don't have permission to perform this action. Contact your admin.",
+      );
+      return;
+    }
+    if (
+      !confirm(
+        "Are you sure you want to delete this group? This action cannot be undone.",
+      )
+    ) {
       return;
     }
 
     try {
       const response = await fetch(`/api/admin/groups?id=${groupId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
       const data = await response.json();
 
       if (data.success) {
-        setGroups(groups.filter(group => group.id !== groupId));
-        toast.success('Group deleted successfully');
+        setGroups(groups.filter((group) => group.id !== groupId));
+        toast.success("Group deleted successfully");
       } else {
-        toast.error(data.error || 'Failed to delete group');
+        toast.error(data.error || "Failed to delete group");
       }
     } catch (error) {
-      console.error('Error deleting group:', error);
-      toast.error('Failed to delete group');
+      console.error("Error deleting group:", error);
+      toast.error("Failed to delete group");
     }
   };
 
@@ -122,32 +137,48 @@ export default function AdminGroupsPage() {
       setLoadingMembers(true);
       setViewMembersModal(true);
       setSelectedGroupName(groupName);
-      
+
       const response = await fetch(`/api/groups/${groupId}/members`);
       const data = await response.json();
 
       if (data.success) {
         setSelectedGroupMembers(data.members);
       } else {
-        toast.error(data.error || 'Failed to fetch members');
+        toast.error(data.error || "Failed to fetch members");
         setViewMembersModal(false);
       }
     } catch (error) {
-      console.error('Error fetching members:', error);
-      toast.error('Failed to fetch members');
+      console.error("Error fetching members:", error);
+      toast.error("Failed to fetch members");
       setViewMembersModal(false);
     } finally {
       setLoadingMembers(false);
     }
   };
-  
-  if (status === 'loading' || (status === 'authenticated' && loading)) {
+
+  if (status === "loading" || (status === "authenticated" && loading)) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center">
-          <svg className="animate-spin h-8 w-8 text-orange-600 dark:text-orange-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <svg
+            className="animate-spin h-8 w-8 text-orange-600 dark:text-orange-400 mb-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
           </svg>
           <p className="text-gray-600 dark:text-gray-400">Loading groups...</p>
         </div>
@@ -155,29 +186,43 @@ export default function AdminGroupsPage() {
     );
   }
 
-  if (status === 'authenticated' && session?.user?.role !== 'PLATFORM_ADMIN') {
+  if (
+    status === "authenticated" &&
+    session?.user?.role !== "PLATFORM_ADMIN" &&
+    session?.user?.role !== "TEMP_ADMIN"
+  ) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-        <p className="text-gray-600 dark:text-gray-400">You do not have permission to view this page.</p>
+        <p className="text-gray-600 dark:text-gray-400">
+          You do not have permission to view this page.
+        </p>
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Group Management</h1>
-        <Link 
-          href="/groups/create" 
+        <button
+          onClick={() => {
+            if (session?.user?.role === "TEMP_ADMIN") {
+              toast.error(
+                "You don't have permission to perform this action. Contact your admin.",
+              );
+              return;
+            }
+            router.push("/groups/create");
+          }}
           className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md"
         >
           <PlusCircle className="h-5 w-5" />
           Create Group
-        </Link>
+        </button>
       </div>
-      
+
       {/* Filters and search */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -193,7 +238,7 @@ export default function AdminGroupsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <select
@@ -209,32 +254,53 @@ export default function AdminGroupsPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Groups table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Group
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Visibility
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Members
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Challenges
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Creator
                 </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Status
                 </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Actions
                 </th>
               </tr>
@@ -256,14 +322,24 @@ export default function AdminGroupsPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      {group.visibility === 'PUBLIC' && <Globe className="h-4 w-4 text-green-500 mr-1" />}
-                      {group.visibility === 'PRIVATE' && <Lock className="h-4 w-4 text-red-500 mr-1" />}
-                      {group.visibility === 'UNLISTED' && <Eye className="h-4 w-4 text-yellow-500 mr-1" />}
-                      <span className={`text-sm ${
-                        group.visibility === 'PUBLIC' ? 'text-green-500' :
-                        group.visibility === 'PRIVATE' ? 'text-red-500' :
-                        'text-yellow-500'
-                      }`}>
+                      {group.visibility === "PUBLIC" && (
+                        <Globe className="h-4 w-4 text-green-500 mr-1" />
+                      )}
+                      {group.visibility === "PRIVATE" && (
+                        <Lock className="h-4 w-4 text-red-500 mr-1" />
+                      )}
+                      {group.visibility === "UNLISTED" && (
+                        <Eye className="h-4 w-4 text-yellow-500 mr-1" />
+                      )}
+                      <span
+                        className={`text-sm ${
+                          group.visibility === "PUBLIC"
+                            ? "text-green-500"
+                            : group.visibility === "PRIVATE"
+                              ? "text-red-500"
+                              : "text-yellow-500"
+                        }`}
+                      >
                         {group.visibility}
                       </span>
                     </div>
@@ -275,16 +351,22 @@ export default function AdminGroupsPage() {
                     {group.challengeCount}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">{group.creatorName}</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">{group.creatorEmail}</div>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {group.creatorName}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {group.creatorEmail}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      group.isActive
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
-                      {group.isActive ? 'Active' : 'Inactive'}
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        group.isActive
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }`}
+                    >
+                      {group.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -318,12 +400,12 @@ export default function AdminGroupsPage() {
           </table>
         </div>
       </div>
-      
+
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center mt-4 space-x-2">
           <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
             className="px-3 py-1 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50"
           >
@@ -333,7 +415,9 @@ export default function AdminGroupsPage() {
             Page {currentPage} of {totalPages}
           </span>
           <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+            onClick={() =>
+              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+            }
             disabled={currentPage === totalPages}
             className="px-3 py-1 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50"
           >
@@ -346,16 +430,21 @@ export default function AdminGroupsPage() {
       {viewMembersModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div 
-              className="fixed inset-0 transition-opacity" 
+            <div
+              className="fixed inset-0 transition-opacity"
               aria-hidden="true"
               onClick={() => setViewMembersModal(false)}
             >
               <div className="absolute inset-0 bg-gray-500 dark:bg-gray-900 opacity-75"></div>
             </div>
-            
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
+            <span
+              className="hidden sm:inline-block sm:align-middle sm:h-screen"
+              aria-hidden="true"
+            >
+              &#8203;
+            </span>
+
             <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
               <div className="px-4 pt-5 pb-4 sm:p-6">
                 <div className="flex justify-between items-center mb-4">
@@ -369,7 +458,7 @@ export default function AdminGroupsPage() {
                     <X className="h-6 w-6" />
                   </button>
                 </div>
-                
+
                 {loadingMembers ? (
                   <div className="flex justify-center items-center py-12">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600 dark:border-orange-400"></div>
@@ -401,16 +490,23 @@ export default function AdminGroupsPage() {
                               <div className="flex items-center">
                                 <div className="flex-shrink-0 h-10 w-10 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center">
                                   {member.user?.image ? (
-                                    <img src={member.user.image} alt={member.user.name} className="h-10 w-10 rounded-full" />
+                                    <img
+                                      src={member.user.image}
+                                      alt={member.user.name}
+                                      className="h-10 w-10 rounded-full"
+                                    />
                                   ) : (
                                     <span className="text-orange-600 dark:text-orange-400 font-medium text-sm">
-                                      {member.user?.name?.charAt(0) || member.user?.email?.charAt(0).toUpperCase()}
+                                      {member.user?.name?.charAt(0) ||
+                                        member.user?.email
+                                          ?.charAt(0)
+                                          .toUpperCase()}
                                     </span>
                                   )}
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                    {member.user?.name || 'N/A'}
+                                    {member.user?.name || "N/A"}
                                   </div>
                                   <div className="text-sm text-gray-500 dark:text-gray-400">
                                     {member.user?.email}
@@ -419,12 +515,14 @@ export default function AdminGroupsPage() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                member.role === 'ADMIN'
-                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                              }`}>
-                                {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                              <span
+                                className={`px-2 py-1 text-xs rounded-full ${
+                                  member.role === "ADMIN"
+                                    ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
+                                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                                }`}
+                              >
+                                {member.role === "ADMIN" ? "Admin" : "Member"}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -443,4 +541,4 @@ export default function AdminGroupsPage() {
       )}
     </div>
   );
-} 
+}

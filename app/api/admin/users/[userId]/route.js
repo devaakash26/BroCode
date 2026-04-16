@@ -1,20 +1,27 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma, disconnectPrisma } from '@/app/lib/db';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { prisma, disconnectPrisma } from "@/app/lib/db";
 
 export async function GET(request, { params }) {
   try {
     // Check if user is authenticated and is an admin
     const session = await getServerSession(authOptions);
-    if (!session || session.user.role !== 'PLATFORM_ADMIN') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const role = session?.user?.role;
+    if (!session || (role !== "PLATFORM_ADMIN" && role !== "TEMP_ADMIN")) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
     const userId = params.userId;
 
     if (!userId) {
-      return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "User ID is required" },
+        { status: 400 },
+      );
     }
 
     // Fetch user with related data
@@ -47,7 +54,7 @@ export async function GET(request, { params }) {
             },
           },
           orderBy: {
-            submittedAt: 'desc',
+            submittedAt: "desc",
           },
           take: 10,
         },
@@ -76,12 +83,15 @@ export async function GET(request, { params }) {
     });
 
     if (!user) {
-      return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      return NextResponse.json(
+        { success: false, error: "User not found" },
+        { status: 404 },
+      );
     }
 
     // Get submission stats
     const submissionStats = await prisma.submission.groupBy({
-      by: ['status'],
+      by: ["status"],
       where: {
         userId: userId,
       },
@@ -106,12 +116,12 @@ export async function GET(request, { params }) {
           submissions: {
             some: {
               userId: userId,
-              status: 'ACCEPTED',
+              status: "ACCEPTED",
             },
           },
         },
       }),
-      groups: user.userGroups.map(ug => ({
+      groups: user.userGroups.map((ug) => ({
         id: ug.group.id,
         name: ug.group.name,
         role: ug.role,
@@ -122,9 +132,12 @@ export async function GET(request, { params }) {
 
     return NextResponse.json({ success: true, user: formattedUser });
   } catch (error) {
-    console.error('Error fetching user details:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch user details' }, { status: 500 });
+    console.error("Error fetching user details:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch user details" },
+      { status: 500 },
+    );
   } finally {
     await disconnectPrisma();
   }
-} 
+}

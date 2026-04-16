@@ -1,16 +1,34 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { NavLink } from './nav-link';
-import { useSession, signOut } from 'next-auth/react';
-import { Menu, X, ChevronDown, User, LogOut, Settings, PanelLeft, Code, Users, BookOpen, List, HelpCircle, ShieldCheck } from 'lucide-react';
-import ThemeToggle from './theme-toggle';
-import NotificationBell from './NotificationBell';
+import { useState } from "react";
+import Link from "next/link";
+import { NavLink } from "./nav-link";
+import { useSession, signOut } from "next-auth/react";
+import {
+  Menu,
+  X,
+  ChevronDown,
+  User,
+  LogOut,
+  Settings,
+  PanelLeft,
+  Code,
+  Users,
+  BookOpen,
+  List,
+  HelpCircle,
+  ShieldCheck,
+} from "lucide-react";
+import ThemeToggle from "./theme-toggle";
+import NotificationBell from "./NotificationBell";
 import { Button } from "../../components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
-import { usePathname } from 'next/navigation';
-import { useProblemDrawer } from '@/app/context/ProblemDrawerContext';
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
+import { usePathname } from "next/navigation";
+import { useProblemDrawer } from "@/app/context/ProblemDrawerContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,23 +38,40 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 
-export default function Navbar({ 
-  sidebarCollapsed, 
-  setSidebarCollapsed, 
-  isMobile
+export default function Navbar({
+  sidebarCollapsed,
+  setSidebarCollapsed,
+  isMobile,
 }) {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const { openDrawer } = useProblemDrawer();
 
-  const isProblemPage = pathname.startsWith('/problems/') && pathname.length > '/problems/'.length;
-  
+  const isProblemPage =
+    pathname.startsWith("/problems/") && pathname.length > "/problems/".length;
+
   const mainNavItems = [
-    { name: 'Problems', href: '/problems', icon: <Code className="h-4 w-4 mr-2" /> },
-    { name: 'Submissions', href: '/submissions', icon: <List className="h-4 w-4 mr-2" /> },
-    { name: 'Groups', href: '/groups', icon: <Users className="h-4 w-4 mr-2" /> },
-    { name: 'Leaderboard', href: '/leaderboard', icon: <BookOpen className="h-4 w-4 mr-2" /> },
+    {
+      name: "Problems",
+      href: "/problems",
+      icon: <Code className="h-4 w-4 mr-2" />,
+    },
+    {
+      name: "Submissions",
+      href: "/submissions",
+      icon: <List className="h-4 w-4 mr-2" />,
+    },
+    {
+      name: "Groups",
+      href: "/groups",
+      icon: <Users className="h-4 w-4 mr-2" />,
+    },
+    {
+      name: "Leaderboard",
+      href: "/leaderboard",
+      icon: <BookOpen className="h-4 w-4 mr-2" />,
+    },
   ];
 
   return (
@@ -55,7 +90,7 @@ export default function Navbar({
                 <PanelLeft className="block h-5 w-5" aria-hidden="true" />
               </button>
             )}
-            
+
             {/* Problem List Toggle */}
             {isProblemPage && (
               <button
@@ -67,29 +102,40 @@ export default function Navbar({
                 <span className="ml-2">Problem List</span>
               </button>
             )}
-            
+
             {/* Logo for mobile */}
             {isMobile && (
               <div className="flex-shrink-0 flex items-center">
-                <NavLink href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
+                <NavLink
+                  href="/"
+                  className="text-xl font-bold text-indigo-600 dark:text-indigo-400"
+                >
                   BroCode
                 </NavLink>
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <NotificationBell />
-            
+
             {session ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Button
+                    variant="ghost"
+                    className="relative h-8 w-8 rounded-full"
+                  >
                     <Avatar>
-                      <AvatarImage src={session.user.image || ""} alt={session.user.name || ""} />
+                      <AvatarImage
+                        src={session.user.image || ""}
+                        alt={session.user.name || ""}
+                      />
                       <AvatarFallback className="bg-indigo-100 text-indigo-800">
-                        {session.user.name ? session.user.name.charAt(0).toUpperCase() : "U"}
+                        {session.user.name
+                          ? session.user.name.charAt(0).toUpperCase()
+                          : "U"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -97,34 +143,51 @@ export default function Navbar({
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{session.user.email}</p>
+                      <p className="text-sm font-medium leading-none">
+                        {session.user.name}
+                      </p>
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {session.user.email}
+                      </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <NavLink href="/dashboard" className="flex w-full cursor-pointer">
+                    <NavLink
+                      href="/dashboard"
+                      className="flex w-full cursor-pointer"
+                    >
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
                     </NavLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <NavLink href="/profile" className="flex w-full cursor-pointer">
+                    <NavLink
+                      href="/profile"
+                      className="flex w-full cursor-pointer"
+                    >
                       <Settings className="mr-2 h-4 w-4" />
                       Profile
                     </NavLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <NavLink href="/help" className="flex w-full cursor-pointer">
+                    <NavLink
+                      href="/help"
+                      className="flex w-full cursor-pointer"
+                    >
                       <HelpCircle className="mr-2 h-4 w-4" />
                       Help
                     </NavLink>
                   </DropdownMenuItem>
-                  {session.user.role === 'PLATFORM_ADMIN' && (
+                  {(session.user.role === "PLATFORM_ADMIN" ||
+                    session.user.role === "TEMP_ADMIN") && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <NavLink href="/admin" className="flex w-full cursor-pointer text-indigo-600 dark:text-indigo-400 font-medium">
+                        <NavLink
+                          href="/admin"
+                          className="flex w-full cursor-pointer text-indigo-600 dark:text-indigo-400 font-medium"
+                        >
                           <ShieldCheck className="mr-2 h-4 w-4" />
                           Admin Portal
                         </NavLink>
@@ -132,7 +195,10 @@ export default function Navbar({
                     </>
                   )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={() => signOut()}
+                    className="cursor-pointer"
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
@@ -153,7 +219,10 @@ export default function Navbar({
       </div>
 
       {/* Mobile menu */}
-      <div className={`${mobileMenuOpen ? 'block' : 'hidden'} sm:hidden`} id="mobile-menu">
+      <div
+        className={`${mobileMenuOpen ? "block" : "hidden"} sm:hidden`}
+        id="mobile-menu"
+      >
         <div className="pt-2 pb-3 space-y-1">
           {mainNavItems.map((item) => (
             <NavLink
@@ -166,8 +235,9 @@ export default function Navbar({
               {item.name}
             </NavLink>
           ))}
-          
-          {session?.user.role === 'PLATFORM_ADMIN' && (
+
+          {(session?.user.role === "PLATFORM_ADMIN" ||
+            session?.user.role === "TEMP_ADMIN") && (
             <NavLink
               href="/admin"
               className="flex items-center px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -178,22 +248,31 @@ export default function Navbar({
             </NavLink>
           )}
         </div>
-        
+
         <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
           {session ? (
             <>
               <div className="flex items-center px-4">
                 <div className="flex-shrink-0">
                   <Avatar>
-                    <AvatarImage src={session.user.image || ""} alt={session.user.name || ""} />
+                    <AvatarImage
+                      src={session.user.image || ""}
+                      alt={session.user.name || ""}
+                    />
                     <AvatarFallback className="bg-indigo-100 text-indigo-800">
-                      {session.user.name ? session.user.name.charAt(0).toUpperCase() : "U"}
+                      {session.user.name
+                        ? session.user.name.charAt(0).toUpperCase()
+                        : "U"}
                     </AvatarFallback>
                   </Avatar>
                 </div>
                 <div className="ml-3">
-                  <div className="text-base font-medium text-gray-800 dark:text-white">{session.user.name}</div>
-                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">{session.user.email}</div>
+                  <div className="text-base font-medium text-gray-800 dark:text-white">
+                    {session.user.name}
+                  </div>
+                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {session.user.email}
+                  </div>
                 </div>
               </div>
               <div className="mt-3 space-y-1">
@@ -247,4 +326,4 @@ export default function Navbar({
       </div>
     </nav>
   );
-} 
+}

@@ -1,53 +1,63 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  BookOpen, 
-  PlusCircle, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Filter, 
-  ChevronLeft, 
+import { useState, useEffect } from "react";
+import {
+  BookOpen,
+  PlusCircle,
+  Search,
+  Edit,
+  Trash2,
+  Filter,
+  ChevronLeft,
   ChevronRight,
   Eye,
-  AlertCircle
-} from 'lucide-react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+  AlertCircle,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export default function AdminProblemsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
+  const isTempAdmin = session?.user?.role === "TEMP_ADMIN";
+  const handleTempAdminBlock = () =>
+    toast.error(
+      "You don't have permission to perform this action. Contact your admin.",
+    );
   const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [categories, setCategories] = useState([]);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const problemsPerPage = 10;
-  
+
   useEffect(() => {
     const fetchProblems = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/admin/problems');
-        
+        const response = await fetch("/api/admin/problems");
+
         if (!response.ok) {
-          throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+          throw new Error(
+            `Server responded with ${response.status}: ${response.statusText}`,
+          );
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
           setProblems(data.problems);
-          
+
           // Extract unique categories from all problems
           const allCategories = data.problems.reduce((acc, problem) => {
             if (problem.categories && Array.isArray(problem.categories)) {
-              problem.categories.forEach(cat => {
+              problem.categories.forEach((cat) => {
                 if (!acc.includes(cat)) {
                   acc.push(cat);
                 }
@@ -55,92 +65,109 @@ export default function AdminProblemsPage() {
             }
             return acc;
           }, []);
-          
+
           setCategories(allCategories);
         } else {
-          setError(data.error || 'Failed to fetch problems');
+          setError(data.error || "Failed to fetch problems");
         }
       } catch (error) {
-        console.error('Error fetching problems:', error);
-        setError('Failed to load problems. Please try again later.');
+        console.error("Error fetching problems:", error);
+        setError("Failed to load problems. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchProblems();
   }, []);
-  
+
   // Delete problem handler
   const handleDeleteProblem = async (problemId, problemTitle) => {
-    if (!confirm(`Are you sure you want to delete the problem "${problemTitle}"?`)) {
+    if (isTempAdmin) {
+      handleTempAdminBlock();
       return;
     }
-    
+    if (
+      !confirm(`Are you sure you want to delete the problem "${problemTitle}"?`)
+    ) {
+      return;
+    }
+
     try {
       setDeleteLoading(true);
       const response = await fetch(`/api/admin/problems?id=${problemId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
-      
+
       if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+        throw new Error(
+          `Server responded with ${response.status}: ${response.statusText}`,
+        );
       }
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         // Remove the deleted problem from the list
-        setProblems(problems.filter(p => p.id !== problemId));
-        alert('Problem deleted successfully');
+        setProblems(problems.filter((p) => p.id !== problemId));
+        alert("Problem deleted successfully");
       } else {
-        throw new Error(data.error || 'Failed to delete problem');
+        throw new Error(data.error || "Failed to delete problem");
       }
     } catch (error) {
-      console.error('Error deleting problem:', error);
+      console.error("Error deleting problem:", error);
       alert(`Failed to delete problem: ${error.message}`);
     } finally {
       setDeleteLoading(false);
     }
   };
-  
+
   // Filter problems based on search term and filters
-  const filteredProblems = problems.filter(problem => {
-    const matchesSearch = 
-      searchTerm === '' || 
+  const filteredProblems = problems.filter((problem) => {
+    const matchesSearch =
+      searchTerm === "" ||
       problem.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       problem.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesDifficulty = 
-      difficultyFilter === '' || 
-      problem.difficulty === difficultyFilter;
-    
-    const matchesCategory = 
-      categoryFilter === '' || 
-      (problem.categories && problem.categories.some(cat => cat === categoryFilter));
-    
+
+    const matchesDifficulty =
+      difficultyFilter === "" || problem.difficulty === difficultyFilter;
+
+    const matchesCategory =
+      categoryFilter === "" ||
+      (problem.categories &&
+        problem.categories.some((cat) => cat === categoryFilter));
+
     return matchesSearch && matchesDifficulty && matchesCategory;
   });
-  
+
   // Pagination
   const indexOfLastProblem = currentPage * problemsPerPage;
   const indexOfFirstProblem = indexOfLastProblem - problemsPerPage;
-  const currentProblems = filteredProblems.slice(indexOfFirstProblem, indexOfLastProblem);
+  const currentProblems = filteredProblems.slice(
+    indexOfFirstProblem,
+    indexOfLastProblem,
+  );
   const totalPages = Math.ceil(filteredProblems.length / problemsPerPage);
-  
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Problem Management</h1>
-        <Link 
-          href="/admin/problems/new" 
+        <Link
+          href="/admin/problems/new"
+          onClick={(e) => {
+            if (isTempAdmin) {
+              e.preventDefault();
+              handleTempAdminBlock();
+            }
+          }}
           className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md"
         >
           <PlusCircle className="h-5 w-5" />
           Add Problem
         </Link>
       </div>
-      
+
       {/* Filters and search */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -156,7 +183,7 @@ export default function AdminProblemsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <select
@@ -170,7 +197,7 @@ export default function AdminProblemsPage() {
               <option value="HARD">Hard</option>
             </select>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5 text-gray-500 dark:text-gray-400" />
             <select
@@ -179,22 +206,28 @@ export default function AdminProblemsPage() {
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
               <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category} value={category}>{category}</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
               ))}
             </select>
           </div>
         </div>
       </div>
-      
+
       {/* Error message */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">Error loading problems</h3>
-            <p className="mt-1 text-sm text-red-700 dark:text-red-400">{error}</p>
-            <button 
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+              Error loading problems
+            </h3>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+              {error}
+            </p>
+            <button
               className="mt-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
               onClick={() => router.refresh()}
             >
@@ -203,7 +236,7 @@ export default function AdminProblemsPage() {
           </div>
         </div>
       )}
-      
+
       {/* Loading state */}
       {loading ? (
         <div className="flex justify-center items-center py-12">
@@ -216,10 +249,12 @@ export default function AdminProblemsPage() {
             {filteredProblems.length === 0 ? (
               <div className="text-center py-12">
                 <BookOpen className="mx-auto h-10 w-10 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No problems found</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                  No problems found
+                </h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {problems.length === 0 
-                    ? "You haven't created any problems yet" 
+                  {problems.length === 0
+                    ? "You haven't created any problems yet"
                     : "No problems match your current filters"}
                 </p>
                 <div className="mt-6">
@@ -236,49 +271,72 @@ export default function AdminProblemsPage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Title
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Difficulty
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Categories
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Stats
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Last Updated
                     </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {currentProblems.map((problem) => (
-                    <tr key={problem.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr
+                      key={problem.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
                           {problem.title}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          problem.difficulty === 'EASY' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                            : problem.difficulty === 'MEDIUM'
-                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            problem.difficulty === "EASY"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                              : problem.difficulty === "MEDIUM"
+                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          }`}
+                        >
                           {problem.difficulty}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-wrap gap-1">
                           {problem.categories?.map((category, index) => (
-                            <span 
+                            <span
                               key={index}
                               className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full"
                             >
@@ -289,16 +347,24 @@ export default function AdminProblemsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         <div>
-                          <span className="font-medium">{problem.submissionCount}</span> submissions
+                          <span className="font-medium">
+                            {problem.submissionCount}
+                          </span>{" "}
+                          submissions
                         </div>
                         <div>
-                          <span className={`font-medium ${
-                            problem.acceptanceRate >= 80 ? 'text-green-600 dark:text-green-400' : 
-                            problem.acceptanceRate >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 
-                            'text-red-600 dark:text-red-400'
-                          }`}>
+                          <span
+                            className={`font-medium ${
+                              problem.acceptanceRate >= 80
+                                ? "text-green-600 dark:text-green-400"
+                                : problem.acceptanceRate >= 60
+                                  ? "text-yellow-600 dark:text-yellow-400"
+                                  : "text-red-600 dark:text-red-400"
+                            }`}
+                          >
                             {problem.acceptanceRate}%
-                          </span> acceptance
+                          </span>{" "}
+                          acceptance
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -322,7 +388,9 @@ export default function AdminProblemsPage() {
                           <button
                             disabled={deleteLoading}
                             className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 disabled:opacity-50"
-                            onClick={() => handleDeleteProblem(problem.id, problem.title)}
+                            onClick={() =>
+                              handleDeleteProblem(problem.id, problem.title)
+                            }
                           >
                             <Trash2 className="h-5 w-5" />
                           </button>
@@ -334,29 +402,42 @@ export default function AdminProblemsPage() {
               </table>
             )}
           </div>
-          
+
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
               <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    Showing <span className="font-medium">{indexOfFirstProblem + 1}</span> to{' '}
+                    Showing{" "}
+                    <span className="font-medium">
+                      {indexOfFirstProblem + 1}
+                    </span>{" "}
+                    to{" "}
                     <span className="font-medium">
                       {Math.min(indexOfLastProblem, filteredProblems.length)}
-                    </span>{' '}
-                    of <span className="font-medium">{filteredProblems.length}</span> problems
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-medium">
+                      {filteredProblems.length}
+                    </span>{" "}
+                    problems
                   </p>
                 </div>
                 <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <nav
+                    className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                    aria-label="Pagination"
+                  >
                     <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
                       disabled={currentPage === 1}
                       className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                         currentPage === 1
-                          ? 'text-gray-300 dark:text-gray-600'
-                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? "text-gray-300 dark:text-gray-600"
+                          : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                       }`}
                     >
                       <span className="sr-only">Previous</span>
@@ -368,20 +449,22 @@ export default function AdminProblemsPage() {
                         onClick={() => setCurrentPage(index + 1)}
                         className={`relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                           currentPage === index + 1
-                            ? 'z-10 bg-orange-50 dark:bg-orange-900 border-orange-500 dark:border-orange-500 text-orange-600 dark:text-orange-200'
-                            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            ? "z-10 bg-orange-50 dark:bg-orange-900 border-orange-500 dark:border-orange-500 text-orange-600 dark:text-orange-200"
+                            : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                         }`}
                       >
                         {index + 1}
                       </button>
                     ))}
                     <button
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
                       disabled={currentPage === totalPages}
                       className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium ${
                         currentPage === totalPages
-                          ? 'text-gray-300 dark:text-gray-600'
-                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          ? "text-gray-300 dark:text-gray-600"
+                          : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                       }`}
                     >
                       <span className="sr-only">Next</span>
@@ -396,4 +479,4 @@ export default function AdminProblemsPage() {
       )}
     </div>
   );
-} 
+}
