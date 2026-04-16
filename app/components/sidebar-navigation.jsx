@@ -183,7 +183,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
           </div>
         )}
 
-        {session?.user.role === 'PLATFORM_ADMIN' && !collapsed && (
+        {(session?.user.role === 'PLATFORM_ADMIN' || session?.user.role === 'TEMP_ADMIN') && !collapsed && (
           <div className="px-3 py-2 mt-2">
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Admin

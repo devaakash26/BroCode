@@ -1,37 +1,39 @@
-import { Suspense } from 'react';
-import { prisma } from '@/app/lib/db';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import Link from 'next/link';
-import Image from 'next/image';
-import SearchForm from '@/app/components/SearchForm';
-import ProfileDialogWrapper from '@/app/components/ProfileDialogWrapper';
-import LeaderboardRow, { LeaderboardSkeleton } from '@/app/components/LeaderboardRow';
-import { Trophy } from 'lucide-react';
-import { redisHelpers } from '@/lib/redis';
+import { Suspense } from "react";
+import { prisma } from "@/app/lib/db";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import Link from "next/link";
+import Image from "next/image";
+import SearchForm from "@/app/components/SearchForm";
+import ProfileDialogWrapper from "@/app/components/ProfileDialogWrapper";
+import LeaderboardRow, {
+  LeaderboardSkeleton,
+} from "@/app/components/LeaderboardRow";
+import { Trophy } from "lucide-react";
+import { redisHelpers } from "@/lib/redis";
 
 export const metadata = {
-  title: 'Leaderboard - BroCode',
-  description: 'Global rankings of BroCode users',
+  title: "Leaderboard - BroCode",
+  description: "Global rankings of BroCode users",
 };
 
 export const revalidate = 120; // ISR: revalidate every 2 minutes
 
-async function getLeaderboard(searchQuery = '', sortBy = 'total') {
+async function getLeaderboard(searchQuery = "", sortBy = "total") {
   // Try cache first (only for default view - no search, sorted by total)
-  const isDefaultView = !searchQuery && sortBy === 'total';
-  const cacheKey = isDefaultView ? 'brocode-leaderboard-default' : null;
-  
+  const isDefaultView = !searchQuery && sortBy === "total";
+  const cacheKey = isDefaultView ? "brocode-leaderboard-default" : null;
+
   if (cacheKey && redisHelpers?.cache) {
     try {
       const cached = await redisHelpers.cache.get(cacheKey);
       if (cached) {
-        console.log('[Leaderboard] Cache HIT');
+        console.log("[Leaderboard] Cache HIT");
         return cached;
       }
-      console.log('[Leaderboard] Cache MISS');
+      console.log("[Leaderboard] Cache MISS");
     } catch (e) {
-      console.error('[Leaderboard] Cache error:', e);
+      console.error("[Leaderboard] Cache error:", e);
     }
   }
 
@@ -40,17 +42,20 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
 
   // Build WHERE clause for the user search
   const userWhere = {
-    email: { not: 'system@neetcode.io' },
     NOT: [
-      { name: { contains: 'test', mode: 'insensitive' } },
-      { email: { contains: 'test', mode: 'insensitive' } },
+      { email: "system@neetcode.io" },
+      { email: "admin@brocode.com" },
+      { name: { contains: "test", mode: "insensitive" } },
+      { email: { contains: "test", mode: "insensitive" } },
     ],
-    ...(searchQuery ? {
-      OR: [
-        { name: { contains: searchQuery, mode: 'insensitive' } },
-        { email: { contains: searchQuery, mode: 'insensitive' } },
-      ],
-    } : {}),
+    ...(searchQuery
+      ? {
+          OR: [
+            { name: { contains: searchQuery, mode: "insensitive" } },
+            { email: { contains: searchQuery, mode: "insensitive" } },
+          ],
+        }
+      : {}),
   };
 
   // Run both aggregations in parallel instead of fetching raw submissions
@@ -67,13 +72,13 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
     }),
     // 2) Count unique solved problems per user via groupBy
     prisma.submission.groupBy({
-      by: ['userId', 'problemId'],
-      where: { status: 'ACCEPTED' },
+      by: ["userId", "problemId"],
+      where: { status: "ACCEPTED" },
       _min: { submittedAt: true }, // just to satisfy Prisma; lightweight
     }),
     // 3) Count recent submissions (last 30 days) per user
     prisma.submission.groupBy({
-      by: ['userId'],
+      by: ["userId"],
       where: {
         submittedAt: { gte: thirtyDaysAgo },
       },
@@ -94,10 +99,10 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
   }
 
   // Build leaderboard from user list
-  const leaderboardData = users.map(user => ({
+  const leaderboardData = users.map((user) => ({
     rank: 0,
     id: user.id,
-    name: user.name || 'Anonymous User',
+    name: user.name || "Anonymous User",
     email: user.email,
     image: user.image,
     solvedCount: solvedMap.get(user.id)?.size || 0,
@@ -105,7 +110,7 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
   }));
 
   // Sort
-  if (sortBy === 'recent') {
+  if (sortBy === "recent") {
     leaderboardData.sort((a, b) => b.recentSolves - a.recentSolves);
   } else {
     leaderboardData.sort((a, b) => b.solvedCount - a.solvedCount);
@@ -113,32 +118,36 @@ async function getLeaderboard(searchQuery = '', sortBy = 'total') {
 
   // Take top 100 after sorting and assign ranks
   const top100 = leaderboardData.slice(0, 100);
-  top100.forEach((user, index) => { user.rank = index + 1; });
+  top100.forEach((user, index) => {
+    user.rank = index + 1;
+  });
 
   // Cache default view (5 minutes TTL)
   if (cacheKey && redisHelpers?.cache) {
     try {
       await redisHelpers.cache.set(cacheKey, top100, 300);
-      console.log('[Leaderboard] Successfully cached');
+      console.log("[Leaderboard] Successfully cached");
     } catch (e) {
-      console.error('[Leaderboard] Failed to cache:', e);
+      console.error("[Leaderboard] Failed to cache:", e);
     }
   }
 
   return top100;
 }
 
-async function LeaderboardContent({searchParams}) {
+async function LeaderboardContent({ searchParams }) {
   const session = await getServerSession(authOptions);
-  const searchQuery = searchParams?.search || '';
-  const sortBy = searchParams?.sort || 'total';
+  const searchQuery = searchParams?.search || "";
+  const sortBy = searchParams?.sort || "total";
   const leaderboard = await getLeaderboard(searchQuery, sortBy);
-  
+
   if (leaderboard.length === 0) {
     return (
       <div className="text-center py-16">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          {searchQuery ? `No users found matching "${searchQuery}"` : 'No users found'}
+          {searchQuery
+            ? `No users found matching "${searchQuery}"`
+            : "No users found"}
         </p>
       </div>
     );
@@ -155,11 +164,11 @@ async function LeaderboardContent({searchParams}) {
           <div className="col-span-3 text-right">Total Score</div>
         </div>
       </div>
-      
+
       {/* Table Body */}
       <div className="divide-y divide-gray-200 dark:divide-gray-700">
         {leaderboard.map((user, index) => (
-          <LeaderboardRow 
+          <LeaderboardRow
             key={user.id}
             user={user}
             rank={index + 1}
@@ -171,7 +180,7 @@ async function LeaderboardContent({searchParams}) {
   );
 }
 
-export default async function LeaderboardPage({searchParams}) {
+export default async function LeaderboardPage({ searchParams }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -188,26 +197,28 @@ export default async function LeaderboardPage({searchParams}) {
         {/* Search and filter controls */}
         <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="w-full sm:w-96">
-            <SearchForm 
-              initialValue={searchParams?.search || ''} 
-              sortValue={searchParams?.sort || 'total'} 
+            <SearchForm
+              initialValue={searchParams?.search || ""}
+              sortValue={searchParams?.sort || "total"}
               placeholder="Search developers..."
             />
           </div>
-          
+
           <form action="" method="get" className="flex items-center gap-2">
-            {searchParams?.search && <input type="hidden" name="search" value={searchParams.search} />}
-            
-            <select 
+            {searchParams?.search && (
+              <input type="hidden" name="search" value={searchParams.search} />
+            )}
+
+            <select
               className="block pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               name="sort"
-              defaultValue={searchParams?.sort || 'total'}
+              defaultValue={searchParams?.sort || "total"}
             >
               <option value="total">Total Solved</option>
               <option value="recent">Recent Activity</option>
             </select>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
             >
               Apply
@@ -221,4 +232,4 @@ export default async function LeaderboardPage({searchParams}) {
       </div>
     </div>
   );
-} 
+}

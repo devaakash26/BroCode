@@ -7,7 +7,12 @@ export async function GET(req) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session || !session.user || session.user.role !== 'PLATFORM_ADMIN') {
+    const role = session?.user?.role;
+    if (
+      !session ||
+      !session.user ||
+      (role !== "PLATFORM_ADMIN" && role !== "TEMP_ADMIN")
+    ) {
       return NextResponse.json({ message: "Not authorized" }, { status: 403 });
     }
 
@@ -21,13 +26,16 @@ export async function GET(req) {
         },
       },
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
     });
 
     return NextResponse.json(queries, { status: 200 });
   } catch (error) {
     console.error("Error fetching queries:", error);
-    return NextResponse.json({ message: "Something went wrong" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Something went wrong" },
+      { status: 500 },
+    );
   }
-} 
+}
