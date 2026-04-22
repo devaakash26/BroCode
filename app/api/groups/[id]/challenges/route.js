@@ -5,6 +5,52 @@ import { prisma } from "@/app/lib/db";
 import { sendEmail } from "@/app/lib/email";
 import { redisHelpers } from "@/lib/redis";
 
+function parseChallengeDate(value, timezoneOffsetMinutes) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // If the string already contains timezone info (Z or +/-HH:mm), parse directly.
+  const hasTimezone = /([zZ]|[+-]\d{2}:\d{2})$/.test(value);
+  if (hasTimezone) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // Handle datetime-local style payloads (YYYY-MM-DDTHH:mm[:ss]).
+  const localMatch = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+
+  if (localMatch && Number.isFinite(timezoneOffsetMinutes)) {
+    const [, y, m, d, h, min, s] = localMatch;
+    const utcMs =
+      Date.UTC(
+        Number(y),
+        Number(m) - 1,
+        Number(d),
+        Number(h),
+        Number(min),
+        Number(s || 0),
+      ) +
+      Number(timezoneOffsetMinutes) * 60 * 1000;
+
+    const parsed = new Date(utcMs);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  // Last-resort fallback to native parsing.
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 // Create a new challenge in a group
 export async function POST(request, { params }) {
   try {
@@ -76,6 +122,8 @@ export async function POST(request, { params }) {
       strictMode,
       inviteOnly,
       lateEntryMinutes,
+      startTimezoneOffsetMinutes,
+      endTimezoneOffsetMinutes,
       invitedMemberIds,
       sendInviteEmails,
     } = await request.json();
@@ -89,10 +137,10 @@ export async function POST(request, { params }) {
     }
 
     // Validate dates
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+    const start = parseChallengeDate(startTime, startTimezoneOffsetMinutes);
+    const end = parseChallengeDate(endTime, endTimezoneOffsetMinutes);
 
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
       return NextResponse.json(
         { message: "Invalid date format" },
         { status: 400 },
