@@ -20,76 +20,67 @@ const inMemoryOnlineUsers = new Map();
 console.log(`[server-dev] 🔍 Checking Redis configuration...`);
 console.log(`[server-dev] REDIS_PROVIDER: ${REDIS_PROVIDER}`);
 
-// Initialize Redis based on provider
-if (REDIS_PROVIDER === "railway") {
+// ── Helper: initialize Redis client from a URL ───────────────────────────────────
+function initRedisClient(redisUrl, providerLabel) {
+  const isTLS = redisUrl.startsWith("rediss://");
+  console.log(`[server-dev] 🔧 Initializing Redis connection (${providerLabel})...`);
+  redis = new Redis(redisUrl, {
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 2000);
+      console.log(`[server-dev] Redis retry attempt ${times}, waiting ${delay}ms`);
+      return delay;
+    },
+    lazyConnect: false,
+    enableOfflineQueue: true,
+    reconnectOnError: (err) => {
+      console.error(`[server-dev] Redis reconnect on error: ${err.message}`);
+      return true;
+    },
+    ...(isTLS && { tls: { rejectUnauthorized: false } }),
+  });
+  redis.on("error", (err) => { console.error("[server-dev] ❌ Redis error:", err.message); redisReady = false; });
+  redis.on("connect", () => console.log("[server-dev] 🔄 Redis connecting..."));
+  redis.on("ready", () => {
+    console.log("[server-dev] ✅ Redis ready - online tracking enabled");
+    redisReady = true;
+    if (inMemoryOnlineUsers.size > 0) {
+      console.log(`[server-dev] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`);
+      syncInMemoryToRedis();
+    }
+  });
+  redis.on("close", () => { console.warn("[server-dev] ⚠️  Redis connection closed"); redisReady = false; });
+  redis.on("reconnecting", () => console.log("[server-dev] 🔄 Redis reconnecting..."));
+}
+
+// ── Initialize Redis based on provider ──────────────────────────────────────────
+// "upstash" → UPSTASH_REDIS_URL  (Upstash managed Redis, TLS)
+// "railway" → RAILWAY_REDIS_URL  (Railway deployment)
+// "aws"     → REDIS_URL          (AWS EC2 / ElastiCache)
+if (REDIS_PROVIDER === "upstash") {
+  const redisUrl = process.env.UPSTASH_REDIS_URL;
+  console.log(`[server-dev] UPSTASH_REDIS_URL exists: ${!!redisUrl}`);
+  if (redisUrl) {
+    initRedisClient(redisUrl, "Upstash");
+  } else {
+    console.warn("[server-dev] ⚠️  UPSTASH_REDIS_URL not set - online tracking disabled");
+  }
+} else if (REDIS_PROVIDER === "railway") {
   const redisUrl = process.env.RAILWAY_REDIS_URL;
   console.log(`[server-dev] RAILWAY_REDIS_URL exists: ${!!redisUrl}`);
-
-  if (redisUrl) {
-    const urlStart = redisUrl.substring(0, 10);
-    console.log(`[server-dev] URL starts with: ${urlStart}`);
-  }
-
-  // Check if Redis URL is valid (not empty and not placeholder)
-  if (redisUrl && redisUrl.startsWith("redis://")) {
-    console.log("[server-dev] 🔧 Initializing Redis connection...");
-    redis = new Redis(redisUrl, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        console.log(
-          `[server-dev] Redis retry attempt ${times}, waiting ${delay}ms`,
-        );
-        return delay;
-      },
-      lazyConnect: false,
-      enableOfflineQueue: true,
-      reconnectOnError: (err) => {
-        console.error(`[server-dev] Redis reconnect on error: ${err.message}`);
-        return true;
-      },
-    });
-
-    redis.on("error", (err) => {
-      console.error("[server-dev] ❌ Redis error:", err.message);
-      redisReady = false;
-    });
-
-    redis.on("connect", () => {
-      console.log("[server-dev] 🔄 Redis connecting...");
-    });
-
-    redis.on("ready", () => {
-      console.log("[server-dev] ✅ Redis ready - online tracking enabled");
-      redisReady = true;
-
-      // Sync in-memory users to Redis when connection is restored
-      if (inMemoryOnlineUsers.size > 0) {
-        console.log(
-          `[server-dev] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`,
-        );
-        syncInMemoryToRedis();
-      }
-    });
-
-    redis.on("close", () => {
-      console.warn("[server-dev] ⚠️  Redis connection closed");
-      redisReady = false;
-    });
-
-    redis.on("reconnecting", () => {
-      console.log("[server-dev] 🔄 Redis reconnecting...");
-    });
+  if (redisUrl && (redisUrl.startsWith("redis://") || redisUrl.startsWith("rediss://"))) {
+    initRedisClient(redisUrl, "Railway");
   } else {
-    console.warn(
-      "[server-dev] ⚠️  Railway Redis URL not configured or invalid",
-    );
-    console.warn("[server-dev] Expected format: redis://...");
+    console.warn("[server-dev] ⚠️  Railway Redis URL not configured or invalid");
   }
-} else if (REDIS_PROVIDER === "upstash") {
-  console.warn(
-    "[server-dev] ⚠️  Upstash Redis not supported in dev server (use Railway)",
-  );
+} else if (REDIS_PROVIDER === "aws") {
+  const redisUrl = process.env.REDIS_URL;
+  console.log(`[server-dev] REDIS_URL exists: ${!!redisUrl}`);
+  if (redisUrl) {
+    initRedisClient(redisUrl, "AWS");
+  } else {
+    console.warn("[server-dev] ⚠️  REDIS_URL not set - online tracking disabled");
+  }
 } else {
   console.warn("[server-dev] ⚠️  No Redis provider - online tracking disabled");
 }
