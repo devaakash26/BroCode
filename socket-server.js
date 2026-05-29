@@ -29,88 +29,108 @@ const inMemoryOnlineUsers = new Map(); // userId → { userData, timestamp }
 console.log(`[socket-server] 🔍 Checking Redis configuration...`);
 console.log(`[socket-server] REDIS_PROVIDER: ${REDIS_PROVIDER}`);
 
-// Initialize Redis based on provider
-if (REDIS_PROVIDER === "railway") {
+// ── Helper: initialize Redis clients from a URL ─────────────────────────────────
+function initRedisClients(redisUrl, providerLabel) {
+  console.log(
+    `[socket-server] 🔧 Initializing Redis connections (${providerLabel})...`,
+  );
+  const isTLS = redisUrl.startsWith("rediss://");
+  const tlsOpts = isTLS ? { tls: { rejectUnauthorized: false } } : {};
+
+  const baseOpts = {
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 2000);
+      console.log(
+        `[socket-server] Redis retry attempt ${times}, waiting ${delay}ms`,
+      );
+      return delay;
+    },
+    lazyConnect: false,
+    enableOfflineQueue: true,
+    reconnectOnError: (err) => {
+      console.error(`[socket-server] Redis reconnect on error: ${err.message}`);
+      return true;
+    },
+    ...tlsOpts,
+  };
+
+  redis = new Redis(redisUrl, baseOpts);
+  redisPub = new Redis(redisUrl, {
+    maxRetriesPerRequest: 3,
+    retryStrategy: (t) => Math.min(t * 50, 2000),
+    ...tlsOpts,
+  });
+  redisSub = new Redis(redisUrl, {
+    maxRetriesPerRequest: 3,
+    retryStrategy: (t) => Math.min(t * 50, 2000),
+    ...tlsOpts,
+  });
+
+  redis.on("error", (err) => {
+    console.error("[socket-server] ❌ Redis error:", err.message);
+    redisReady = false;
+  });
+  redis.on("connect", () =>
+    console.log("[socket-server] 🔄 Redis connecting..."),
+  );
+  redis.on("ready", async () => {
+    console.log("[socket-server] ✅ Redis ready - online tracking enabled");
+    redisReady = true;
+    if (inMemoryOnlineUsers.size > 0) {
+      console.log(
+        `[socket-server] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`,
+      );
+      await syncInMemoryToRedis();
+    }
+  });
+  redis.on("close", () => {
+    console.warn("[socket-server] ⚠️  Redis connection closed");
+    redisReady = false;
+  });
+  redis.on("reconnecting", () =>
+    console.log("[socket-server] 🔄 Redis reconnecting..."),
+  );
+  redisPub.on("error", (err) =>
+    console.error("[socket-server] Redis Pub error:", err.message),
+  );
+  redisSub.on("error", (err) =>
+    console.error("[socket-server] Redis Sub error:", err.message),
+  );
+}
+
+// ── Initialize Redis based on provider ──────────────────────────────────────────
+// "upstash" → UPSTASH_REDIS_URL  (Upstash managed Redis, TLS — rediss://)
+// "railway" → RAILWAY_REDIS_URL  (Railway deployment)
+// "aws"     → REDIS_URL          (AWS EC2 / ElastiCache)
+if (REDIS_PROVIDER === "upstash") {
+  const redisUrl = process.env.UPSTASH_REDIS_URL;
+  console.log(`[socket-server] UPSTASH_REDIS_URL exists: ${!!redisUrl}`);
+  if (redisUrl) {
+    initRedisClients(redisUrl, "Upstash");
+  } else {
+    console.warn(
+      "[socket-server] UPSTASH_REDIS_URL not configured - online tracking disabled",
+    );
+  }
+} else if (REDIS_PROVIDER === "railway") {
   const redisUrl = process.env.RAILWAY_REDIS_URL;
   console.log(`[socket-server] RAILWAY_REDIS_URL exists: ${!!redisUrl}`);
-
   if (redisUrl && !redisUrl.includes("[YOUR_RAILWAY_HOST]")) {
-    console.log("[socket-server] 🔧 Initializing Redis connections...");
-
-    // Main Redis client for online tracking
-    redis = new Redis(redisUrl, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => {
-        const delay = Math.min(times * 50, 2000);
-        console.log(
-          `[socket-server] Redis retry attempt ${times}, waiting ${delay}ms`,
-        );
-        return delay;
-      },
-      lazyConnect: false,
-      enableOfflineQueue: true,
-      reconnectOnError: (err) => {
-        console.error(
-          `[socket-server] Redis reconnect on error: ${err.message}`,
-        );
-        return true;
-      },
-    });
-
-    // Pub/Sub clients for Socket.io adapter (multi-instance support)
-    redisPub = new Redis(redisUrl, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => Math.min(times * 50, 2000),
-    });
-    redisSub = new Redis(redisUrl, {
-      maxRetriesPerRequest: 3,
-      retryStrategy: (times) => Math.min(times * 50, 2000),
-    });
-
-    redis.on("error", (err) => {
-      console.error("[socket-server] ❌ Redis error:", err.message);
-      redisReady = false;
-    });
-
-    redis.on("connect", () => {
-      console.log("[socket-server] 🔄 Redis connecting...");
-    });
-
-    redis.on("ready", async () => {
-      console.log("[socket-server] ✅ Redis ready - online tracking enabled");
-      redisReady = true;
-
-      // Sync in-memory users to Redis when connection is restored
-      if (inMemoryOnlineUsers.size > 0) {
-        console.log(
-          `[socket-server] 📤 Syncing ${inMemoryOnlineUsers.size} users to Redis...`,
-        );
-        await syncInMemoryToRedis();
-      }
-    });
-
-    redis.on("close", () => {
-      console.warn("[socket-server] ⚠️  Redis connection closed");
-      redisReady = false;
-    });
-
-    redis.on("reconnecting", () => {
-      console.log("[socket-server] 🔄 Redis reconnecting...");
-    });
-
-    redisPub.on("error", (err) =>
-      console.error("[socket-server] Redis Pub error:", err.message),
-    );
-    redisSub.on("error", (err) =>
-      console.error("[socket-server] Redis Sub error:", err.message),
-    );
+    initRedisClients(redisUrl, "Railway");
   } else {
     console.warn("[socket-server] Railway Redis URL not configured");
   }
-} else if (REDIS_PROVIDER === "upstash") {
-  console.warn(
-    "[socket-server] Upstash Redis not supported in socket server (use Railway for socket features)",
-  );
+} else if (REDIS_PROVIDER === "aws") {
+  const redisUrl = process.env.REDIS_URL;
+  console.log(`[socket-server] REDIS_URL exists: ${!!redisUrl}`);
+  if (redisUrl) {
+    initRedisClients(redisUrl, "AWS");
+  } else {
+    console.warn(
+      "[socket-server] REDIS_URL not configured - online tracking disabled",
+    );
+  }
 } else {
   console.warn(
     "[socket-server] No Redis provider configured - online tracking disabled",
