@@ -1,0 +1,51 @@
+# Cloud Build config: builds the socket server image and deploys it to Cloud Run.
+# Manual run:  gcloud builds submit --config cloudbuild.yaml .
+# CI run:      .github/workflows/deploy-socket-gcp.yml
+
+substitutions:
+  _REGION: asia-south1
+  _REPO: brocode
+  _SERVICE: brocode-socket
+
+steps:
+  # Build the image from Dockerfile.socket
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - Dockerfile.socket
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/socket-server:latest
+      - .
+
+  # Push to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/socket-server:latest
+
+  # Deploy a new Cloud Run revision.
+  # Env vars are NOT set here — they are managed on the service itself
+  # (gcloud run services update --set-env-vars ...) and persist across deploys.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/socket-server:latest
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --session-affinity
+      - --timeout=3600
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=1
+      - --max-instances=3
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/socket-server:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
