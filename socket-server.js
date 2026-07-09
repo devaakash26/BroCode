@@ -1,6 +1,6 @@
 /**
  * Standalone Socket.io server
- * Deploy this separately on Railway / Render / Fly.io
+ * Deployed separately on Google Cloud Run (see cloudbuild.yaml)
  * Your Next.js app on Vercel connects to this via NEXT_PUBLIC_SOCKET_URL
  */
 
