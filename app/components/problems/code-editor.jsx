@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code, X, Trophy } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,9 +26,42 @@ const defaultLanguages = [
   { id: 'java', name: 'Java', defaultCode: '// Write your Java solution here\n\n' },
 ];
 
-export default function CodeEditor({ 
-  problemId, 
-  initialCode = '', 
+function complexityToFn(bigO) {
+  const s = String(bigO || '').toLowerCase().replace(/[\s{}·]/g, '');
+  if (!s) return null;
+  if (s.includes('constant')) return () => 1;
+  if (s.includes('n!') || s.includes('factorial')) {
+    return (n) => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
+  }
+  if (s.includes('2^n') || s.includes('2ⁿ') || s.includes('exponential')) return (n) => Math.pow(2, n);
+  if (s.includes('n^3') || s.includes('n³')) return (n) => n * n * n;
+  if (s.includes('n^2') || s.includes('n²')) return (n) => n * n;
+  if (s.includes('nlogn')) return (n) => n * Math.log2(Math.max(n, 2));
+  if (s.includes('logn') || s.includes('log')) return (n) => Math.log2(Math.max(n, 2));
+  if (s.includes('sqrt') || s.includes('√')) return (n) => Math.sqrt(n);
+  if (s.includes('n')) return (n) => n;
+  return () => 1; // O(1) or anything with no 'n'
+}
+
+const COMPLEXITY_NS = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40];
+const clampCost = (v) => Math.min(Math.max(1, v), 1e15);
+
+// Build recharts data comparing the user's growth curve to the optimal one.
+function buildComplexityChartData(userBigO, optimalBigO) {
+  const userFn = complexityToFn(userBigO);
+  const optFn = complexityToFn(optimalBigO);
+  const data = COMPLEXITY_NS.map((n) => {
+    const point = { n };
+    if (userFn) point.you = clampCost(userFn(n));
+    if (optFn) point.optimal = clampCost(optFn(n));
+    return point;
+  });
+  return { data, hasUser: !!userFn, hasOptimal: !!optFn };
+}
+
+export default function CodeEditor({
+  problemId,
+  initialCode = '',
   onSubmit,
   testCases = [],
   readOnly = false,
@@ -43,7 +77,11 @@ export default function CodeEditor({
   const [results, setResults] = useState(null);
   const [theme, setTheme] = useState('vs-dark');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('results'); // results or console
+  const [activeTab, setActiveTab] = useState('results'); // 'results' | 'console' | 'ai'
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [complexity, setComplexity] = useState(null);
+  const [isComputingComplexity, setIsComputingComplexity] = useState(false);
   const resultsPanelRef = useRef(null);
   const [executionProgress, setExecutionProgress] = useState(0);
   const [compilationStatus, setCompilationStatus] = useState(null);
@@ -92,16 +130,16 @@ export default function CodeEditor({
     if (isRunning || isSubmitting) {
       // Start with compilation
       setCompilationStatus('running');
-      
+
       timer = setTimeout(() => {
         // Simulate compilation completing
         setCompilationStatus('completed');
         setExecutionProgress(25);
-        
+
         // Initialize test case statuses to "waiting"
         const initialStatuses = testCases.map(() => 'waiting');
         setTestCaseStatus(initialStatuses);
-        
+
         // Simulate test cases running one by one
         let currentCase = 0;
         const testCaseTimer = setInterval(() => {
@@ -112,7 +150,7 @@ export default function CodeEditor({
               updated[currentCase] = 'running';
               return updated;
             });
-            
+
             // After a delay, mark it as "completed"
             setTimeout(() => {
               setTestCaseStatus(prev => {
@@ -120,10 +158,10 @@ export default function CodeEditor({
                 updated[currentCase] = 'completed';
                 return updated;
               });
-              
+
               // Update progress based on completed test cases
               setExecutionProgress(25 + ((currentCase + 1) / testCases.length) * 75);
-              
+
               // Move to next test case
               currentCase++;
             }, 500 + Math.random() * 1000); // Random time per test case
@@ -131,13 +169,13 @@ export default function CodeEditor({
             clearInterval(testCaseTimer);
           }
         }, 800); // Start a new test case every 800ms
-        
+
         return () => {
           clearInterval(testCaseTimer);
         };
       }, 1000); // Compilation takes 1 second
     }
-    
+
     return () => {
       clearTimeout(timer);
     };
@@ -148,16 +186,17 @@ export default function CodeEditor({
     function handleClickOutside(event) {
       if (resultsPanelRef.current && !resultsPanelRef.current.contains(event.target) && isPanelOpen) {
         // Don't close if clicking on run or submit buttons
-        const isActionButton = event.target.closest('button') && 
-          (event.target.closest('button').textContent.includes('Run') || 
-           event.target.closest('button').textContent.includes('Submit'));
-        
+        const isActionButton = event.target.closest('button') &&
+          (event.target.closest('button').textContent.includes('Run') ||
+           event.target.closest('button').textContent.includes('Submit') ||
+           event.target.closest('button').textContent.includes('Complexity'));
+
         if (!isActionButton) {
           setIsPanelOpen(false);
         }
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -168,22 +207,22 @@ export default function CodeEditor({
   const identifyLockedRanges = () => {
     // Reset locked ranges
     const ranges = [];
-    
+
     if (!code) return;
-    
+
     // Find all locked regions marked with special comments
     const lines = code.split('\n');
     let startLine = -1;
-    
+
     for (let i = 0; i < lines.length; i++) {
       // Look for markers that indicate locked code regions
       if (lines[i].includes('// BEGIN LOCKED') || lines[i].includes('/* BEGIN LOCKED */') ||
           lines[i].includes('# BEGIN LOCKED') || lines[i].includes('<!-- BEGIN LOCKED -->')) {
         startLine = i;
       }
-      
+
       if ((lines[i].includes('// END LOCKED') || lines[i].includes('/* END LOCKED */') ||
-           lines[i].includes('# END LOCKED') || lines[i].includes('<!-- END LOCKED -->')) && 
+           lines[i].includes('# END LOCKED') || lines[i].includes('<!-- END LOCKED -->')) &&
           startLine !== -1) {
         ranges.push({
           startLineNumber: startLine + 1,
@@ -193,7 +232,7 @@ export default function CodeEditor({
         startLine = -1;
       }
     }
-    
+
     setLockedRanges(ranges);
   };
 
@@ -223,6 +262,7 @@ export default function CodeEditor({
     // Reset and start execution
     setIsRunning(true);
     setResults(null);
+    setAiAnalysis(null);
     setActiveTab('results');
     setExecutionProgress(5); // Start progress at 5%
 
@@ -233,10 +273,10 @@ export default function CodeEditor({
         // Delay to simulate checking
         await new Promise(resolve => setTimeout(resolve, 800));
         setExecutionProgress(20);
-        
+
         // Show compilation status as failed
         setCompilationStatus('failed');
-        
+
         // Return early with validation error
         setResults({
           status: 'QUALITY_ERROR',
@@ -245,7 +285,7 @@ export default function CodeEditor({
           consoleOutput: `Error: ${validationIssues}`,
           testResults: []
         });
-        
+
         toast.error('Code quality issue: ' + validationIssues);
         setIsRunning(false);
         return;
@@ -280,7 +320,7 @@ export default function CodeEditor({
       setExecutionProgress(100);
 
       setResults({...data, isSubmission: false});
-      
+
       if (data.status === 'ACCEPTED') {
         toast.success('All test cases passed!');
       } else if (data.status === 'COMPILE_ERROR') {
@@ -318,6 +358,7 @@ export default function CodeEditor({
     // Reset and start execution
     setIsSubmitting(true);
     setResults(null);
+    setAiAnalysis(null);
     setActiveTab('results');
     setExecutionProgress(5); // Start progress at 5%
 
@@ -328,10 +369,10 @@ export default function CodeEditor({
         // Delay to simulate checking
         await new Promise(resolve => setTimeout(resolve, 800));
         setExecutionProgress(20);
-        
+
         // Show compilation status as failed
         setCompilationStatus('failed');
-        
+
         // Return early with validation error
         setResults({
           status: 'QUALITY_ERROR',
@@ -340,7 +381,7 @@ export default function CodeEditor({
           consoleOutput: `Error: ${validationIssues}`,
           testResults: []
         });
-        
+
         toast.error('Code quality issue: ' + validationIssues);
         setIsSubmitting(false);
         return;
@@ -375,7 +416,12 @@ export default function CodeEditor({
       setExecutionProgress(100);
 
       setResults({...data, isSubmission: true});
-      
+
+      // Auto-run the AI review on every submission (additive + non-blocking).
+      // The Judge0 verdict above is already shown; this only enriches the
+      // "AI Review" tab, and is cached server-side per unique code.
+      runAiAnalysis(code, language);
+
       if (data.status === 'ACCEPTED') {
         toast.success('All test cases passed! Solution submitted successfully.');
       } else if (data.status === 'COMPILE_ERROR') {
@@ -401,6 +447,70 @@ export default function CodeEditor({
       setExecutionProgress(0);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Fetch the AI review for a submission. Fire-and-forget from submitCode:
+  // it manages its own loading state and never throws into the submit flow, so
+  // a slow or unconfigured AI backend can't affect the Judge0 verdict.
+  const runAiAnalysis = async (analyzeCode, analyzeLanguage) => {
+    if (!session || !analyzeCode?.trim()) return;
+    setAiAnalysis(null);
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: analyzeCode, language: analyzeLanguage, problemId }),
+      });
+      const data = await response.json();
+      if (response.status === 429) {
+        setAiAnalysis({ available: false, message: data.message || 'Too many AI requests — try again shortly.' });
+        return;
+      }
+      setAiAnalysis(data);
+    } catch (error) {
+      console.error('AI analysis error:', error);
+      setAiAnalysis({ available: false, message: 'Could not load AI analysis.' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Analyze the current code's time & space complexity on demand (button-driven).
+  // Opens the Complexity tab and populates the growth graph. Independent of the
+  // Judge0 run/submit flow.
+  const computeComplexity = async () => {
+    if (!session) {
+      toast.error('Please sign in to analyze complexity.');
+      router.push('/auth/signin');
+      return;
+    }
+    if (!code.trim()) {
+      toast.error('Please write some code first');
+      return;
+    }
+    setComplexity(null);
+    setIsComputingComplexity(true);
+    setIsPanelOpen(true);
+    setActiveTab('complexity');
+    try {
+      const response = await fetch('/api/ai/complexity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, language, problemId }),
+      });
+      const data = await response.json();
+      if (response.status === 429) {
+        setComplexity({ available: false, message: data.message || 'Too many AI requests — try again shortly.' });
+        return;
+      }
+      setComplexity(data);
+    } catch (error) {
+      console.error('Complexity error:', error);
+      setComplexity({ available: false, message: 'Could not analyze complexity.' });
+    } finally {
+      setIsComputingComplexity(false);
     }
   };
 
@@ -442,20 +552,20 @@ export default function CodeEditor({
         if (code.includes('int main()') && !code.includes('for') && !code.includes('while') && !code.includes('if')) {
           return 'C++ solution must include algorithmic logic with control structures';
         }
-        
+
         // Check for empty or incomplete main function
         if (code.includes('int main()') && code.split('\n').filter(line => line.trim().length > 0).length < 8) {
-          const hasLogic = code.includes('for') || code.includes('while') || 
+          const hasLogic = code.includes('for') || code.includes('while') ||
                           (code.match(/=/g) || []).length > 2 || // Multiple assignments
                           code.includes('push_back');
-          
+
           if (!hasLogic) {
             return 'C++ solution appears incomplete. Include necessary algorithm implementation.';
           }
         }
         break;
     }
-    
+
     return null; // No issues found
   };
 
@@ -463,6 +573,8 @@ export default function CodeEditor({
     const selectedLang = defaultLanguages.find(lang => lang.id === language);
     setCode(initialCode || selectedLang?.defaultCode || '');
     setResults(null);
+    setAiAnalysis(null);
+    setComplexity(null);
     toast.success('Code reset');
     setIsResetDialogOpen(false);
   };
@@ -480,20 +592,20 @@ export default function CodeEditor({
 
   const renderTestCaseResult = (testCase, index) => {
     if (!results || !testCase) return null;
-    
+
     const testResult = results.testResults?.[index];
-    
+
     // If it's a hidden test case and we're not submitting, don't show it
     const isHidden = testCase.isHidden;
-    
+
     // Don't show hidden test cases during run mode (only during submit)
     if (isHidden && !isSubmitting && !results.isSubmission) {
       return null;
     }
-    
+
     // If there's no result for this test case, don't render anything
     if (!testResult) return null;
-    
+
     return (
       <div className={`mb-4 rounded-lg ${
         testResult.passed ? 'bg-green-50 dark:bg-green-900/10' : 'bg-red-50 dark:bg-red-900/10'
@@ -509,7 +621,7 @@ export default function CodeEditor({
               Test Case {index + 1} {isHidden && <span className="text-xs text-gray-500">(Hidden)</span>}
             </h4>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
               <Clock className="h-4 w-4" />
@@ -526,7 +638,7 @@ export default function CodeEditor({
             )}
           </div>
         </div>
-        
+
         <div className="p-4">
           {/* For hidden test cases, show limited information */}
           {isHidden ? (
@@ -553,7 +665,7 @@ export default function CodeEditor({
                   {testCase.input}
                 </pre>
               </div>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
@@ -563,21 +675,21 @@ export default function CodeEditor({
                     {testCase.expectedOutput || testCase.output}
                   </pre>
                 </div>
-                
+
                 <div>
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
                     <span>Your Output</span>
                   </p>
                   <pre className={`h-full p-3 rounded text-sm overflow-x-auto whitespace-pre-wrap ${
-                    testResult.passed 
-                      ? 'bg-green-50 dark:bg-green-900/20' 
+                    testResult.passed
+                      ? 'bg-green-50 dark:bg-green-900/20'
                       : 'bg-red-50 dark:bg-red-900/20'
                   }`}>
                     {testResult.output || '(No output)'}
                   </pre>
                 </div>
               </div>
-              
+
               {!testResult.passed && testResult.error && (
                 <div className="text-red-600 dark:text-red-400">
                   <p className="font-medium text-sm mb-1">Error:</p>
@@ -595,7 +707,7 @@ export default function CodeEditor({
 
   const renderResultsSummary = () => {
     if (!results) return null;
-    
+
     const totalTests = results.testResults ? results.testResults.length : 0;
     const passedTests = results.testResults ? results.testResults.filter(t => t.passed).length : 0;
     const isSuccess = passedTests === totalTests && totalTests > 0;
@@ -603,7 +715,7 @@ export default function CodeEditor({
     return (
       <div className={`mb-6 p-4 rounded-lg ${
         isSuccess
-          ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+          ? 'bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800'
           : results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' || results.status === 'CLIENT_ERROR'
             ? 'bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800'
             : 'bg-yellow-50 border border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800'
@@ -617,22 +729,22 @@ export default function CodeEditor({
             ) : (
               <AlertCircle className="h-5 w-5 text-yellow-500" />
             )}
-            {results.status === 'COMPILE_ERROR' 
-              ? 'Compile Error' 
-              : results.status === 'QUALITY_ERROR' 
-                ? 'Code Quality Error' 
+            {results.status === 'COMPILE_ERROR'
+              ? 'Compile Error'
+              : results.status === 'QUALITY_ERROR'
+                ? 'Code Quality Error'
                 : results.status === 'CLIENT_ERROR'
                   ? 'Error'
                   : 'Test Summary'}
           </h3>
-          
+
           {results.status !== 'COMPILE_ERROR' && results.status !== 'QUALITY_ERROR' && results.status !== 'CLIENT_ERROR' && (
             <div className="text-sm">
               <span className="font-medium">{passedTests}/{totalTests}</span> tests passed
             </div>
           )}
         </div>
-        
+
         {(results.status === 'COMPILE_ERROR' || results.status === 'QUALITY_ERROR' || results.status === 'CLIENT_ERROR') ? (
           <div className="mt-2 text-red-600 dark:text-red-400">
             <pre className="mt-1 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm overflow-x-auto whitespace-pre-wrap">
@@ -654,12 +766,12 @@ export default function CodeEditor({
         ) : (
           <>
             <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-              <div 
+              <div
                 className={`h-2.5 rounded-full ${passedTests === totalTests ? 'bg-green-500' : 'bg-yellow-500'}`}
                 style={{ width: `${totalTests > 0 ? (passedTests / totalTests) * 100 : 0}%` }}
               ></div>
             </div>
-            
+
             {results.executionTime && (
               <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
                 <Clock className="h-4 w-4" />
@@ -672,10 +784,310 @@ export default function CodeEditor({
     );
   };
 
+  const renderComplexity = () => {
+    if (isComputingComplexity) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <span className="loading loading-spinner loading-sm mb-3"></span>
+          <p className="text-sm">Analyzing time &amp; space complexity…</p>
+        </div>
+      );
+    }
+    if (!complexity) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <Clock className="w-8 h-8 mb-3 opacity-50" />
+          <p className="text-sm">Click “Complexity” to analyze your solution’s Big-O.</p>
+          <p className="text-xs mt-1">Time &amp; space complexity, plus a growth graph vs. optimal.</p>
+        </div>
+      );
+    }
+    if (complexity.available === false) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <AlertCircle className="w-8 h-8 mb-3 opacity-50" />
+          <p className="text-sm">{complexity.message || 'Complexity analysis is unavailable right now.'}</p>
+        </div>
+      );
+    }
+    const c = complexity.complexity;
+    if (!c) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <AlertCircle className="w-8 h-8 mb-3 opacity-50" />
+          <p className="text-sm">Could not determine complexity for this code.</p>
+          {complexity.error && <p className="text-xs mt-1">{complexity.error}</p>}
+        </div>
+      );
+    }
+
+    const userTime = c.time?.bigO;
+    const optimalTime = c.optimal?.time || complexity.reference?.time || '';
+    const { data, hasUser, hasOptimal } = buildComplexityChartData(userTime, optimalTime);
+
+    const verdictStyle = {
+      optimal: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      'near-optimal': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+      suboptimal: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+      unknown: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    };
+
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground mb-1">Time Complexity</p>
+            <p className="text-2xl font-mono font-bold">{userTime || '—'}</p>
+            {c.time?.explanation && <p className="text-xs text-muted-foreground mt-1">{c.time.explanation}</p>}
+          </div>
+          <div className="rounded-lg border p-3">
+            <p className="text-xs text-muted-foreground mb-1">Space Complexity</p>
+            <p className="text-2xl font-mono font-bold">{c.space?.bigO || '—'}</p>
+            {c.space?.explanation && <p className="text-xs text-muted-foreground mt-1">{c.space.explanation}</p>}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {c.verdict && (
+            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${verdictStyle[c.verdict] || ''}`}>
+              {c.verdict}
+            </span>
+          )}
+          {optimalTime && (
+            <span className="text-muted-foreground">Optimal: <span className="font-mono text-foreground">{optimalTime}</span></span>
+          )}
+        </div>
+        {c.dominantOperation && (
+          <p className="text-sm"><span className="font-medium">Dominant cost:</span> <span className="text-muted-foreground">{c.dominantOperation}</span></p>
+        )}
+        {c.optimal?.note && <p className="text-sm text-muted-foreground">{c.optimal.note}</p>}
+
+        {data.length > 0 && (hasUser || hasOptimal) && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Relative growth vs input size — log scale, illustrative (not exact operation counts).</p>
+            <div className="h-[260px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data} margin={{ top: 8, right: 16, bottom: 16, left: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.3} />
+                  <XAxis
+                    dataKey="n"
+                    tickLine={false}
+                    axisLine={false}
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    label={{ value: 'input size (n)', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#94a3b8' }}
+                  />
+                  <YAxis
+                    scale="log"
+                    domain={[1, 'dataMax']}
+                    allowDataOverflow
+                    tickLine={false}
+                    axisLine={false}
+                    width={48}
+                    tick={{ fontSize: 11, fill: '#94a3b8' }}
+                    tickFormatter={(v) => (v >= 1000 ? Number(v).toExponential(0) : v)}
+                  />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid rgba(148,163,184,0.4)', background: 'rgba(24,24,27,0.92)', color: '#fff' }}
+                    formatter={(v, name) => [Number(v).toLocaleString(), name === 'you' ? 'Your solution' : 'Optimal']}
+                    labelFormatter={(l) => `n = ${l}`}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12 }}
+                    formatter={(value) => (value === 'you' ? `Your solution${userTime ? ` (${userTime})` : ''}` : `Optimal${optimalTime ? ` (${optimalTime})` : ''}`)}
+                  />
+                  {hasUser && <Line type="monotone" dataKey="you" stroke="#3b82f6" strokeWidth={2} dot={false} />}
+                  {hasOptimal && <Line type="monotone" dataKey="optimal" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 4" dot={false} />}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2 border-t text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+          {complexity.model && (
+            <span>{complexity.provider === 'gemini' ? 'Gemini' : 'Groq'}: <span className="font-mono">{complexity.model}</span></span>
+          )}
+          {complexity.cached && <span className="italic">cached</span>}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAiAnalysis = () => {
+    if (isAnalyzing) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <span className="loading loading-spinner loading-sm mb-3"></span>
+          <p className="text-sm">Analyzing your code with Groq + Gemini…</p>
+          <p className="text-xs mt-1">Fast first pass, then a deep review.</p>
+        </div>
+      );
+    }
+
+    if (!aiAnalysis) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <Zap className="w-8 h-8 mb-3 opacity-50" />
+          <p className="text-sm">Submit your solution to get an AI review.</p>
+          <p className="text-xs mt-1">Approach breakdown, enhancements, and edge-case tests.</p>
+        </div>
+      );
+    }
+
+    if (aiAnalysis.available === false) {
+      return (
+        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+          <AlertCircle className="w-8 h-8 mb-3 opacity-50" />
+          <p className="text-sm">{aiAnalysis.message || 'AI analysis is unavailable right now.'}</p>
+        </div>
+      );
+    }
+
+    const { groq, gemini, models, cached, errors } = aiAnalysis;
+
+    const riskColor = {
+      low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    };
+    const severityColor = { info: 'text-blue-500', warning: 'text-yellow-500', error: 'text-red-500' };
+    const impactColor = {
+      correctness: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      performance: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+      memory: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      readability: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      style: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    };
+    const categoryColor = {
+      typical: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+      edge: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+      boundary: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+      large: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      adversarial: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    };
+
+    return (
+      <div className="space-y-5">
+        {gemini?.verdict && (
+          <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="w-4 h-4 text-primary" />
+              <h3 className="font-semibold text-sm">AI Verdict</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">{gemini.verdict}</p>
+          </div>
+        )}
+
+        {groq && (
+          <div className="rounded-lg border p-4">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <Code className="w-4 h-4" /> Quick Analysis
+              {groq.correctnessRisk && (
+                <span className={`ml-auto px-2 py-0.5 text-xs font-medium rounded-full ${riskColor[groq.correctnessRisk] || ''}`}>
+                  {groq.correctnessRisk} risk
+                </span>
+              )}
+            </h3>
+            {groq.approachSummary && <p className="text-sm mb-2">{groq.approachSummary}</p>}
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mb-3">
+              {groq.detectedAlgorithm && <span>Algorithm: <span className="font-medium text-foreground">{groq.detectedAlgorithm}</span></span>}
+              {groq.candidateTimeComplexity && <span>Time: <span className="font-mono font-medium text-foreground">{groq.candidateTimeComplexity}</span></span>}
+              {groq.candidateSpaceComplexity && <span>Space: <span className="font-mono font-medium text-foreground">{groq.candidateSpaceComplexity}</span></span>}
+            </div>
+            {groq.issues?.length > 0 && (
+              <ul className="space-y-1.5">
+                {groq.issues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <AlertCircle className={`w-4 h-4 mt-0.5 shrink-0 ${severityColor[issue.severity] || ''}`} />
+                    <span><span className="font-medium">{issue.title}.</span> <span className="text-muted-foreground">{issue.detail}</span></span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {groq.edgeCasesToWatch?.length > 0 && (
+              <div className="mt-3 text-xs">
+                <span className="font-medium">Edge cases to watch: </span>
+                <span className="text-muted-foreground">{groq.edgeCasesToWatch.join(' · ')}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {gemini?.enhancements?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-2">Suggested Enhancements</h3>
+            <div className="space-y-2">
+              {gemini.enhancements.map((e, i) => (
+                <div key={i} className="rounded-lg border p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${impactColor[e.impact] || ''}`}>{e.impact}</span>
+                    <h4 className="font-medium text-sm">{e.title}</h4>
+                  </div>
+                  {e.why && <p className="text-xs text-muted-foreground mb-1">{e.why}</p>}
+                  {e.suggestion && <p className="text-sm">{e.suggestion}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {gemini?.optimalApproach && (gemini.optimalApproach.summary || gemini.optimalApproach.timeComplexity) && (
+          <div className="rounded-lg border p-4">
+            <h3 className="font-semibold text-sm mb-2">Optimal Approach</h3>
+            {gemini.optimalApproach.summary && <p className="text-sm mb-2">{gemini.optimalApproach.summary}</p>}
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+              {gemini.optimalApproach.timeComplexity && <span>Time: <span className="font-mono font-medium text-foreground">{gemini.optimalApproach.timeComplexity}</span></span>}
+              {gemini.optimalApproach.spaceComplexity && <span>Space: <span className="font-mono font-medium text-foreground">{gemini.optimalApproach.spaceComplexity}</span></span>}
+            </div>
+          </div>
+        )}
+
+        {gemini?.suggestedTestCases?.length > 0 && (
+          <div>
+            <h3 className="font-semibold text-sm mb-1">AI-Suggested Test Cases</h3>
+            <p className="text-xs text-muted-foreground mb-2">Unverified suggestions — automatic verification against the reference solution is coming next.</p>
+            <div className="space-y-2">
+              {gemini.suggestedTestCases.map((tc, i) => (
+                <div key={i} className="rounded-lg border p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${categoryColor[tc.category] || ''}`}>{tc.category}</span>
+                    {tc.rationale && <span className="text-xs text-muted-foreground">{tc.rationale}</span>}
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs font-medium mb-1">Input</p>
+                      <pre className="p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto whitespace-pre-wrap">{tc.input}</pre>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium mb-1">Expected Output</p>
+                      <pre className="p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-x-auto whitespace-pre-wrap">{tc.expectedOutput}</pre>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="pt-2 border-t text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+          {models?.groq && <span>Groq: <span className="font-mono">{models.groq}</span></span>}
+          {models?.gemini && <span>Gemini: <span className="font-mono">{models.gemini}</span></span>}
+          {cached && <span className="italic">cached</span>}
+          {errors?.groq && <span className="text-red-500">Groq unavailable</span>}
+          {errors?.gemini && <span className="text-red-500">Gemini unavailable</span>}
+        </div>
+
+        {!groq && !gemini && (
+          <div className="text-sm text-muted-foreground text-center py-6">No analysis could be generated for this submission.</div>
+        )}
+      </div>
+    );
+  };
+
   // Handle editor mounting
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
-    
+
     // Only apply restrictions in challenge mode
     if (challengeId) {
       // Prevent copy/paste/cut only in challenge mode
@@ -687,7 +1099,7 @@ export default function CodeEditor({
           document.execCommand('copy');
         }
       });
-      
+
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
         if (challengeId) {
           toast.error('Paste is disabled in challenge mode');
@@ -696,7 +1108,7 @@ export default function CodeEditor({
           document.execCommand('paste');
         }
       });
-      
+
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
         if (challengeId) {
           toast.error('Cut is disabled in challenge mode');
@@ -786,6 +1198,25 @@ export default function CodeEditor({
               </>
             )}
           </Button>
+          <Button
+            onClick={computeComplexity}
+            variant="outline"
+            size="sm"
+            disabled={isRunning || isSubmitting || isComputingComplexity || isDisabled}
+            title="Analyze time & space complexity"
+          >
+            {isComputingComplexity ? (
+              <div className="flex items-center">
+                <span className="loading loading-spinner loading-sm mr-2"></span>
+                Analyzing...
+              </div>
+            ) : (
+              <>
+                <Clock className="w-4 h-4 mr-1" />
+                Complexity
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
@@ -844,6 +1275,29 @@ export default function CodeEditor({
           >
             Console
           </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium flex items-center gap-1.5 ${
+              activeTab === 'ai' ? 'border-b-2 border-b-primary' : ''
+            }`}
+            onClick={() => setActiveTab('ai')}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            AI Review
+            {isAnalyzing && <span className="loading loading-spinner loading-sm"></span>}
+            {!isAnalyzing && aiAnalysis?.available && activeTab !== 'ai' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
+            )}
+          </button>
+          <button
+            className={`px-4 py-2 text-sm font-medium flex items-center gap-1.5 ${
+              activeTab === 'complexity' ? 'border-b-2 border-b-primary' : ''
+            }`}
+            onClick={() => setActiveTab('complexity')}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Complexity
+            {isComputingComplexity && <span className="loading loading-spinner loading-sm"></span>}
+          </button>
         </div>
         <div className="p-4 overflow-y-auto" style={{maxHeight: 'calc(50vh - 41px)'}}>
           {activeTab === 'results' && (
@@ -851,8 +1305,8 @@ export default function CodeEditor({
               {renderResultsSummary()}
               <div className="space-y-4">
                 {results?.testResults?.map((result, index) => {
-                  const currentTestCases = results.isSubmission 
-                    ? testCases 
+                  const currentTestCases = results.isSubmission
+                    ? testCases
                     : testCases.filter(tc => tc.isExample);
                   return renderTestCaseResult(currentTestCases[index], index);
                 })}
@@ -867,6 +1321,8 @@ export default function CodeEditor({
               </pre>
             </div>
           )}
+          {activeTab === 'ai' && <div>{renderAiAnalysis()}</div>}
+          {activeTab === 'complexity' && <div>{renderComplexity()}</div>}
         </div>
       </div>
 
@@ -883,4 +1339,4 @@ export default function CodeEditor({
       )}
     </div>
   );
-} 
+}
