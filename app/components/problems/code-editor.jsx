@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useRef } from 'react';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
-import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code, X, Trophy } from 'lucide-react';
+import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code, X, Trophy, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,22 @@ function complexityToFn(bigO) {
 const COMPLEXITY_NS = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 36, 40];
 const clampCost = (v) => Math.min(Math.max(1, v), 1e15);
 
+// Rotating status lines shown while the AI is "cooking" a result — no model
+// names surface anywhere in the UI, just a sense of active work happening.
+const AI_REVIEW_STEPS = [
+  'Reading your solution…',
+  'Checking correctness…',
+  'Hunting for edge cases…',
+  'Cooking up enhancements…',
+  'Plating the final review…',
+];
+const COMPLEXITY_STEPS = [
+  'Reading your code…',
+  'Counting the loops…',
+  'Working out the Big-O…',
+  'Comparing to the optimal solution…',
+];
+
 // Build recharts data comparing the user's growth curve to the optimal one.
 function buildComplexityChartData(userBigO, optimalBigO) {
   const userFn = complexityToFn(userBigO);
@@ -82,6 +98,8 @@ export default function CodeEditor({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [complexity, setComplexity] = useState(null);
   const [isComputingComplexity, setIsComputingComplexity] = useState(false);
+  const [aiLoadingStep, setAiLoadingStep] = useState(0);
+  const [complexityLoadingStep, setComplexityLoadingStep] = useState(0);
   const resultsPanelRef = useRef(null);
   const [executionProgress, setExecutionProgress] = useState(0);
   const [compilationStatus, setCompilationStatus] = useState(null);
@@ -105,6 +123,29 @@ export default function CodeEditor({
   useEffect(() => {
     identifyLockedRanges();
   }, [code]);
+
+  // Cycle the "cooking" status line while each AI call is in flight.
+  useEffect(() => {
+    if (!isAnalyzing) {
+      setAiLoadingStep(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setAiLoadingStep((s) => (s + 1) % AI_REVIEW_STEPS.length);
+    }, 1500);
+    return () => clearInterval(id);
+  }, [isAnalyzing]);
+
+  useEffect(() => {
+    if (!isComputingComplexity) {
+      setComplexityLoadingStep(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setComplexityLoadingStep((s) => (s + 1) % COMPLEXITY_STEPS.length);
+    }, 1500);
+    return () => clearInterval(id);
+  }, [isComputingComplexity]);
 
   // Auto-open panel when results are available (and close it when results are cleared)
   useEffect(() => {
@@ -784,14 +825,27 @@ export default function CodeEditor({
     );
   };
 
+  // Shared "AI is cooking" loading state for both the AI Review and
+  // Complexity tabs — a rotating status line + pulsing glow, no model names.
+  const renderCookingState = (steps, step) => (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="relative w-16 h-16 flex items-center justify-center mb-4">
+        <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse"></div>
+        <div className="absolute inset-0 rounded-full border-2 border-primary/25 border-t-primary animate-spin"></div>
+        <Sparkles className="w-6 h-6 text-primary relative z-10" />
+      </div>
+      <p key={step} className="text-sm font-medium animate-fade-in">{steps[step]}</p>
+      <div className="flex gap-1.5 mt-3">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.3s]"></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce [animation-delay:-0.15s]"></span>
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/70 animate-bounce"></span>
+      </div>
+    </div>
+  );
+
   const renderComplexity = () => {
     if (isComputingComplexity) {
-      return (
-        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-          <span className="loading loading-spinner loading-sm mb-3"></span>
-          <p className="text-sm">Analyzing time &amp; space complexity…</p>
-        </div>
-      );
+      return renderCookingState(COMPLEXITY_STEPS, complexityLoadingStep);
     }
     if (!complexity) {
       return (
@@ -834,6 +888,10 @@ export default function CodeEditor({
 
     return (
       <div className="space-y-4">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-primary/80">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI-generated analysis</span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg border p-3">
             <p className="text-xs text-muted-foreground mb-1">Time Complexity</p>
@@ -903,25 +961,16 @@ export default function CodeEditor({
           </div>
         )}
 
-        <div className="pt-2 border-t text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-          {complexity.model && (
-            <span>{complexity.provider === 'gemini' ? 'Gemini' : 'Groq'}: <span className="font-mono">{complexity.model}</span></span>
-          )}
-          {complexity.cached && <span className="italic">cached</span>}
-        </div>
+        {complexity.cached && (
+          <div className="pt-2 border-t text-xs text-muted-foreground italic">cached result</div>
+        )}
       </div>
     );
   };
 
   const renderAiAnalysis = () => {
     if (isAnalyzing) {
-      return (
-        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-          <span className="loading loading-spinner loading-sm mb-3"></span>
-          <p className="text-sm">Analyzing your code with Groq + Gemini…</p>
-          <p className="text-xs mt-1">Fast first pass, then a deep review.</p>
-        </div>
-      );
+      return renderCookingState(AI_REVIEW_STEPS, aiLoadingStep);
     }
 
     if (!aiAnalysis) {
@@ -943,7 +992,7 @@ export default function CodeEditor({
       );
     }
 
-    const { groq, gemini, models, cached, errors } = aiAnalysis;
+    const { groq, gemini, cached, errors } = aiAnalysis;
 
     const riskColor = {
       low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -968,6 +1017,10 @@ export default function CodeEditor({
 
     return (
       <div className="space-y-5">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-primary/80">
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI-generated review</span>
+        </div>
         {gemini?.verdict && (
           <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
             <div className="flex items-center gap-2 mb-1">
@@ -1069,13 +1122,16 @@ export default function CodeEditor({
           </div>
         )}
 
-        <div className="pt-2 border-t text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-          {models?.groq && <span>Groq: <span className="font-mono">{models.groq}</span></span>}
-          {models?.gemini && <span>Gemini: <span className="font-mono">{models.gemini}</span></span>}
-          {cached && <span className="italic">cached</span>}
-          {errors?.groq && <span className="text-red-500">Groq unavailable</span>}
-          {errors?.gemini && <span className="text-red-500">Gemini unavailable</span>}
-        </div>
+        {(cached || errors?.groq || errors?.gemini) && (
+          <div className="pt-2 border-t text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+            {cached && <span className="italic">cached result</span>}
+            {(errors?.groq || errors?.gemini) && (
+              <span className="text-amber-600 dark:text-amber-400">
+                Part of the analysis was unavailable — try resubmitting
+              </span>
+            )}
+          </div>
+        )}
 
         {!groq && !gemini && (
           <div className="text-sm text-muted-foreground text-center py-6">No analysis could be generated for this submission.</div>
