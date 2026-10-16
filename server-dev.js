@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const next = require("next");
 const { Server } = require("socket.io");
+const { registerPlayground } = require("./socket-playground");
 const path = require("path");
 const fs = require("fs");
 const { PrismaClient } = require("@prisma/client");
@@ -365,6 +366,13 @@ app.prepare().then(() => {
 
       socketConnections.set(userData.id, { socketId: socket.id, userData });
       socketToUser.set(socket.id, userData.id);
+      // Used by the Live Playground (see socket-playground.js)
+      socket.data.user = {
+        id: userData.id,
+        name: userData.name,
+        image: userData.image,
+      };
+      socket.join(`user:${userData.id}`);
 
       // Track online user with fallback
       const tracked = await trackUserOnline(userData.id, userData);
@@ -636,6 +644,18 @@ app.prepare().then(() => {
         });
       }
     });
+  });
+
+  // Live Playground — single dev process, so local connections are everyone online
+  registerPlayground(io, {
+    getRedis: () => (redis && redisReady ? redis : null),
+    prisma,
+    getOnlineUsers: async () =>
+      [...socketConnections.entries()].map(([id, { userData }]) => ({
+        id,
+        name: userData?.name || null,
+        image: userData?.image || null,
+      })),
   });
 
   // Health check route

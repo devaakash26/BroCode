@@ -10,6 +10,7 @@ import { useState, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { ProblemDrawerProvider } from './context/ProblemDrawerContext';
 import ProblemListDrawer from './components/problems/ProblemListDrawer';
+import PlaygroundInviteListener from './components/playground/PlaygroundInviteListener';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -154,6 +155,7 @@ export default function ClientLayout({ children }) {
 
   const isProblemPage = pathname.startsWith('/problems/');
   const isAdminPage = pathname.startsWith('/admin');
+  const isPlaygroundRoom = pathname.startsWith('/playground/');
 
   // Load sidebar state from local storage on mount
   useEffect(() => {
@@ -212,7 +214,7 @@ export default function ClientLayout({ children }) {
   return (
     <ProblemDrawerProvider>
       <div className="flex h-screen overflow-hidden">
-        {!isMobile && !isAdminPage && !isProblemPage && (
+        {!isMobile && !isAdminPage && !isProblemPage && !isPlaygroundRoom && (
           <div className="fixed lg:static z-50 lg:z-0 transition-all duration-300 translate-x-0">
             <SidebarNavigation 
               collapsed={sidebarCollapsed} 
@@ -222,7 +224,7 @@ export default function ClientLayout({ children }) {
           </div>
         )}
         
-        <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage && !isProblemPage ? '' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage && !isProblemPage && !isPlaygroundRoom ? '' : 'w-full'}`}>
           {!isAdminPage && (
             <>
               <MaintenanceBanner />
@@ -236,10 +238,10 @@ export default function ClientLayout({ children }) {
               </div>
             </>
           )}
-          <main className={`flex-1 p-0 ${isMobile && !isAdminPage ? 'pb-20' : ''}`}>
+          <main className={`flex-1 p-0 ${isMobile && !isAdminPage ? 'pb-20' : ''} ${isPlaygroundRoom ? 'min-h-0 overflow-hidden' : ''}`}>
             {children}
           </main>
-          {!isMobile && !isAdminPage && <Footer />}
+          {!isMobile && !isAdminPage && !isPlaygroundRoom && <Footer />}
         </div>
 
         {isMobile && !isAdminPage && (
@@ -249,6 +251,7 @@ export default function ClientLayout({ children }) {
           />
         )}
         <ProblemListDrawer />
+        <PlaygroundInviteListener />
         {/* Maintenance overlay — shown when emergency maintenance activates while user is browsing */}
         {maintenanceInfo && <MaintenanceOverlay info={maintenanceInfo} />}
       </div>

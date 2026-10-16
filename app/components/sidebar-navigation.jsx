@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { 
   Code, 
+  PenTool,
   Users, 
   Trophy, 
   Home, 
@@ -47,6 +48,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
     { name: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: 'Problems', href: '/problems', icon: <Code className="h-5 w-5" /> },
     { name: 'Groups', href: '/groups', icon: <Users className="h-5 w-5" /> },
+    { name: 'Playground', href: '/playground', icon: <PenTool className="h-5 w-5" /> },
     { name: 'Leaderboard', href: '/leaderboard', icon: <Trophy className="h-5 w-5" /> },
   ];
 

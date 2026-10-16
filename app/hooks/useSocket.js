@@ -18,6 +18,7 @@ import { useSession } from "next-auth/react";
 let _socket = null;
 let _isConnected = false;
 let _isConnecting = false;
+let _lastError = null; // last connect_error message, for UI diagnostics
 const _stateListeners = new Set(); // () => void   — called on connect/disconnect
 
 function notifyListeners() {
@@ -38,6 +39,7 @@ async function getSocket(sessionUser) {
       ? `${window.location.protocol}//${window.location.hostname}:${window.location.port || 3000}`
       : "http://localhost:3000");
 
+  console.log("[socket] connecting to", url);
   _socket = io(url, {
     path: "/socket.io",
     reconnectionAttempts: Infinity,
@@ -52,6 +54,7 @@ async function getSocket(sessionUser) {
     console.log("[socket] connected", _socket.id);
     _isConnected = true;
     _isConnecting = false;
+    _lastError = null;
     notifyListeners();
 
     // Identify user immediately after connect
@@ -107,6 +110,7 @@ async function getSocket(sessionUser) {
   _socket.on("connect_error", (err) => {
     console.error("[socket] connect error:", err.message);
     _isConnecting = false;
+    _lastError = err.message;
     notifyListeners();
   });
 
@@ -236,6 +240,7 @@ export default function useSocket(options = {}) {
     socket: _socket,
     isConnected: _isConnected,
     isConnecting: _isConnecting,
+    lastError: _lastError,
     joinGroup,
     joinChallenge,
     sendMessage,
