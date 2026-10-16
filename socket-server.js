@@ -10,6 +10,7 @@ const { Server } = require("socket.io");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const { PrismaClient } = require("@prisma/client");
 const Redis = require("ioredis");
+const { registerPlayground } = require("./socket-playground");
 
 const port = parseInt(process.env.PORT || "4000", 10);
 
@@ -437,6 +438,12 @@ io.on("connection", (socket) => {
     }
     socketConnections.set(userData.id, { socketId: socket.id, userData });
     socketToUser.set(socket.id, userData.id);
+    socket.data.user = {
+      id: userData.id,
+      name: userData.name,
+      image: userData.image,
+    };
+    socket.join(`user:${userData.id}`);
 
     // Track online user with fault-proof mechanism
     const onlineData = {
@@ -771,6 +778,53 @@ io.on("connection", (socket) => {
       });
     }
   });
+});
+
+// ── Live Playground ──────────────────────────────────────────────────────────────
+async function getOnlineUsersForInvite() {
+  const users = new Map();
+  for (const [userId, { userData }] of socketConnections.entries()) {
+    users.set(userId, {
+      id: userId,
+      name: userData?.name || null,
+      image: userData?.image || null,
+    });
+  }
+  if (redis && redisReady) {
+    try {
+      let cursor = "0";
+      const keys = [];
+      do {
+        const [next, batch] = await redis.scan(
+          cursor,
+          "MATCH",
+          "user:online:*",
+          "COUNT",
+          200,
+        );
+        cursor = next;
+        keys.push(...batch);
+      } while (cursor !== "0" && keys.length < 500);
+      const values = keys.length ? await redis.mget(keys) : [];
+      values.forEach((raw, i) => {
+        const id = keys[i].slice("user:online:".length);
+        if (users.has(id) || !raw) return;
+        try {
+          const u = JSON.parse(raw);
+          users.set(id, { id, name: u.name || null, image: u.image || null });
+        } catch {}
+      });
+    } catch (err) {
+      console.error("[socket-server] online users scan error:", err.message);
+    }
+  }
+  return [...users.values()];
+}
+
+registerPlayground(io, {
+  getRedis: () => (redis && redisReady ? redis : null),
+  getOnlineUsers: getOnlineUsersForInvite,
+  prisma,
 });
 
 // ── Health check ─────────────────────────────────────────────────────────────────
