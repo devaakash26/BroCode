@@ -6,6 +6,8 @@ import toast from 'react-hot-toast';
 import useSocket from '@/app/hooks/useSocket';
 
 const REMOTE = 'remote';
+const TYPING_TTL = 3500;
+const TYPING_SEND_MS = 1500;
 
 /**
  * Joins a playground room and keeps the shared Yjs doc, peers, chat and last
@@ -24,7 +26,9 @@ export default function usePlaygroundRoom(roomId) {
   const [peers, setPeers] = useState([]);
   const [myPeerId, setMyPeerId] = useState(null);
   const [chat, setChat] = useState([]);
-  const [run, setRun] = useState(null);
+  const [runs, setRuns] = useState({}); // tab id → last run on that tab
+  const [typers, setTypers] = useState({}); // userId → { name, at }
+  const lastTypingSent = useRef(0);
   const [runningBy, setRunningBy] = useState(null);
   const [language, setLanguageState] = useState('cpp');
   // Bumped on every (re)join so the whiteboard reloads the server snapshot.
@@ -78,7 +82,7 @@ export default function usePlaygroundRoom(roomId) {
       setPeers(res.peers || []);
       setMyPeerId(res.peerId);
       setChat(res.chat || []);
-      setRun(res.run || null);
+      setRuns(res.run ? { [res.run.tab || 'main']: res.run } : {});
       setSnapshot((s) => ({ strokes: res.strokes || [], version: s.version + 1 }));
       setError(null);
       setStatus('ready');
@@ -95,9 +99,18 @@ export default function usePlaygroundRoom(roomId) {
     const handlers = {
       'pg:yjs': (u) => Y.applyUpdate(doc, new Uint8Array(u), REMOTE),
       'pg:peers': setPeers,
-      'pg:chat': (msg) => setChat((c) => (c.length >= 200 ? [...c.slice(-150), msg] : [...c, msg])),
+      'pg:chat': (msg) => {
+        setChat((c) => (c.length >= 200 ? [...c.slice(-150), msg] : [...c, msg]));
+        // A message landing means they've stopped typing.
+        setTypers((t) => {
+          if (!t[msg.userId]) return t;
+          const { [msg.userId]: _done, ...rest } = t;
+          return rest;
+        });
+      },
+      'pg:typing': ({ userId, name }) => setTypers((t) => ({ ...t, [userId]: { name, at: Date.now() } })),
       'pg:run': (r) => {
-        setRun(r);
+        setRuns((all) => ({ ...all, [r.tab || 'main']: r }));
         setRunningBy(null);
       },
       'pg:running': ({ running, name }) => {
@@ -116,6 +129,18 @@ export default function usePlaygroundRoom(roomId) {
     Object.entries(handlers).forEach(([e, fn]) => socket.on(e, fn));
     return () => Object.entries(handlers).forEach(([e, fn]) => socket.off(e, fn));
   }, [socket, doc]);
+
+  // Expire typing indicators.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTypers((t) => {
+        const now = Date.now();
+        const live = Object.entries(t).filter(([, v]) => now - v.at < TYPING_TTL);
+        return live.length === Object.keys(t).length ? t : Object.fromEntries(live);
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Leave on unmount.
   useEffect(() => {
@@ -143,6 +168,23 @@ export default function usePlaygroundRoom(roomId) {
     [socket],
   );
 
+  const sendTyping = useCallback(() => {
+    const now = Date.now();
+    if (!socket?.connected || now - lastTypingSent.current < TYPING_SEND_MS) return;
+    lastTypingSent.current = now;
+    socket.emit('pg:typing');
+  }, [socket]);
+
+  /** Host only. Omit userId to mute everyone else in the call. */
+  const muteUser = useCallback(
+    (userId) => {
+      socket?.emit('pg:mute', { userId: userId || null }, (res) => {
+        if (res?.error) toast.error('Only the host can mute people');
+      });
+    },
+    [socket],
+  );
+
   const endSession = useCallback(() => {
     socket?.emit('pg:end', {}, (res) => {
       if (res?.error) toast.error('Only the host can end the session');
@@ -159,13 +201,16 @@ export default function usePlaygroundRoom(roomId) {
     peers,
     myPeerId,
     chat,
-    run,
+    runs,
+    typers,
     runningBy,
     setRunningBy,
     language,
     setLanguage,
     snapshot,
     sendChat,
+    sendTyping,
+    muteUser,
     endSession,
   };
 }

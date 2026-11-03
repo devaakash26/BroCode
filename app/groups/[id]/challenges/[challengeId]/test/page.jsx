@@ -635,7 +635,7 @@ export default function TestPage({ params }) {
                     {currentProblem.difficulty}
                   </span>
                 </div>
-                <div className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed"
+                <div className="problem-statement"
                   dangerouslySetInnerHTML={{ __html: currentProblem.description || '' }} />
 
                 {currentProblem.examples?.length > 0 && (
@@ -681,6 +681,7 @@ export default function TestPage({ params }) {
               <CodeEditor
                 problemId={currentProblem.id}
                 initialCode={''}
+                templateCode={currentProblem.templateCode}
                 testCases={currentProblem.testCases || []}
                 onSubmit={handleSubmitResult}
                 challengeId={challengeId}

@@ -5,13 +5,13 @@ import Link from "next/link";
 import { NavLink } from "./nav-link";
 import { useSession, signOut } from "next-auth/react";
 import {
+  PanelLeft,
   Menu,
   X,
   ChevronDown,
   User,
   LogOut,
   Settings,
-  PanelLeft,
   Code,
   Users,
   BookOpen,
@@ -38,11 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 
-export default function Navbar({
-  sidebarCollapsed,
-  setSidebarCollapsed,
-  isMobile,
-}) {
+export default function Navbar({ isMobile, onOpenSidebar }) {
   const { data: session } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -79,15 +75,17 @@ export default function Navbar({
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            {/* Desktop sidebar toggle */}
-            {!isMobile && !isProblemPage && (
+
+            {/* Opens the sidebar on pages that hide it (problem pages, playground rooms) */}
+            {onOpenSidebar && (
               <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={onOpenSidebar}
                 type="button"
-                className="hidden lg:inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 mr-2"
+                title="Open menu"
+                className="hidden lg:inline-flex items-center justify-center p-2 mr-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
-                <span className="sr-only">Toggle sidebar</span>
-                <PanelLeft className="block h-5 w-5" aria-hidden="true" />
+                <span className="sr-only">Open menu</span>
+                <PanelLeft className="h-5 w-5" aria-hidden="true" />
               </button>
             )}
 

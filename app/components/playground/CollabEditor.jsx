@@ -62,7 +62,8 @@ function caretCss(key, color, name) {
 .pg-caret-${key}::after{content:${label};position:absolute;left:-2px;top:-1.35em;font:600 10px/1.4 ui-sans-serif,system-ui;color:#fff;background:${color};padding:0 4px;border-radius:3px 3px 3px 0;white-space:nowrap;pointer-events:none;z-index:10;}`;
 }
 
-export default function CollabEditor({ doc, language, socket, peers, myPeerId, onRun }) {
+// `codeKey` names the shared text (language + tab); `language` only drives highlighting.
+export default function CollabEditor({ doc, language, codeKey = language, socket, peers, myPeerId, onRun }) {
   const { resolvedTheme } = useTheme();
   const [editor, setEditor] = useState(null);
   const monacoRef = useRef(null);
@@ -74,7 +75,7 @@ export default function CollabEditor({ doc, language, socket, peers, myPeerId, o
   onRunRef.current = onRun;
 
   const monacoLang = LANGUAGES.find((l) => l.id === language)?.monaco || 'plaintext';
-  const ytext = useMemo(() => doc.getText(`code:${language}`), [doc, language]);
+  const ytext = useMemo(() => doc.getText(`code:${codeKey}`), [doc, codeKey]);
 
   // Re-paint remote carets from the latest known relative positions.
   const renderCursors = useRef(() => {});
@@ -83,7 +84,7 @@ export default function CollabEditor({ doc, language, socket, peers, myPeerId, o
     if (!model || !decorationsRef.current) return;
     const decos = [];
     for (const [peerId, c] of cursorsRef.current) {
-      if (c.lang !== language) continue;
+      if (c.lang !== codeKey) continue;
       const a = decodePosition(doc, c.anchor);
       const h = decodePosition(doc, c.head);
       if (a == null || h == null) continue;
@@ -129,7 +130,7 @@ export default function CollabEditor({ doc, language, socket, peers, myPeerId, o
       const model = editor.getModel();
       const sel = editor.getSelection();
       if (!model || !sel || !socket.connected) return;
-      socket.emit('pg:cursor', { lang: language, ...encodeSelection(ytext, model, sel) });
+      socket.emit('pg:cursor', { lang: codeKey, ...encodeSelection(ytext, model, sel) });
     };
     const schedule = () => {
       if (!timer) timer = setTimeout(send, 80);
@@ -143,7 +144,7 @@ export default function CollabEditor({ doc, language, socket, peers, myPeerId, o
       socket.off('pg:peerJoined', schedule);
       clearTimeout(timer);
     };
-  }, [editor, socket, ytext, language]);
+  }, [editor, socket, ytext, codeKey]);
 
   // Receive remote selections.
   useEffect(() => {
@@ -178,14 +179,14 @@ export default function CollabEditor({ doc, language, socket, peers, myPeerId, o
     const id = setInterval(() => {
       const now = Date.now();
       const names = [...cursorsRef.current.values()]
-        .filter((c) => c.lang === language && now - c.at < TYPING_WINDOW)
+        .filter((c) => c.lang === codeKey && now - c.at < TYPING_WINDOW)
         .map((c) => ({ name: c.name, userId: c.userId }));
       setTyping((prev) =>
         prev.length === names.length && prev.every((p, i) => p.userId === names[i].userId) ? prev : names,
       );
     }, 500);
     return () => clearInterval(id);
-  }, [language]);
+  }, [codeKey]);
 
   const handleMount = (ed, monaco) => {
     monacoRef.current = monaco;

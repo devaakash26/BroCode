@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
   Timer, UserPlus, Mic, MicOff, PhoneOff, Headphones, MessageSquare, LogOut, Power,
-  Loader2, PenTool, Code2, Columns, Copy, WifiOff, Crown, Video, VideoOff, Users,
-  ChevronDown, ChevronUp, X, LogIn,
+  Loader2, PenTool, Code2, Columns, Copy, WifiOff, Crown, Video, VideoOff,
+  ChevronDown, ChevronUp, X, LogIn, PhoneCall,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import usePlaygroundRoom from './usePlaygroundRoom';
 import useVoice from './useVoice';
@@ -76,41 +77,228 @@ function usePeople(peers, speaking) {
   }, [peers, speaking]);
 }
 
-function PeoplePill({ people, hostId, max }) {
+function PeopleMenu({ people, hostId, max, isHost, meId, onMute }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+
+  const sorted = [...people].sort((a, b) => (b.userId === hostId) - (a.userId === hostId) || b.voice - a.voice);
+  const mutable = people.filter((u) => u.voice && !u.muted && u.userId !== meId);
+
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center -space-x-2">
-        {people.slice(0, 5).map((u) => (
-          <div
-            key={u.userId}
-            className="relative"
-            title={`${u.name}${u.userId === hostId ? ' (host)' : ''}${u.voice ? (u.muted ? ' · muted' : ' · in call') : ''}`}
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 h-9 pl-1.5 pr-2 rounded-md hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-colors"
+        title="People in this room"
+      >
+        <div className="flex items-center -space-x-2">
+          {people.slice(0, 5).map((u) => (
+            <div key={u.userId} className="relative">
+              <Avatar
+                userId={u.userId}
+                name={u.name}
+                size={26}
+                className={`ring-2 ${u.speaking ? 'ring-emerald-500' : 'ring-white dark:ring-[#0d1119]'}`}
+              />
+              {u.userId === hostId && <Crown className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 text-amber-400 drop-shadow" />}
+              {u.voice && (
+                <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
+                  {u.muted ? <MicOff className="w-2 h-2 text-rose-500" /> : <Mic className="w-2 h-2 text-emerald-500" />}
+                </span>
+              )}
+            </div>
+          ))}
+          {people.length > 5 && (
+            <div className="w-[26px] h-[26px] rounded-full ring-2 ring-white dark:ring-[#0d1119] bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-semibold text-gray-600 dark:text-gray-200">
+              +{people.length - 5}
+            </div>
+          )}
+        </div>
+        <span className="flex items-center gap-1 text-xs font-semibold tabular-nums text-gray-600 dark:text-gray-300">
+          {people.length}/{max}
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            style={{ transformOrigin: 'top right' }}
+            className={`absolute right-0 top-full mt-2 w-72 z-50 rounded-xl shadow-xl shadow-black/10 dark:shadow-black/50 ${GLASS}`}
           >
-            <Avatar
-              userId={u.userId}
-              name={u.name}
-              size={26}
-              className={`ring-2 ${u.speaking ? 'ring-emerald-500' : 'ring-white dark:ring-[#0d1119]'}`}
-            />
-            {u.userId === hostId && <Crown className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 text-amber-400 drop-shadow" />}
-            {u.voice && (
-              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center">
-                {u.muted ? <MicOff className="w-2 h-2 text-rose-500" /> : <Mic className="w-2 h-2 text-emerald-500" />}
+            <div className="flex items-center justify-between px-3 h-10 border-b border-gray-200 dark:border-white/[0.07]">
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                In this room <span className="font-normal text-gray-400 tabular-nums">· {people.length}/{max}</span>
               </span>
+              {isHost && mutable.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onMute(null)}
+                  className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                >
+                  <MicOff className="w-3 h-3" /> Mute all
+                </button>
+              )}
+            </div>
+            <ul className="max-h-80 overflow-y-auto py-1">
+              {sorted.map((u) => (
+                <li key={u.userId} className="flex items-center gap-2.5 px-3 h-11">
+                  <Avatar userId={u.userId} name={u.name} size={26} className={u.speaking ? 'ring-2 ring-emerald-500' : ''} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1 text-sm text-gray-800 dark:text-gray-100 truncate">
+                      {u.name}
+                      {u.userId === meId && <span className="text-gray-400 text-xs">(you)</span>}
+                      {u.userId === hostId && <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />}
+                    </span>
+                    <span className="block text-[11px] text-gray-400">
+                      {!u.voice ? 'Not in call' : u.muted ? 'In call · muted' : u.speaking ? 'Speaking' : 'In call'}
+                      {u.camera ? ' · camera on' : ''}
+                    </span>
+                  </span>
+                  {u.voice &&
+                    (isHost && u.userId !== meId && !u.muted ? (
+                      <button
+                        type="button"
+                        onClick={() => onMute(u.userId)}
+                        title={`Mute ${u.name}`}
+                        className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-[11px] font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:text-rose-600 hover:border-rose-300 dark:hover:border-rose-500/40 transition-colors"
+                      >
+                        <MicOff className="w-3 h-3" /> Mute
+                      </button>
+                    ) : u.muted ? (
+                      <MicOff className="w-3.5 h-3.5 text-rose-500" />
+                    ) : (
+                      <Mic className={`w-3.5 h-3.5 ${u.speaking ? 'text-emerald-500' : 'text-gray-400'}`} />
+                    ))}
+                </li>
+              ))}
+            </ul>
+            {isHost && (
+              <p className="px-3 py-2 text-[11px] text-gray-400 border-t border-gray-200 dark:border-white/[0.07]">
+                As host you can mute anyone. They can unmute themselves.
+              </p>
             )}
-          </div>
-        ))}
-        {people.length > 5 && (
-          <div className="w-[26px] h-[26px] rounded-full ring-2 ring-white dark:ring-[#0d1119] bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-[10px] font-semibold text-gray-600 dark:text-gray-200">
-            +{people.length - 5}
-          </div>
+          </motion.div>
         )}
-      </div>
-      <span className="flex items-center gap-1 text-xs font-semibold tabular-nums text-gray-600 dark:text-gray-300" title={`Up to ${max} people can join`}>
-        <Users className="w-3.5 h-3.5 text-gray-400" />
-        {people.length}/{max}
-      </span>
+      </AnimatePresence>
     </div>
+  );
+}
+
+/** Short two-tone ring, built with WebAudio so there is no asset to load. */
+function playRing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const t0 = ctx.currentTime;
+    [[0, 660], [0.18, 880], [0.75, 660], [0.93, 880]].forEach(([d, f]) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.3);
+      o.connect(g).connect(ctx.destination);
+      o.start(t0 + d);
+      o.stop(t0 + d + 0.32);
+    });
+    setTimeout(() => ctx.close().catch(() => {}), 1600);
+  } catch {
+    // No audio (autoplay blocked, old browser) — the popup still shows.
+  }
+}
+
+/** Blocking prompt shown when someone joins the call and you aren't in it. */
+function CallPrompt({ prompt, callers, voice, onDismiss }) {
+  useEffect(() => {
+    if (!prompt) return undefined;
+    playRing();
+    let n = 1;
+    const id = setInterval(() => (n++ < 4 ? playRing() : clearInterval(id)), 2800);
+    return () => clearInterval(id);
+  }, [prompt]);
+
+  const lead = prompt?.names?.[0];
+  const headline =
+    callers.length <= 1 ? `${lead} started a call` : prompt?.names?.length > 1 ? `${prompt.names.join(' and ')} joined the call` : `${lead} joined the call`;
+
+  return (
+    <AnimatePresence>
+      {prompt && (
+        <motion.div
+          key="call-prompt"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/55 backdrop-blur-[2px]"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="call-prompt-title"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+            className={`w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl ${GLASS}`}
+          >
+            <div className="relative mx-auto w-16 h-16">
+              {[0, 1].map((i) => (
+                <motion.span
+                  key={i}
+                  className="absolute inset-0 rounded-full border-2 border-emerald-500"
+                  animate={{ scale: [1, 1.7], opacity: [0.6, 0] }}
+                  transition={{ duration: 1.6, repeat: Infinity, delay: i * 0.8, ease: 'easeOut' }}
+                />
+              ))}
+              <motion.span
+                className="relative w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center"
+                animate={{ rotate: [0, -12, 12, -8, 8, 0] }}
+                transition={{ duration: 0.7, repeat: Infinity, repeatDelay: 1.2 }}
+              >
+                <PhoneCall className="w-7 h-7" />
+              </motion.span>
+            </div>
+            <h2 id="call-prompt-title" className="mt-5 text-lg font-semibold text-gray-900 dark:text-white">{headline}</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {callers.length} {callers.length === 1 ? 'person is' : 'people are'} talking. Join so you don&apos;t miss anything.
+            </p>
+            <div className="mt-4 flex justify-center -space-x-2">
+              {callers.slice(0, 6).map((u) => (
+                <Avatar key={u.userId} userId={u.userId} name={u.name} size={30} className="ring-2 ring-white dark:ring-[#11151f]" />
+              ))}
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button onClick={voice.join} disabled={voice.joining} className={`${PRIMARY_BTN} !bg-emerald-600 hover:!bg-emerald-500 h-10`}>
+                {voice.joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />} Join call
+              </button>
+              <button onClick={voice.toggleCamera} disabled={voice.joining} className={`${GHOST_BTN} h-10`}>
+                <Video className="w-4 h-4" /> With camera
+              </button>
+            </div>
+            <button onClick={onDismiss} className="mt-3 text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+              Not now
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -207,12 +395,48 @@ export default function PlaygroundRoom({ roomId }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [seenChat, setSeenChat] = useState(0);
   const bodyRef = useRef(null);
+  const boardApi = useRef(null); // filled by the Whiteboard while it is on screen
 
   const me = useMemo(
-    () => ({ id: session?.user?.id || '', name: session?.user?.name || 'You' }),
-    [session?.user?.id, session?.user?.name],
+    () => ({ id: session?.user?.id || '', name: session?.user?.name || 'You', email: session?.user?.email || '' }),
+    [session?.user?.id, session?.user?.name, session?.user?.email],
   );
   const isHost = pg.room?.hostId === me.id;
+  const closeInvite = useCallback(() => setInviteOpen(false), []);
+
+  // ── Call prompt: ring everyone who isn't in the call when someone joins it.
+  const callers = useMemo(() => people.filter((p) => p.voice && p.userId !== me.id), [people, me.id]);
+  const [callPrompt, setCallPrompt] = useState(null); // { names: [...] }
+  const knownCallers = useRef(new Set());
+  useEffect(() => {
+    const ids = new Set(callers.map((c) => c.userId));
+    const fresh = callers.filter((c) => !knownCallers.current.has(c.userId));
+    knownCallers.current = ids;
+    if (!ids.size) return setCallPrompt(null);
+    if (fresh.length && !voice.inVoice) setCallPrompt({ names: fresh.map((c) => c.name), at: Date.now() });
+  }, [callers, voice.inVoice]);
+  useEffect(() => {
+    if (voice.inVoice) setCallPrompt(null);
+  }, [voice.inVoice]);
+
+  // ── Host mute: each client mutes itself when asked.
+  const { forceMute } = voice;
+  useEffect(() => {
+    const socket = pg.socket;
+    if (!socket) return undefined;
+    const onForceMute = ({ roomId: r, userId, hostId, by }) => {
+      if (r !== roomId) return;
+      if (userId ? userId !== me.id : me.id === hostId) return;
+      if (forceMute()) toast(`${by} muted your mic`);
+    };
+    socket.on('pg:forceMute', onForceMute);
+    return () => socket.off('pg:forceMute', onForceMute);
+  }, [pg.socket, roomId, me.id, forceMute]);
+
+  const typers = useMemo(
+    () => Object.entries(pg.typers).filter(([id]) => id !== me.id).map(([userId, t]) => ({ userId, name: t.name })),
+    [pg.typers, me.id],
+  );
 
   // Narrow screens: one pane at a time.
   useEffect(() => {
@@ -364,7 +588,7 @@ export default function PlaygroundRoom({ roomId }) {
           </button>
         </div>
 
-        <PeoplePill people={people} hostId={pg.room.hostId} max={maxPeers} />
+        <PeopleMenu people={people} hostId={pg.room.hostId} max={maxPeers} isHost={isHost} meId={me.id} onMute={pg.muteUser} />
 
         {/* Call controls */}
         {voice.inVoice ? (
@@ -389,9 +613,22 @@ export default function PlaygroundRoom({ roomId }) {
           </div>
         ) : (
           <div className="flex items-center gap-1">
-            <button onClick={voice.join} disabled={voice.joining} className={GHOST_BTN}>
-              {voice.joining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Headphones className="w-4 h-4" />}
-              Join call
+            <button
+              onClick={voice.join}
+              disabled={voice.joining}
+              className={callers.length ? `${GHOST_BTN} !border-emerald-500/40 !text-emerald-600 dark:!text-emerald-400 bg-emerald-500/[0.06]` : GHOST_BTN}
+            >
+              {voice.joining ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : callers.length ? (
+                <span className="relative flex w-2 h-2">
+                  <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-70" />
+                  <span className="relative w-2 h-2 rounded-full bg-emerald-500" />
+                </span>
+              ) : (
+                <Headphones className="w-4 h-4" />
+              )}
+              {callers.length ? `Join call · ${callers.length}` : 'Join call'}
             </button>
             <button onClick={voice.toggleCamera} disabled={voice.joining} className={`${GHOST_BTN} !px-2.5`} title="Join with camera">
               <Video className="w-4 h-4" />
@@ -432,7 +669,7 @@ export default function PlaygroundRoom({ roomId }) {
         <div ref={bodyRef} className="flex-1 min-w-0 flex">
           {showBoard && (
             <div className="min-w-0 h-full" style={{ width: view === 'split' ? `${split}%` : '100%' }}>
-              <Whiteboard socket={pg.socket} snapshot={pg.snapshot} me={me} peers={pg.peers} />
+              <Whiteboard socket={pg.socket} snapshot={pg.snapshot} me={me} peers={pg.peers} doc={pg.doc} apiRef={boardApi} />
             </div>
           )}
           {view === 'split' && (
@@ -442,7 +679,7 @@ export default function PlaygroundRoom({ roomId }) {
           )}
           {showCode && (
             <div className="flex-1 min-w-0 h-full">
-              <CompilerPanel pg={pg} />
+              <CompilerPanel pg={pg} me={me} isHost={isHost} boardApi={boardApi} />
             </div>
           )}
         </div>
@@ -458,7 +695,7 @@ export default function PlaygroundRoom({ roomId }) {
               </button>
             </div>
             <div className="flex-1 min-h-0">
-              <PlaygroundChat messages={pg.chat} myUserId={me.id} onSend={pg.sendChat} />
+              <PlaygroundChat messages={pg.chat} myUserId={me.id} onSend={pg.sendChat} typers={typers} onTyping={pg.sendTyping} />
             </div>
           </aside>
         )}
@@ -470,7 +707,18 @@ export default function PlaygroundRoom({ roomId }) {
         <RemoteAudio key={peerId} stream={stream} />
       ))}
 
-      <InviteModal socket={pg.socket} roomId={roomId} open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <CallPrompt prompt={callPrompt} callers={callers} voice={voice} onDismiss={() => setCallPrompt(null)} />
+
+      <InviteModal
+        socket={pg.socket}
+        roomId={roomId}
+        open={inviteOpen}
+        onClose={closeInvite}
+        isHost={isHost}
+        me={me}
+        title={pg.room.title}
+        peopleInRoom={people.length}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { notFound } from 'next/navigation';
 import CodeEditor from '@/app/components/problems/code-editor';
 import Link from 'next/link';
+import ProblemSplit from '@/app/components/problems/ProblemSplit';
 import { ChevronLeft, BookOpen, Info, Zap } from 'lucide-react';
 import BookmarkButton from '@/app/components/problems/BookmarkButton';
 
@@ -92,8 +93,8 @@ export default async function ProblemDetailPage({ params }) {
   const initialLanguage = problem.lastSubmission?.language || 'cpp';
 
   return (
-    <div className="container py-10">
-      <div className="flex items-center mb-8">
+    <div className="max-w-[1680px] mx-auto px-4 sm:px-6 py-4">
+      <div className="flex items-center mb-3">
         <Link 
           href="/problems" 
           className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
@@ -103,9 +104,9 @@ export default async function ProblemDetailPage({ params }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Problem Description */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+      <ProblemSplit
+        left={
+        <div className="h-full overflow-y-auto rounded-xl bg-white dark:bg-[#0f141d] border border-gray-200 dark:border-white/[0.07] [scrollbar-width:thin]">
           <div className="p-6">
             <div className="flex justify-between items-start">
               <div>
@@ -136,22 +137,8 @@ export default async function ProblemDetailPage({ params }) {
               </div>
             </div>
 
-            <div className="mt-6 prose prose-indigo dark:prose-invert max-w-none">
-              <div dangerouslySetInnerHTML={{ __html: problem.description }} />
-            </div>
-
-            {/* Complexity Info */}
             <div className="mt-6">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="p-3 flex-1 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                  <p className="text-sm font-semibold mb-1 text-blue-700 dark:text-blue-300">Expected Time Complexity</p>
-                  <p className="text-sm text-blue-600 dark:text-blue-400">{problem.timeComplexity}</p>
-                </div>
-                <div className="p-3 flex-1 bg-purple-50 dark:bg-purple-900/20 rounded-md">
-                  <p className="text-sm font-semibold mb-1 text-purple-700 dark:text-purple-300">Expected Space Complexity</p>
-                  <p className="text-sm text-purple-600 dark:text-purple-400">{problem.spaceComplexity}</p>
-                </div>
-              </div>
+              <div className="problem-statement" dangerouslySetInnerHTML={{ __html: problem.description }} />
             </div>
 
             {problem.testCases.length > 0 && (
@@ -209,16 +196,19 @@ export default async function ProblemDetailPage({ params }) {
           </div>
         </div>
 
-        {/* Code Editor */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow h-[calc(100vh-14rem)]">
+        }
+        right={
+        <div className="relative h-[80vh] lg:h-full overflow-hidden rounded-xl bg-white dark:bg-[#0f141d] border border-gray-200 dark:border-white/[0.07]">
           <CodeEditor 
             problemId={problem.id}
             initialCode={initialCode || (problem.templateCode && problem.templateCode[initialLanguage])}
             initialLanguage={initialLanguage}
+            templateCode={problem.templateCode}
             testCases={problem.testCases}
           />
         </div>
-      </div>
+        }
+      />
     </div>
   );
 } 

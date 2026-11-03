@@ -284,3 +284,57 @@
     background-size: 40px 40px;
   }
 }
+
+/* ── Problem statements ──────────────────────────────────────────────
+   Statements are HTML converted from markdown. Tailwind's reset strips
+   heading sizes, list bullets and spacing, so they're restored here. */
+@layer components {
+  .problem-statement {
+    @apply text-[15px] leading-7 text-gray-700 dark:text-gray-300;
+  }
+  .problem-statement > :first-child { @apply mt-0; }
+  .problem-statement p { @apply my-3; }
+  .problem-statement strong { @apply font-semibold text-gray-900 dark:text-white; }
+  .problem-statement em { @apply italic; }
+  .problem-statement a { @apply text-indigo-600 dark:text-indigo-400 underline underline-offset-2; }
+
+  .problem-statement h1,
+  .problem-statement h2 { @apply mt-8 mb-3 text-lg font-semibold text-gray-900 dark:text-white; }
+  .problem-statement h3,
+  .problem-statement h4 { @apply mt-7 mb-2 text-base font-semibold text-gray-900 dark:text-white; }
+
+  /* A paragraph that is only bold text (e.g. "**Constraints**") reads as a section heading. */
+  .problem-statement p > strong:only-child { @apply block mt-7 -mb-1 text-base; }
+
+  .problem-statement ul { @apply my-3 pl-5 list-disc space-y-1.5; }
+  .problem-statement ol { @apply my-3 pl-5 list-decimal space-y-1.5; }
+  .problem-statement li { @apply pl-1; }
+  .problem-statement li::marker { @apply text-gray-400 dark:text-gray-500; }
+  .problem-statement li > p { @apply my-0; }
+
+  .problem-statement code {
+    @apply px-1.5 py-0.5 rounded-md font-mono text-[0.85em]
+           bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-200
+           dark:bg-white/[0.06] dark:text-gray-100 dark:ring-white/10;
+  }
+  .problem-statement pre {
+    @apply my-4 p-4 rounded-lg overflow-x-auto text-[13px] leading-6
+           bg-gray-50 ring-1 ring-gray-200 dark:bg-[#0b1020] dark:ring-white/10;
+  }
+  .problem-statement pre code { @apply p-0 bg-transparent ring-0 text-inherit; }
+
+  /* "Example N" heading + its Input/Output/Explanation become a card. */
+  .problem-statement h3 + p,
+  .problem-statement h4 + p {
+    @apply mt-2 px-4 py-3 rounded-lg border-l-[3px] border-indigo-500/70
+           bg-gray-50 dark:bg-white/[0.03] ring-1 ring-inset ring-gray-200 dark:ring-white/[0.06];
+  }
+
+  .problem-statement blockquote { @apply my-4 pl-4 border-l-[3px] border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400; }
+  .problem-statement hr { @apply my-6 border-gray-200 dark:border-gray-700; }
+  .problem-statement table { @apply my-4 w-full text-sm border-collapse; }
+  .problem-statement th,
+  .problem-statement td { @apply px-3 py-2 border border-gray-200 dark:border-gray-700 text-left; }
+  .problem-statement th { @apply font-semibold bg-gray-50 dark:bg-white/[0.03]; }
+  .problem-statement img { @apply max-w-full h-auto rounded-lg; }
+}

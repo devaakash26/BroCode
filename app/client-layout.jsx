@@ -148,44 +148,35 @@ function MaintenanceOverlay({ info }) {
 
 /* ── Main client layout ──────────────────────────────────────────── */
 export default function ClientLayout({ children }) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false); // sidebar drawer on pages that hide the rail
   const [maintenanceInfo, setMaintenanceInfo] = useState(null); // null = not active
   const pathname = usePathname();
 
   const isProblemPage = pathname.startsWith('/problems/');
   const isAdminPage = pathname.startsWith('/admin');
   const isPlaygroundRoom = pathname.startsWith('/playground/');
+  // Problem pages and playground rooms are full-width; their sidebar opens as a drawer from the navbar.
+  const sidebarHidden = !isMobile && !isAdminPage && (isProblemPage || isPlaygroundRoom);
 
-  // Load sidebar state from local storage on mount
+  useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
-    const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-    setSidebarCollapsed(isCollapsed);
-  }, []);
+    if (!drawerOpen) return undefined;
+    const esc = (e) => e.key === 'Escape' && setDrawerOpen(false);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [drawerOpen]);
 
-  // Handle responsive behavior and initial collapse state
+  // The desktop sidebar is a hover rail (see SidebarNavigation), so there's no
+  // collapsed state to keep here — only whether we're on a phone-sized screen.
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 1024;
-      setIsMobile(mobile);
-      if (mobile) {
-        setSidebarCollapsed(true);
-      }
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
 
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
-  // Function to toggle sidebar and save to local storage
-  const handleToggleSidebar = () => {
-    setSidebarCollapsed(prev => {
-      const newState = !prev;
-      localStorage.setItem('sidebar-collapsed', newState);
-      return newState;
-    });
-  };
 
   // Poll maintenance status every 5 seconds (skip on admin pages — admins bypass maintenance)
   useEffect(() => {
@@ -215,24 +206,14 @@ export default function ClientLayout({ children }) {
     <ProblemDrawerProvider>
       <div className="flex h-screen overflow-hidden">
         {!isMobile && !isAdminPage && !isProblemPage && !isPlaygroundRoom && (
-          <div className="fixed lg:static z-50 lg:z-0 transition-all duration-300 translate-x-0">
-            <SidebarNavigation 
-              collapsed={sidebarCollapsed} 
-              setCollapsed={handleToggleSidebar} 
-              className="h-screen"
-            />
-          </div>
+          <SidebarNavigation className="h-screen" />
         )}
         
         <div className={`flex-1 flex flex-col overflow-x-hidden ${!isAdminPage && !isProblemPage && !isPlaygroundRoom ? '' : 'w-full'}`}>
           {!isAdminPage && (
             <>
               <MaintenanceBanner />
-              <Navbar 
-                sidebarCollapsed={sidebarCollapsed} 
-                setSidebarCollapsed={handleToggleSidebar}
-                isMobile={isMobile}
-              />
+              <Navbar isMobile={isMobile} onOpenSidebar={sidebarHidden ? () => setDrawerOpen(true) : null} />
               <div className="px-4 md:px-6 lg:px-8">
                 <VerificationAlert />
               </div>
@@ -245,10 +226,23 @@ export default function ClientLayout({ children }) {
         </div>
 
         {isMobile && !isAdminPage && (
-          <SidebarNavigation 
-            collapsed={true}
-            setCollapsed={() => {}}
-          />
+          <SidebarNavigation />
+        )}
+        {sidebarHidden && (
+          <div className={`fixed inset-0 z-[60] ${drawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!drawerOpen}>
+            <div
+              onClick={() => setDrawerOpen(false)}
+              className={`absolute inset-0 bg-black/40 transition-opacity duration-200 ${drawerOpen ? 'opacity-100' : 'opacity-0'}`}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Navigation"
+              className={`absolute inset-y-0 left-0 shadow-2xl transition-transform duration-200 ease-out ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            >
+              <SidebarNavigation forceOpen className="h-screen" />
+            </div>
+          </div>
         )}
         <ProblemListDrawer />
         <PlaygroundInviteListener />

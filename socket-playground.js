@@ -309,6 +309,8 @@ function sanitizeRun(run) {
   if (!run || !Array.isArray(run.results)) return null;
   return {
     language: LANGUAGES.includes(run.language) ? run.language : "cpp",
+    // Which code tab the run belongs to ("main" for the first tab).
+    tab: typeof run.tab === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(run.tab) ? run.tab : "main",
     results: run.results.slice(0, MAX_INPUTS).map((r) => ({
       status: clip(r?.status, 60),
       stdout: clip(r?.stdout, MAX_OUTPUT),
@@ -595,6 +597,18 @@ function registerPlayground(io, { getRedis, getOnlineUsers, prisma }) {
       }),
     );
 
+    // "Someone is typing" in chat — throttled by the client, fine to drop.
+    socket.on(
+      "pg:typing",
+      inRoom(socket, (roomId) => {
+        socket.volatile.to(roomKey(roomId)).emit("pg:typing", {
+          peerId: socket.id,
+          userId: socket.data.user.id,
+          name: socket.data.user.name || "Someone",
+        });
+      }),
+    );
+
     // ── Compiler: the runner calls Judge0 via Next.js, then shares the result ─
     socket.on(
       "pg:running",
@@ -669,6 +683,26 @@ function registerPlayground(io, { getRedis, getOnlineUsers, prisma }) {
         socket.data.pgMuted = !!p?.muted;
         socket.data.pgCamera = !!p?.on && !!p?.camera;
         await broadcastPeers(roomId);
+      }),
+    );
+
+    // Host-only: mute one person (userId) or everyone else in the call (no userId).
+    // Each client mutes its own mic; they can unmute themselves afterwards.
+    socket.on(
+      "pg:mute",
+      inRoom(socket, async (roomId, p, ack) => {
+        const meta = await store.getMeta(roomId);
+        if (!meta || meta.hostId !== socket.data.user.id) {
+          return typeof ack === "function" && ack({ error: "forbidden" });
+        }
+        const userId = typeof p?.userId === "string" ? p.userId.slice(0, 64) : null;
+        socket.to(roomKey(roomId)).emit("pg:forceMute", {
+          roomId,
+          userId,
+          hostId: meta.hostId,
+          by: socket.data.user.name || "The host",
+        });
+        if (typeof ack === "function") ack({ ok: true });
       }),
     );
 

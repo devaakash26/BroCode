@@ -49,3 +49,19 @@ export const PANEL_HEADER =
   'flex items-center gap-2 h-11 px-3 border-b border-gray-200 dark:border-white/[0.07]';
 export const ICON_BTN =
   'inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors';
+
+// ── Code tabs ────────────────────────────────────────────────────────────────
+// The first tab ("main") keeps the original doc keys so older rooms still open.
+export const MAIN_TAB = 'main';
+export const MAX_TABS = 8;
+export const codeKey = (tab, lang) => (tab === MAIN_TAB ? lang : `${lang}@${tab}`);
+export const inputsKey = (tab) => (tab === MAIN_TAB ? 'inputs' : `inputs@${tab}`);
+
+// Mirrors the server's starter code; used when someone opens a new tab.
+export const TEMPLATES = {
+  c: '#include <stdio.h>\n\nint main() {\n    printf("Hello, BroCode!\\n");\n    return 0;\n}\n',
+  cpp: '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    cout << "Hello, BroCode!" << endl;\n    return 0;\n}\n',
+  java: 'import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, BroCode!");\n    }\n}\n',
+  javascript: 'const input = require("fs").readFileSync(0, "utf8");\n\nconsole.log("Hello, BroCode!");\n',
+  python: 'import sys\n\ninput_data = sys.stdin.read()\n\nprint("Hello, BroCode!")\n',
+};

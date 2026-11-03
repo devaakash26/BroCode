@@ -10,10 +10,14 @@ const languageToJudge0Id = {
   python: 71, // Python 3.8.1
   java: 62, // Java OpenJDK 13.0.1
   cpp: 54, // C++ GCC 9.2.0
+  c: 50, // C (GCC 9.2.0)
 };
 
 // Helper to wrap user code in proper boilerplate
 function wrapCodeWithBoilerplate(userCode, language, problem) {
+  // Imported problems ship a complete stdin/stdout driver; wrapping would break it.
+  if (problem.hasDriverCode) return userCode;
+
   const functionName = extractMainFunctionName(problem.title, language);
 
   // Check if code contains locked sections

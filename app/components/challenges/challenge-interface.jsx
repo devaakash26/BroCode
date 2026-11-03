@@ -536,7 +536,7 @@ export default function ChallengeInterface({
                   <div className="p-6">
                     <h2 className="text-2xl font-bold mb-4">{currentProblem?.title}</h2>
                     <div className="prose dark:prose-invert max-w-none">
-                      <div dangerouslySetInnerHTML={{ __html: currentProblem?.description || '' }} />
+                      <div className="problem-statement" dangerouslySetInnerHTML={{ __html: currentProblem?.description || '' }} />
                     </div>
                     
                     {/* Examples section */}
@@ -568,6 +568,8 @@ export default function ChallengeInterface({
                   <CodeEditor 
                     problemId={currentProblem?.id}
                     initialCode={currentProblem?.templateCode?.[language] || ''}
+                    initialLanguage={language}
+                    templateCode={currentProblem?.templateCode}
                     testCases={currentProblem?.testCases || []}
                     onSubmit={handleSubmitResult}
                     challengeId={challengeId}
