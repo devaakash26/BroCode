@@ -1,73 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as Y from 'yjs';
-import { Play, Plus, X, Loader2, Terminal, CheckCircle2, AlertCircle, Code2, ChevronDown } from 'lucide-react';
+import { Play, Plus, X, Loader2, Terminal, CheckCircle2, AlertCircle, Code2, ChevronDown, Radio, BookOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { formatDistanceToNowStrict } from 'date-fns';
 import CollabEditor from './CollabEditor';
-import { LANGUAGES, MAX_INPUTS, PANEL, PANEL_HEADER } from './utils';
+import SharedTextarea from './SharedTextarea';
+import useCodeTabs from './useCodeTabs';
+import ProblemPicker from './ProblemPicker';
+import { layoutNote, NOTE_KINDS } from './BoardNote';
+import { statementBlocks, layoutStatement, starterCode } from './problemImport';
+import { LANGUAGES, MAX_INPUTS, MAX_TABS, MAIN_TAB, PANEL, PANEL_HEADER, codeKey, inputsKey } from './utils';
 
 const LANG_DOT = { cpp: '#3b82f6', c: '#64748b', java: '#f97316', javascript: '#eab308', python: '#22c55e' };
-
-/** Textarea bound to a Y.Text; keeps the caret steady on remote edits. */
-function SharedTextarea({ ytext, placeholder }) {
-  const ref = useRef(null);
-  const [value, setValue] = useState(() => ytext.toString());
-
-  useEffect(() => {
-    setValue(ytext.toString());
-    const onChange = (event, tx) => {
-      if (tx.local) return setValue(ytext.toString());
-      const el = ref.current;
-      let { selectionStart: s, selectionEnd: e } = el || { selectionStart: 0, selectionEnd: 0 };
-      let i = 0;
-      for (const op of event.delta) {
-        if (op.retain) i += op.retain;
-        else if (op.insert) {
-          if (i <= s) s += op.insert.length;
-          if (i <= e) e += op.insert.length;
-          i += op.insert.length;
-        } else if (op.delete) {
-          if (i < s) s -= Math.min(op.delete, s - i);
-          if (i < e) e -= Math.min(op.delete, e - i);
-        }
-      }
-      setValue(ytext.toString());
-      if (el && document.activeElement === el) requestAnimationFrame(() => el.setSelectionRange(s, e));
-    };
-    ytext.observe(onChange);
-    return () => ytext.unobserve(onChange);
-  }, [ytext]);
-
-  const handleChange = (e) => {
-    const next = e.target.value;
-    const prev = ytext.toString();
-    let start = 0;
-    while (start < prev.length && start < next.length && prev[start] === next[start]) start++;
-    let endPrev = prev.length;
-    let endNext = next.length;
-    while (endPrev > start && endNext > start && prev[endPrev - 1] === next[endNext - 1]) {
-      endPrev--;
-      endNext--;
-    }
-    ytext.doc.transact(() => {
-      if (endPrev > start) ytext.delete(start, endPrev - start);
-      if (endNext > start) ytext.insert(start, next.slice(start, endNext));
-    });
-  };
-
-  return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={handleChange}
-      placeholder={placeholder}
-      spellCheck={false}
-      className="w-full h-full resize-none bg-transparent px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 outline-none"
-    />
-  );
-}
 
 function useYArrayLength(yarr) {
   const [len, setLen] = useState(yarr.length);
@@ -80,17 +27,195 @@ function useYArrayLength(yarr) {
   return len;
 }
 
-export default function CompilerPanel({ pg }) {
-  const { doc, socket, language, setLanguage, peers, myPeerId, run, runningBy, setRunningBy } = pg;
-  const inputs = doc.getArray('inputs');
+
+/** Question tabs across the top of the compiler. */
+function TabStrip({ ct, isHost, me, onOpenProblems }) {
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState('');
+  const commit = () => {
+    if (editing) ct.renameTab(editing, draft);
+    setEditing(null);
+  };
+  return (
+    <div className="flex items-center gap-1 h-10 px-1.5 border-b border-gray-200 dark:border-white/[0.07] bg-gray-50/70 dark:bg-black/20 overflow-x-auto [scrollbar-width:none]">
+      <AnimatePresence initial={false}>
+        {ct.tabs.map((t, i) => {
+          const on = t.id === ct.active;
+          const canClose = t.id !== MAIN_TAB && (isHost || t.by === me.id);
+          return (
+            <motion.div
+              key={t.id}
+              layout
+              initial={{ opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+              transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+              className="relative flex-shrink-0"
+            >
+              {editing === t.id ? (
+                <input
+                  autoFocus
+                  value={draft}
+                  maxLength={40}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={commit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commit();
+                    if (e.key === 'Escape') setEditing(null);
+                  }}
+                  className="h-7 w-36 px-2 rounded-md text-xs font-medium bg-white dark:bg-[#0b1020] border border-indigo-500 text-gray-900 dark:text-white outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => ct.setActive(t.id)}
+                  onDoubleClick={() => {
+                    setEditing(t.id);
+                    setDraft(t.title);
+                  }}
+                  title="Double-click to rename"
+                  className={`group relative h-7 pl-2.5 ${canClose ? 'pr-1' : 'pr-2.5'} rounded-md inline-flex items-center gap-1.5 text-xs font-medium transition-colors ${
+                    on ? 'text-gray-900 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'
+                  }`}
+                >
+                  {on && (
+                    <motion.span
+                      layoutId="code-tab-pill"
+                      className="absolute inset-0 rounded-md bg-white dark:bg-white/[0.08] ring-1 ring-gray-200 dark:ring-white/[0.08] shadow-sm"
+                      transition={{ type: 'spring', stiffness: 500, damping: 38 }}
+                    />
+                  )}
+                  <span className="relative font-mono text-[10px] text-gray-400">{i + 1}</span>
+                  <span className="relative max-w-[140px] truncate">{t.title}</span>
+                  {canClose && (
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm(`Close “${t.title}” for everyone? Its code is deleted.`)) ct.removeTab(t.id);
+                      }}
+                      className="relative w-4 h-4 rounded flex items-center justify-center opacity-0 group-hover:opacity-70 hover:!opacity-100 hover:bg-black/5 dark:hover:bg-white/10"
+                    >
+                      <X className="w-3 h-3" />
+                    </span>
+                  )}
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+      {ct.tabs.length < MAX_TABS && (
+        <button
+          type="button"
+          onClick={() => ct.addTab()}
+          title="New question tab"
+          className="flex-shrink-0 inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Tab</span>
+        </button>
+      )}
+      <div className="flex-1" />
+      {isHost && (
+        <button
+          type="button"
+          onClick={onOpenProblems}
+          title="Load a problem's starter code and statement"
+          className="flex-shrink-0 inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors"
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Problem</span>
+        </button>
+      )}
+      {isHost && ct.tabs.length > 1 && (
+        <button
+          type="button"
+          onClick={ct.bringEveryone}
+          title="Move everyone in the room to this tab"
+          className="flex-shrink-0 inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span className="hidden md:inline">Bring everyone here</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+const INK = '#111827'; // theme-adaptive ink, same as the scratchpad
+const MUTED = '#6b7280';
+const LANG_ORDER = ['cpp', 'java', 'python', 'javascript', 'c'];
+const parseHtml = (html) => new DOMParser().parseFromString(html, 'text/html').body;
+
+export default function CompilerPanel({ pg, me, isHost, boardApi }) {
+  const { doc, socket, peers, myPeerId, runs, runningBy, setRunningBy } = pg;
+  const ct = useCodeTabs(doc, { mainLanguage: pg.language, setMainLanguage: pg.setLanguage, me });
+  const { active: tab, language, setLanguage } = ct;
+  const run = runs[tab] || null;
+  const inputs = useMemo(() => doc.getArray(inputsKey(tab)), [doc, tab]);
   const inputCount = useYArrayLength(inputs);
   const [activeInput, setActiveInput] = useState(0);
   const [running, setRunning] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  /** Host loads a problem: driver code into a new tab, statement onto the board. */
+  const loadProblem = useCallback(
+    async (problem, opts) => {
+      if (opts.code) {
+        const code = starterCode(problem);
+        const lang = code[language] ? language : LANG_ORDER.find((l) => code[l]) || language;
+        const id = ct.addTab({
+          title: problem.title,
+          code,
+          language: lang,
+          inputs: opts.inputs ? (problem.samples || []).map((s) => s.input) : [],
+          focus: opts.focus,
+          problemId: problem.id,
+        });
+        if (!id) return;
+        if (!Object.keys(code).length) toast('This problem has no starter code — using the default template');
+      }
+      if (opts.statement) {
+        const notes = doc.getMap('notes');
+        // Place it below whatever is on the board already.
+        let bottom = boardApi?.current?.contentBottom?.() ?? 0;
+        notes.forEach((m) => {
+          const kind = NOTE_KINDS[m.get('kind')] ? m.get('kind') : 'text';
+          bottom = Math.max(bottom, (m.get('y') || 0) + layoutNote(kind, m.get('text')?.toString() || '', m.get('w') || 520).height);
+        });
+        const startY = bottom > 0 ? Math.ceil(bottom + 140) : 60;
+        const blocks = statementBlocks(problem, parseHtml);
+        const laid = layoutStatement(blocks, { y: startY, measure: (k, t, w) => layoutNote(k, t, w).height });
+        const stamp = Date.now().toString(36);
+        doc.transact(() => {
+          laid.notes.forEach((n, i) => {
+            const m = new Y.Map();
+            m.set('x', n.x);
+            m.set('y', n.y);
+            m.set('w', n.w);
+            m.set('kind', n.kind);
+            m.set('color', n.muted ? MUTED : INK);
+            m.set('by', me.id);
+            m.set('problemId', problem.id);
+            m.set('text', new Y.Text(n.text));
+            notes.set(`${me.id.slice(-6)}-${stamp}-${i}`, m);
+          });
+        });
+        if (boardApi?.current) boardApi.current.scrollToBoardY(startY);
+        else toast.success('Statement added to the scratchpad');
+      }
+    },
+    [ct, language, doc, boardApi, me.id],
+  );
   const busy = running || !!runningBy;
 
   useEffect(() => {
     if (activeInput >= inputCount) setActiveInput(Math.max(0, inputCount - 1));
   }, [inputCount, activeInput]);
+
+  useEffect(() => setActiveInput(0), [tab]);
 
   const addInput = () => {
     if (inputs.length >= MAX_INPUTS) return;
@@ -105,7 +230,7 @@ export default function CompilerPanel({ pg }) {
 
   const runCode = useCallback(async () => {
     if (running) return;
-    const code = doc.getText(`code:${language}`).toString();
+    const code = doc.getText(`code:${codeKey(tab, language)}`).toString();
     const stdins = inputs.toArray().map((t) => t.toString());
     setRunning(true);
     socket?.emit('pg:running', { running: true });
@@ -117,7 +242,7 @@ export default function CompilerPanel({ pg }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Run failed');
-      socket?.emit('pg:run', data); // server broadcasts the result to everyone
+      socket?.emit('pg:run', { ...data, tab }); // server broadcasts the result to everyone
     } catch (err) {
       toast.error(err.message);
       socket?.emit('pg:running', { running: false });
@@ -125,7 +250,7 @@ export default function CompilerPanel({ pg }) {
       setRunning(false);
       setRunningBy(null);
     }
-  }, [running, doc, language, inputs, socket, setRunningBy]);
+  }, [running, doc, tab, language, inputs, socket, setRunningBy]);
 
   const result = run?.results?.[activeInput];
   const pill = (active) =>
@@ -138,6 +263,14 @@ export default function CompilerPanel({ pg }) {
 
   return (
     <div className={`${PANEL} flex flex-col h-full min-h-0`}>
+      <TabStrip ct={ct} isHost={isHost} me={me} onOpenProblems={() => setPickerOpen(true)} />
+      <ProblemPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onLoad={loadProblem}
+        tabsFull={ct.tabs.length >= MAX_TABS}
+      />
+
       {/* Header */}
       <div className={PANEL_HEADER}>
         <Code2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -185,6 +318,7 @@ export default function CompilerPanel({ pg }) {
         <CollabEditor
           doc={doc}
           language={language}
+          codeKey={codeKey(tab, language)}
           socket={socket}
           peers={peers}
           myPeerId={myPeerId}
@@ -224,9 +358,10 @@ export default function CompilerPanel({ pg }) {
           <div className="flex-1 min-h-0">
             {inputCount > 0 && inputs.get(Math.min(activeInput, inputCount - 1)) && (
               <SharedTextarea
-                key={activeInput}
+                key={`${tab}-${activeInput}`}
                 ytext={inputs.get(Math.min(activeInput, inputCount - 1))}
                 placeholder="stdin for this run…"
+                className="w-full h-full resize-none bg-transparent px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-600 outline-none"
               />
             )}
           </div>

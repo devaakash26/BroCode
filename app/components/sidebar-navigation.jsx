@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -22,12 +22,33 @@ import {
   LayoutDashboard
 } from 'lucide-react';
 
-export default function SidebarNavigation({ collapsed, setCollapsed, className = '' }) {
+// Hover intent: open a beat after the pointer arrives, close a beat after it leaves,
+// so passing across the rail on the way somewhere else doesn't flash it open.
+const OPEN_DELAY = 90;
+const CLOSE_DELAY = 180;
+
+// `forceOpen` renders the full sidebar (no hover rail), e.g. inside the navbar drawer.
+export default function SidebarNavigation({ className = '', forceOpen = false }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hoverOpen, setOpen] = useState(false);
+  const open = forceOpen || hoverOpen;
+  const timer = useRef(null);
+  const collapsed = !open;
+
+  const schedule = (next, ms) => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(next), ms);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  // Fold away after navigating.
+  useEffect(() => {
+    clearTimeout(timer.current);
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     setMounted(true);
@@ -61,7 +82,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
   ];
 
   // Mobile bottom navigation bar
-  if (isMobile) {
+  if (isMobile && !forceOpen) {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg">
         <div className="grid grid-cols-5 h-16">
@@ -94,29 +115,32 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
     );
   }
 
-  // Desktop sidebar
+  const label = `ml-3 text-sm font-medium whitespace-nowrap transition-opacity duration-150 ${open ? 'opacity-100 delay-75' : 'opacity-0'}`;
+  const heading = `h-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap transition-opacity duration-150 ${open ? 'opacity-100 delay-75' : 'opacity-0'}`;
+
+  // Desktop sidebar: a 64px rail that expands over the page on hover/focus.
   return (
-    <div className={`h-full flex flex-col bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'} ${className}`}>
-      <div className="flex items-center justify-between p-3 h-16 border-b border-gray-200 dark:border-gray-800">
-        {!collapsed ? (
-          <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            BroCode
-          </Link>
-        ) : (
-          <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            BC
-          </Link>
-        )}
-       
+    <div className={`relative z-40 h-full flex-shrink-0 ${forceOpen ? 'w-64' : 'w-16'} ${className}`}>
+    <nav
+      aria-label="Main"
+      onMouseEnter={forceOpen ? undefined : () => schedule(true, OPEN_DELAY)}
+      onMouseLeave={forceOpen ? undefined : () => schedule(false, CLOSE_DELAY)}
+      onFocus={forceOpen ? undefined : () => schedule(true, 0)}
+      onBlur={forceOpen ? undefined : (e) => !e.currentTarget.contains(e.relatedTarget) && schedule(false, 0)}
+      className={`absolute inset-y-0 left-0 flex flex-col overflow-hidden bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 transition-[width,box-shadow] duration-200 ease-out ${
+        forceOpen ? 'w-64' : open ? 'w-64 shadow-2xl shadow-black/10 dark:shadow-black/50' : 'w-16'
+      }`}
+    >
+      <div className="flex items-center p-3 h-16 border-b border-gray-200 dark:border-gray-800">
+        <Link href="/" className="relative block h-7 w-full text-xl font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap" aria-label="BroCode home">
+          <span className={`absolute left-1 top-0 transition-opacity duration-150 ${open ? 'opacity-0' : 'opacity-100'}`}>BC</span>
+          <span className={`absolute left-1 top-0 transition-opacity duration-150 ${open ? 'opacity-100' : 'opacity-0'}`}>BroCode</span>
+        </Link>
       </div>
 
       <div className="flex-1 overflow-y-auto py-2">
         <div className="px-3 py-2">
-          {!collapsed && (
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Navigation
-            </h3>
-          )}
+          <h3 className={heading}>Navigation</h3>
           <ul className="mt-2 space-y-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -124,6 +148,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
                 <li key={item.name}>
                   <Link
                     href={item.href}
+                    title={collapsed ? item.name : undefined}
                     className={`flex items-center px-3 py-2.5 rounded-md group transition-colors ${
                       isActive
                         ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
@@ -133,9 +158,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
                     <span className={`${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`}>
                       {item.icon}
                     </span>
-                    {!collapsed && (
-                      <span className="ml-3 text-sm font-medium">{item.name}</span>
-                    )}
+                    <span className={label}>{item.name}</span>
                   </Link>
                 </li>
               );
@@ -145,11 +168,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
 
         {session && (
           <div className="px-3 py-2 mt-2">
-            {!collapsed && (
-              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Problem Lists
-              </h3>
-            )}
+            <h3 className={heading}>Problem Lists</h3>
             <ul className="mt-2 space-y-1">
               {problemLists.map((item) => {
                 const [itemPath, itemQuery] = item.href.split('?');
@@ -165,6 +184,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
                   <li key={item.name}>
                     <Link
                       href={item.href}
+                      title={collapsed ? item.name : undefined}
                       className={`flex items-center px-3 py-2 rounded-md group transition-colors ${
                         isActive
                           ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
@@ -174,9 +194,7 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
                       <span className={`${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`}>
                         {item.icon}
                       </span>
-                      {!collapsed && (
-                        <span className="ml-3 text-sm font-medium">{item.name}</span>
-                      )}
+                      <span className={label}>{item.name}</span>
                     </Link>
                   </li>
                 );
@@ -185,11 +203,9 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
           </div>
         )}
 
-        {(session?.user.role === 'PLATFORM_ADMIN' || session?.user.role === 'TEMP_ADMIN') && !collapsed && (
+        {(session?.user.role === 'PLATFORM_ADMIN' || session?.user.role === 'TEMP_ADMIN') && (
           <div className="px-3 py-2 mt-2">
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Admin
-            </h3>
+            <h3 className={heading}>Admin</h3>
             <ul className="mt-2 space-y-1">
               <li>
                 <Link
@@ -203,13 +219,14 @@ export default function SidebarNavigation({ collapsed, setCollapsed, className =
                   <span className={`${pathname === '/admin' ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`}>
                     <PanelLeft className="h-4 w-4" />
                   </span>
-                  <span className="ml-3 text-sm font-medium">Admin Dashboard</span>
+                  <span className={label}>Admin Dashboard</span>
                 </Link>
               </li>
             </ul>
           </div>
         )}
       </div>
+    </nav>
     </div>
   );
 } 

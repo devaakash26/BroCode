@@ -186,6 +186,13 @@ model Problem {
   isPublic        Boolean    @default(true)
   isCustom        Boolean    @default(false) // Whether this is a custom problem created by a group admin
   groupId         String? // Associated group for custom problems
+  // Imported problems: where they came from, so imports are idempotent and removable.
+  source          String? // e.g. "accio_cq_v2"
+  sourceId        String?    @unique
+  hints           Json? // string[]
+  companies       String[]   @default([])
+  solutions       Json? // reference solution per language — never sent to clients
+  hasDriverCode   Boolean    @default(false) // templateCode is a full stdin/stdout program; run it as-is
   creatorId       String
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
@@ -201,6 +208,7 @@ model Problem {
   @@index([difficulty, isPublic]) // filtered problem queries
   @@index([isPublic, isFeatured]) // featured problems listing
   @@index([groupId])              // group custom problems
+  @@index([source])
 }
 
 // ProblemCategory model (many-to-many relationship)

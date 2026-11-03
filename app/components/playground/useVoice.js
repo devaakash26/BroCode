@@ -276,6 +276,15 @@ export default function useVoice({ socket, peers, myPeerId }) {
     announce(true, { muted: next });
   }, [muted, announce]);
 
+  // Host asked us to mute. We mute locally and tell the room; unmuting is up to us.
+  const forceMute = useCallback(() => {
+    if (!localRef.current || stateRef.current.muted) return false;
+    localRef.current.getAudioTracks().forEach((t) => (t.enabled = false));
+    setMuted(true);
+    announce(true, { muted: true });
+    return true;
+  }, [announce]);
+
   const toggleCamera = useCallback(async () => {
     if (camera) {
       stopCameraTrack();
@@ -327,6 +336,7 @@ export default function useVoice({ socket, peers, myPeerId }) {
     join,
     leave,
     toggleMute,
+    forceMute,
     toggleCamera,
   };
 }

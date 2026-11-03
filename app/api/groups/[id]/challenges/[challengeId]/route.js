@@ -87,6 +87,7 @@ export async function GET(request, { params }) {
                 exampleInput: true,
                 exampleOutput: true,
                 testCases: true,
+                templateCode: true,
               },
             },
           },

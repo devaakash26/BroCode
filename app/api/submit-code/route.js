@@ -11,6 +11,7 @@ const languageToJudge0Id = {
   python: 71,
   java: 62,
   cpp: 54,
+  c: 50, // C (GCC 9.2.0)
 };
 
 const calculatePoints = (difficulty) => {

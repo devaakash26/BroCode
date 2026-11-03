@@ -10,6 +10,7 @@ import {
   BookOpen,
   Folder,
   MessageSquare,
+  PenTool,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const sidebarLinks = [
   { name: "Problems", href: "/admin/problems", icon: BookOpen },
   { name: "Users", href: "/admin/users", icon: Users },
   { name: "Groups", href: "/admin/groups", icon: Folder },
+  { name: "Playground", href: "/admin/playground", icon: PenTool },
   { name: "Help Queries", href: "/admin/queries", icon: MessageSquare },
   { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
@@ -31,7 +33,18 @@ const PAGE_TITLES = {
   "/admin/groups": "Groups",
   "/admin/queries": "Help Queries",
   "/admin/settings": "Maintenance Control Center",
+  "/admin/playground": "Playground Activity",
 };
+
+// Sub-pages (e.g. /admin/problems/new) use their section's title, so the header
+// never falls back to repeating the "Admin Console" label above it.
+function titleFor(pathname) {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  const section = Object.keys(PAGE_TITLES)
+    .filter((k) => k !== "/admin" && pathname.startsWith(`${k}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  return section ? PAGE_TITLES[section] : "Overview";
+}
 
 export default function AdminLayout({ children, user }) {
   const pathname = usePathname();
@@ -40,7 +53,7 @@ export default function AdminLayout({ children, user }) {
   const pageTitle =
     pathname === "/admin"
       ? `Hi, ${firstName} 👋`
-      : (PAGE_TITLES[pathname] ?? "Admin Console");
+      : titleFor(pathname);
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 

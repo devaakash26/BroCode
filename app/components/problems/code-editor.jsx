@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useRef } from 'react';
 const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
-import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, Zap, Code, X, Trophy, Sparkles } from 'lucide-react';
+import { Play, Save, CheckCircle, AlertCircle, Clock, RotateCcw, ChevronLeft, ChevronRight, ChevronDown, Check, Loader2, Zap, Code, X, Trophy, Sparkles } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { toast } from 'react-hot-toast';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -21,10 +22,110 @@ import {
 
 const defaultLanguages = [
   { id: 'cpp', name: 'C++', defaultCode: '// Write your C++ solution here\n\n' },
-  { id: 'javascript', name: 'JavaScript', defaultCode: '// Write your JavaScript solution here\n\n' },
-  { id: 'python', name: 'Python', defaultCode: '// Write your Python solution here\n\n' },
   { id: 'java', name: 'Java', defaultCode: '// Write your Java solution here\n\n' },
+  { id: 'python', name: 'Python', defaultCode: '# Write your Python solution here\n\n' },
+  { id: 'javascript', name: 'JavaScript', defaultCode: '// Write your JavaScript solution here\n\n' },
+  { id: 'c', name: 'C', defaultCode: '// Write your C solution here\n\n' },
 ];
+const isLanguage = (id) => defaultLanguages.some((l) => l.id === id);
+const LANG_DOT = { cpp: '#3b82f6', java: '#f97316', python: '#22c55e', javascript: '#eab308', c: '#94a3b8' };
+
+// Editor themes that sit flush with the surrounding card.
+function defineEditorThemes(monaco) {
+  monaco.editor.defineTheme('brocode-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#0f141d',
+      'editorGutter.background': '#0f141d',
+      'editor.lineHighlightBackground': '#ffffff08',
+      'editor.lineHighlightBorder': '#00000000',
+      'editorLineNumber.foreground': '#4b5563',
+      'editorLineNumber.activeForeground': '#a5b4fc',
+      'editor.selectionBackground': '#6366f155',
+      'editorCursor.foreground': '#a5b4fc',
+      'editorIndentGuide.background1': '#ffffff0d',
+      'scrollbarSlider.background': '#ffffff14',
+      'scrollbarSlider.hoverBackground': '#ffffff24',
+    },
+  });
+  monaco.editor.defineTheme('brocode-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [],
+    colors: {
+      'editor.background': '#ffffff',
+      'editor.lineHighlightBackground': '#6366f10a',
+      'editor.lineHighlightBorder': '#00000000',
+      'editorLineNumber.foreground': '#cbd5e1',
+      'editorLineNumber.activeForeground': '#6366f1',
+      'editor.selectionBackground': '#6366f133',
+      'editorCursor.foreground': '#4f46e5',
+    },
+  });
+}
+
+/** Language picker: a small menu instead of the browser's native select. */
+function LanguageMenu({ value, onChange, disabled }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const current = defaultLanguages.find((l) => l.id === value) || defaultLanguages[0];
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="inline-flex items-center gap-2 h-8 pl-2.5 pr-2 rounded-md text-sm font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-white/[0.04] ring-1 ring-gray-200 dark:ring-white/10 hover:bg-gray-50 dark:hover:bg-white/[0.07] disabled:opacity-50 transition-colors"
+      >
+        <span className="w-2 h-2 rounded-full" style={{ background: LANG_DOT[current.id] }} />
+        {current.name}
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          className="absolute left-0 top-full mt-1.5 z-30 w-44 py-1 rounded-lg bg-white dark:bg-[#161c28] ring-1 ring-gray-200 dark:ring-white/10 shadow-xl shadow-black/10 dark:shadow-black/40"
+        >
+          {defaultLanguages.map((l) => (
+            <li key={l.id}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={l.id === value}
+                onClick={() => {
+                  onChange(l.id);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 h-8 text-sm text-left transition-colors ${
+                  l.id === value ? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/[0.05]' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04]'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full" style={{ background: LANG_DOT[l.id] }} />
+                <span className="flex-1">{l.name}</span>
+                {l.id === value && <Check className="w-3.5 h-3.5 text-indigo-500" />}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function complexityToFn(bigO) {
   const s = String(bigO || '').toLowerCase().replace(/[\s{}·]/g, '');
@@ -78,6 +179,8 @@ function buildComplexityChartData(userBigO, optimalBigO) {
 export default function CodeEditor({
   problemId,
   initialCode = '',
+  initialLanguage = 'cpp',
+  templateCode = null, // { [language]: starter/driver code } from the problem
   onSubmit,
   testCases = [],
   readOnly = false,
@@ -86,12 +189,22 @@ export default function CodeEditor({
 }) {
   const { data: session } = useSession();
   const router = useRouter();
-  const [language, setLanguage] = useState('cpp');
-  const [code, setCode] = useState(initialCode || defaultLanguages.find(lang => lang.id === 'cpp')?.defaultCode || '');
+  // The problem's own starter (driver) code for a language, else a generic stub.
+  const templateFor = (lang) => {
+    const t = templateCode && typeof templateCode === 'object' ? templateCode[lang] : null;
+    return typeof t === 'string' && t.trim() ? t : defaultLanguages.find((l) => l.id === lang)?.defaultCode || '';
+  };
+  const startLanguage = isLanguage(initialLanguage) ? initialLanguage : 'cpp';
+  const [language, setLanguageState] = useState(startLanguage);
+  const [code, setCode] = useState(() => initialCode || templateFor(startLanguage));
+  // What you typed in each language, so switching away and back keeps it.
+  const draftsRef = useRef({});
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [results, setResults] = useState(null);
   const [theme, setTheme] = useState('vs-dark');
+  const { resolvedTheme } = useTheme();
+  const editorTheme = resolvedTheme === 'light' ? 'brocode-light' : 'brocode-dark';
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('results'); // 'results' | 'console' | 'ai'
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -107,17 +220,27 @@ export default function CodeEditor({
   const [lockedRanges, setLockedRanges] = useState([]);
   const editorRef = useRef(null);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const isInitialMount = useRef(true);
+  // Switching language loads that language's driver code (or your draft in it).
+  // Done in the handler rather than an effect, so React's double-invoked
+  // effects in development can't overwrite the code that was just loaded.
+  const setLanguage = (next) => {
+    if (!isLanguage(next) || next === language) return;
+    draftsRef.current[language] = code;
+    setLanguageState(next);
+    setCode(draftsRef.current[next] ?? templateFor(next));
+  };
 
-  // When language changes, update the code to the new boilerplate.
+  // A different problem (or its templates arriving late) starts fresh.
+  const templateKey = templateCode ? Object.keys(templateCode).sort().join(',') : '';
+  const loadedFor = useRef(`${problemId}|${templateKey}`);
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    const selectedLang = defaultLanguages.find(lang => lang.id === language);
-    setCode(selectedLang?.defaultCode || '');
-  }, [language]);
+    const key = `${problemId}|${templateKey}`;
+    if (loadedFor.current === key) return;
+    loadedFor.current = key;
+    draftsRef.current = {};
+    setCode(initialCode || templateFor(language));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemId, templateKey]);
 
   // Re-identify locked ranges whenever the code changes.
   useEffect(() => {
@@ -611,8 +734,8 @@ export default function CodeEditor({
   };
 
   const handleResetConfirm = () => {
-    const selectedLang = defaultLanguages.find(lang => lang.id === language);
-    setCode(initialCode || selectedLang?.defaultCode || '');
+    delete draftsRef.current[language];
+    setCode(templateFor(language));
     setResults(null);
     setAiAnalysis(null);
     setComplexity(null);
@@ -627,6 +750,7 @@ export default function CodeEditor({
       case 'python': return 'python';
       case 'java': return 'java';
       case 'cpp': return 'cpp';
+      case 'c': return 'c';
       default: return 'javascript';
     }
   };
@@ -1178,37 +1302,26 @@ export default function CodeEditor({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center space-x-2">
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="bg-background border rounded-md px-2 py-1"
-            disabled={isDisabled}
-          >
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="cpp">C++</option>
-          </select>
+      <div className="flex items-center justify-between gap-2 h-12 px-3 border-b border-gray-200 dark:border-white/[0.07] bg-gray-50/80 dark:bg-[#121823]">
+        <div className="flex items-center gap-1.5">
+          <LanguageMenu value={language} onChange={setLanguage} disabled={isDisabled} />
 
           <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
             <DialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                title="Reset code"
+              <button
+                type="button"
+                title="Reset to starter code"
                 disabled={isDisabled}
-                className="text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
               >
                 <RotateCcw className="w-4 h-4" />
-              </Button>
+              </button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Reset Code</DialogTitle>
+                <DialogTitle>Reset code?</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to reset your code? This action cannot be undone.
+                  This replaces your code in {defaultLanguages.find((l) => l.id === language)?.name} with the starter code. It can&apos;t be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -1218,61 +1331,37 @@ export default function CodeEditor({
             </DialogContent>
           </Dialog>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={runCode}
-            variant="outline"
-            size="sm"
-            disabled={isSubmitting || isDisabled}
-          >
-            {isRunning ? (
-              <div className="flex items-center">
-                <span className="loading loading-spinner loading-sm mr-2"></span>
-                Running...
-              </div>
-            ) : (
-              <>
-                <Play className="w-4 h-4 mr-1" />
-                Run Code
-              </>
-            )}
-          </Button>
-          <Button
-            onClick={submitCode}
-            size="sm"
-            disabled={isSubmitting || isDisabled}
-          >
-            {isSubmitting ? (
-              <div className="flex items-center">
-                <span className="loading loading-spinner loading-sm mr-2"></span>
-                Submitting...
-              </div>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-1" />
-                Submit
-              </>
-            )}
-          </Button>
-          <Button
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
             onClick={computeComplexity}
-            variant="outline"
-            size="sm"
             disabled={isRunning || isSubmitting || isComputingComplexity || isDisabled}
             title="Analyze time & space complexity"
+            className="hidden sm:inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/[0.06] disabled:opacity-50 transition-colors"
           >
-            {isComputingComplexity ? (
-              <div className="flex items-center">
-                <span className="loading loading-spinner loading-sm mr-2"></span>
-                Analyzing...
-              </div>
-            ) : (
-              <>
-                <Clock className="w-4 h-4 mr-1" />
-                Complexity
-              </>
-            )}
-          </Button>
+            {isComputingComplexity ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+            {isComputingComplexity ? 'Analyzing…' : 'Complexity'}
+          </button>
+          <span className="hidden sm:block w-px h-5 mx-0.5 bg-gray-200 dark:bg-white/10" />
+          <button
+            type="button"
+            onClick={runCode}
+            disabled={isRunning || isSubmitting || isDisabled}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-sm font-medium text-gray-800 dark:text-gray-100 bg-white dark:bg-white/[0.05] ring-1 ring-gray-200 dark:ring-white/10 hover:bg-gray-50 dark:hover:bg-white/[0.09] disabled:opacity-50 transition-colors"
+          >
+            {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            {isRunning ? 'Running…' : 'Run'}
+          </button>
+          <button
+            type="button"
+            onClick={submitCode}
+            disabled={isSubmitting || isRunning || isDisabled}
+            className="inline-flex items-center gap-1.5 h-8 px-3.5 rounded-md text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition-colors"
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {isSubmitting ? 'Submitting…' : 'Submit'}
+          </button>
         </div>
       </div>
 
@@ -1281,11 +1370,21 @@ export default function CodeEditor({
           height="100%"
           language={getEditorLanguage()}
           value={code}
-          theme={theme}
+          theme={editorTheme}
+          beforeMount={defineEditorThemes}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
+            fontFamily: "'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace",
+            lineHeight: 22,
             lineNumbers: 'on',
+            renderLineHighlight: 'line',
+            smoothScrolling: true,
+            cursorBlinking: 'smooth',
+            cursorSmoothCaretAnimation: 'on',
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
+            scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
             readOnly: isDisabled,
             renderWhitespace: 'selection',
             scrollBeyondLastLine: false,
@@ -1293,7 +1392,7 @@ export default function CodeEditor({
             tabSize: 2,
             wordWrap: 'on',
             wrappingStrategy: 'advanced',
-            padding: { top: 10, bottom: 10 },
+            padding: { top: 14, bottom: 14 },
           }}
           onMount={handleEditorDidMount}
           onChange={handleEditorChange}
