@@ -28,7 +28,8 @@ const OPEN_DELAY = 90;
 const CLOSE_DELAY = 180;
 
 // `forceOpen` renders the full sidebar (no hover rail), e.g. inside the navbar drawer.
-export default function SidebarNavigation({ className = '', forceOpen = false }) {
+// `mobile` renders the bottom tab bar; the layout decides, so both agree on the breakpoint.
+export default function SidebarNavigation({ className = '', forceOpen = false, mobile = false }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
@@ -69,7 +70,7 @@ export default function SidebarNavigation({ className = '', forceOpen = false })
     { name: 'Dashboard', href: '/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
     { name: 'Problems', href: '/problems', icon: <Code className="h-5 w-5" /> },
     { name: 'Groups', href: '/groups', icon: <Users className="h-5 w-5" /> },
-    { name: 'Playground', href: '/playground', icon: <PenTool className="h-5 w-5" /> },
+    { name: 'Playground', href: '/playground', icon: <PenTool className="h-5 w-5" />, badge: 'New' },
     { name: 'Leaderboard', href: '/leaderboard', icon: <Trophy className="h-5 w-5" /> },
   ];
 
@@ -81,12 +82,13 @@ export default function SidebarNavigation({ className = '', forceOpen = false })
     { name: 'Bookmarked', href: '/problems?bookmarked=true', icon: <Bookmark className="h-4 w-4" /> },
   ];
 
-  // Mobile bottom navigation bar
-  if (isMobile && !forceOpen) {
+  // Mobile bottom navigation bar: five tabs fit; the rest live in the navbar drawer.
+  if (mobile || (isMobile && !forceOpen)) {
+    const tabs = navItems.filter((item) => item.name !== 'Leaderboard');
     return (
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg">
-        <div className="grid grid-cols-5 h-16">
-          {navItems.map((item) => {
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 shadow-lg pb-[env(safe-area-inset-bottom)]">
+        <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+          {tabs.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
@@ -102,10 +104,15 @@ export default function SidebarNavigation({ className = '', forceOpen = false })
                     ? 'text-indigo-600 dark:text-indigo-400'
                     : 'text-gray-600 dark:text-gray-400'
                 }`}>
-                  <span className={`${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  <span className={`relative ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}>
                     {item.icon}
+                    {item.badge && (
+                      <span className="absolute -top-1.5 -right-4 px-1 rounded-full text-[8px] leading-[14px] font-bold uppercase tracking-wide text-white bg-gradient-to-r from-indigo-500 to-pink-500">
+                        {item.badge}
+                      </span>
+                    )}
                   </span>
-                  <span className="text-xs mt-1 font-medium">{item.name}</span>
+                  <span className="text-[11px] mt-1 font-medium truncate max-w-full px-1">{item.name}</span>
                 </div>
               </Link>
             );
@@ -155,10 +162,23 @@ export default function SidebarNavigation({ className = '', forceOpen = false })
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >
-                    <span className={`${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`}>
+                    <span className={`relative ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300'}`}>
                       {item.icon}
+                      {item.badge && (
+                        <span
+                          className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-pink-500 ring-2 ring-white dark:ring-gray-900 transition-opacity ${open ? 'opacity-0' : 'opacity-100'}`}
+                          aria-hidden
+                        />
+                      )}
                     </span>
                     <span className={label}>{item.name}</span>
+                    {item.badge && (
+                      <span
+                        className={`ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide text-white bg-gradient-to-r from-indigo-500 to-pink-500 shadow-sm transition-opacity ${open ? 'opacity-100 delay-75' : 'opacity-0'}`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );

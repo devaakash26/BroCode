@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import axios from "axios";
 import { JUDGE0_URL, getJudge0Headers, isJudge0Configured } from "@/lib/judge0";
 
-// Free-form compiler for the Live Playground: run code against up to 5 stdins.
+// Free-form compiler for the Live Playground: run code against up to 10 stdins.
 const LANGUAGE_IDS = {
   c: 50, // C (GCC 9.2.0)
   cpp: 54, // C++ (GCC 9.2.0)
@@ -13,7 +13,7 @@ const LANGUAGE_IDS = {
   python: 71, // Python 3.8.1
 };
 
-const MAX_INPUTS = 5;
+const MAX_INPUTS = 10;
 const MAX_CODE = 64 * 1024;
 const MAX_STDIN = 16 * 1024;
 const MAX_OUTPUT = 64 * 1024;

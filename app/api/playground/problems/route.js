@@ -5,8 +5,10 @@ import { prisma } from "@/app/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const MAX_SAMPLES = 5; // the compiler takes up to 5 inputs
+const MAX_SAMPLES = 10;
 
+// Only visible (sample) cases are sent to the room. Hidden ones stay on the
+// server and are run by /api/playground/check, which reports pass/fail only.
 const visible = (list) =>
   (Array.isArray(list) ? list : [])
     .filter((t) => t && !t.isHidden && typeof t.input === "string")
@@ -54,6 +56,7 @@ export async function GET(request) {
 
       let samples = visible(p.testCasesRel);
       if (!samples.length) samples = visible(p.testCases);
+      const hiddenCount = await prisma.testCase.count({ where: { problemId: p.id, isHidden: true } });
       if (!samples.length && p.exampleInput) {
         samples = [{ input: p.exampleInput, expectedOutput: p.exampleOutput || "", explanation: null }];
       }
@@ -68,6 +71,7 @@ export async function GET(request) {
           tags: p.tags,
           templateCode: p.templateCode && typeof p.templateCode === "object" ? p.templateCode : {},
           samples: samples.slice(0, MAX_SAMPLES),
+          hiddenCount,
         },
       });
     }

@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 import {
   Timer, UserPlus, Mic, MicOff, PhoneOff, Headphones, MessageSquare, LogOut, Power,
   Loader2, PenTool, Code2, Columns, Copy, WifiOff, Crown, Video, VideoOff,
-  ChevronDown, ChevronUp, X, LogIn, PhoneCall,
+  ChevronDown, ChevronUp, X, LogIn, PhoneCall, Maximize2, Minimize2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -302,25 +302,90 @@ function CallPrompt({ prompt, callers, voice, onDismiss }) {
   );
 }
 
+// Browser full screen, with the WebKit prefixes Safari still needs.
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+function enterFullscreen(el, video) {
+  if (el.requestFullscreen) return el.requestFullscreen().catch(() => {});
+  if (el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+  // iPhone Safari can only full-screen the <video> itself.
+  if (video?.webkitEnterFullscreen) return video.webkitEnterFullscreen();
+  return null;
+}
+function exitFullscreen() {
+  if (document.exitFullscreen) return document.exitFullscreen().catch(() => {});
+  if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  return null;
+}
+
 function VideoTile({ stream, name, userId, mirrored, muted, speaking }) {
   const ref = useRef(null);
+  const tileRef = useRef(null);
+  const [full, setFull] = useState(false);
+
   useEffect(() => {
     if (!ref.current) return;
     ref.current.srcObject = stream;
     ref.current.play().catch(() => {});
   }, [stream]);
+
+  // Track full screen however it ends (button, Esc, or the browser's own UI).
+  useEffect(() => {
+    const sync = () => setFull(fsElement() === tileRef.current);
+    document.addEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+    };
+  }, []);
+
+  // Leaving the call while full screen shouldn't strand the user there.
+  useEffect(() => () => fsElement() === tileRef.current && exitFullscreen(), []);
+
+  const toggle = () => (full ? exitFullscreen() : enterFullscreen(tileRef.current, ref.current));
+
   return (
     <div
-      className={`relative w-48 aspect-video rounded-md overflow-hidden bg-gray-900 ring-2 ${
-        speaking ? 'ring-emerald-500' : 'ring-transparent'
+      ref={tileRef}
+      onDoubleClick={toggle}
+      className={`group relative overflow-hidden ${
+        full ? 'w-screen h-screen bg-black' : `w-48 aspect-video rounded-md bg-gray-900 ring-2 ${speaking ? 'ring-emerald-500' : 'ring-transparent'}`
       }`}
+      style={full && speaking ? { boxShadow: 'inset 0 0 0 4px #10b981' } : undefined}
     >
       {/* Audio plays through <RemoteAudio>; the video element stays muted. */}
-      <video ref={ref} autoPlay playsInline muted className={`w-full h-full object-cover ${mirrored ? '-scale-x-100' : ''}`} />
-      <div className="absolute left-1.5 bottom-1.5 flex items-center gap-1.5 max-w-[calc(100%-12px)] px-1.5 py-0.5 rounded bg-black/60">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: colorFor(userId) }} />
-        <span className="text-[11px] font-semibold text-white truncate">{name}</span>
-        {muted && <MicOff className="w-3 h-3 text-rose-400 ml-auto flex-shrink-0" />}
+      <video
+        ref={ref}
+        autoPlay
+        playsInline
+        muted
+        className={`w-full h-full ${full ? 'object-contain' : 'object-cover'} ${mirrored ? '-scale-x-100' : ''}`}
+      />
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggle();
+        }}
+        title={full ? 'Exit full screen (Esc)' : 'Full screen'}
+        aria-label={full ? `Exit full screen for ${name}` : `Show ${name} full screen`}
+        className={`absolute top-1.5 right-1.5 inline-flex items-center justify-center rounded-md bg-black/60 text-white hover:bg-black/80 transition-opacity focus:opacity-100 ${
+          full ? 'w-10 h-10 top-4 right-4 opacity-100' : 'w-7 h-7 opacity-0 group-hover:opacity-100'
+        }`}
+      >
+        {full ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+      </button>
+
+      <div
+        className={`absolute flex items-center gap-1.5 rounded bg-black/60 ${
+          full ? 'left-4 bottom-4 px-3 py-1.5 gap-2' : 'left-1.5 bottom-1.5 max-w-[calc(100%-12px)] px-1.5 py-0.5'
+        }`}
+      >
+        <span className={`rounded-full ${full ? 'w-2.5 h-2.5' : 'w-1.5 h-1.5'}`} style={{ background: colorFor(userId) }} />
+        <span className={`font-semibold text-white truncate ${full ? 'text-base' : 'text-[11px]'}`}>{name}</span>
+        {muted && <MicOff className={`text-rose-400 ml-auto flex-shrink-0 ${full ? 'w-4 h-4' : 'w-3 h-3'}`} />}
+        {full && speaking && <span className="text-xs font-medium text-emerald-400">speaking</span>}
       </div>
     </div>
   );
@@ -669,7 +734,7 @@ export default function PlaygroundRoom({ roomId }) {
         <div ref={bodyRef} className="flex-1 min-w-0 flex">
           {showBoard && (
             <div className="min-w-0 h-full" style={{ width: view === 'split' ? `${split}%` : '100%' }}>
-              <Whiteboard socket={pg.socket} snapshot={pg.snapshot} me={me} peers={pg.peers} doc={pg.doc} apiRef={boardApi} />
+              <Whiteboard socket={pg.socket} snapshot={pg.snapshot} me={me} peers={pg.peers} doc={pg.doc} apiRef={boardApi} isHost={isHost} />
             </div>
           )}
           {view === 'split' && (

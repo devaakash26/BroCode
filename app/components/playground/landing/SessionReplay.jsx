@@ -20,7 +20,7 @@ const PEOPLE = {
 export const CHAPTERS = [
   { key: 'sketch', start: 0, end: 6500, icon: PenTool, title: 'Sketch it', text: 'Draw on the scratchpad. Everyone sees who is drawing and where.' },
   { key: 'code', start: 6500, end: 15000, icon: Code2, title: 'Write it together', text: 'One editor, live cursors. C, C++, Java, JavaScript or Python.' },
-  { key: 'run', start: 15000, end: 20500, icon: Play, title: 'Run it', text: 'Run against up to 5 inputs at once and see each result.' },
+  { key: 'run', start: 15000, end: 20500, icon: Play, title: 'Run it', text: 'Run against up to 10 inputs at once and see each result.' },
   { key: 'talk', start: 20500, end: DURATION, icon: MessageSquare, title: 'Talk it through', text: 'Voice, camera and chat inside the room, no extra tabs.' },
 ];
 

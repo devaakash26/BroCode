@@ -76,13 +76,13 @@ export default function Navbar({ isMobile, onOpenSidebar }) {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
 
-            {/* Opens the sidebar on pages that hide it (problem pages, playground rooms) */}
+            {/* Opens the full sidebar as a drawer (phones, problem pages, playground rooms) */}
             {onOpenSidebar && (
               <button
                 onClick={onOpenSidebar}
                 type="button"
                 title="Open menu"
-                className="hidden lg:inline-flex items-center justify-center p-2 mr-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="inline-flex items-center justify-center p-2 -ml-2 mr-1 lg:ml-0 lg:mr-2 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 <span className="sr-only">Open menu</span>
                 <PanelLeft className="h-5 w-5" aria-hidden="true" />

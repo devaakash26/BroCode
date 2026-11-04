@@ -6,7 +6,7 @@ export const LANGUAGES = [
   { id: 'python', label: 'Python', monaco: 'python' },
 ];
 
-export const MAX_INPUTS = 5;
+export const MAX_INPUTS = 10; // a problem has up to 10 test cases
 
 const PALETTE = [
   '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',

@@ -6,7 +6,7 @@ const ROOM_TTL = 6 * 60 * 60; // seconds — refreshed on activity
 const EMPTY_ROOM_TTL = 15 * 60; // keep an empty room around for refresh/rejoin
 // People per room (unique users — extra tabs of the same person don't count).
 const MAX_PEERS = parseInt(process.env.PLAYGROUND_MAX_PEERS || "10", 10);
-const MAX_INPUTS = 5;
+const MAX_INPUTS = 10;
 const MAX_CHAT = 100;
 const MAX_STROKES = 3000;
 const MAX_STROKE_POINTS = 6000; // flat [x,y,x,y…] length

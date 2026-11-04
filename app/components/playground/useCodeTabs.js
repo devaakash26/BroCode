@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Y from 'yjs';
 import toast from 'react-hot-toast';
-import { LANGUAGES, MAIN_TAB, MAX_TABS, TEMPLATES, codeKey, inputsKey } from './utils';
+import { LANGUAGES, MAIN_TAB, MAX_TABS, MAX_INPUTS, TEMPLATES, codeKey, inputsKey } from './utils';
 
 const newId = () => `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
@@ -82,7 +82,7 @@ export default function useCodeTabs(doc, { mainLanguage, setMainLanguage, me }) 
 
   /**
    * Opens a new tab. Options (all optional) pre-fill it, e.g. from a problem:
-   * { title, code: { [lang]: string }, inputs: [string], language, focus }
+   * { title, code: { [lang]: string }, inputs: [string], language, focus, problemId, hiddenCount }
    */
   const addTab = useCallback(
     (opts = {}) => {
@@ -92,7 +92,7 @@ export default function useCodeTabs(doc, { mainLanguage, setMainLanguage, me }) 
       }
       const id = newId();
       const lang = LANGUAGES.some((l) => l.id === opts.language) ? opts.language : language;
-      const stdins = (opts.inputs?.length ? opts.inputs : ['']).slice(0, 5);
+      const stdins = (opts.inputs?.length ? opts.inputs : ['']).slice(0, MAX_INPUTS);
       // One transaction, so nobody ever sees the tab without its code.
       doc.transact(() => {
         for (const { id: l } of LANGUAGES) {
@@ -109,7 +109,9 @@ export default function useCodeTabs(doc, { mainLanguage, setMainLanguage, me }) 
           title: (opts.title || `Question ${tabs.length + 1}`).slice(0, 40),
           createdAt: Date.now(),
           by: me.id,
-          ...(opts.problemId ? { problemId: opts.problemId } : {}),
+          ...(opts.problemId
+            ? { problemId: opts.problemId, hiddenCount: opts.hiddenCount || 0, sampleCount: opts.sampleCount || 0 }
+            : {}),
         });
         if (opts.focus) meta.set('focus', { tab: id, by: me.name, byId: me.id, at: Date.now() });
       });
