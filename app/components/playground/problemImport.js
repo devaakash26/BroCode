@@ -28,6 +28,9 @@ const stripMarks = (s) =>
     .replace(/`([^`\n]+)`/g, '$1');
 
 const LIST_LINE = /^\s*(?:[-*•]\s+|\d+[.)]\s+)/;
+// <br> becomes this marker so a hard line break survives paragraph joining
+// (plain newlines inside HTML text are just soft wraps).
+const BR = '\uE000';
 const isLabel = (line) => line.length <= 48 && /:\s*$/.test(line) && !LIST_LINE.test(line);
 
 /** Plain text paragraphs → text / list / subheading blocks. */
@@ -44,8 +47,9 @@ function textBlocks(raw, out) {
     if (list.length) out.push({ kind: 'list', text: list.map((l) => (/^\d+[.)]\s/.test(l) ? l : `• ${l}`)).join('\n') });
     list = [];
   };
-  for (const line of lines) {
-    if (!line) {
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line.split(BR).join('').trim()) {
       flushPara();
       flushList();
     } else if (LIST_LINE.test(line)) {
@@ -63,6 +67,12 @@ function textBlocks(raw, out) {
   }
   flushPara();
   flushList();
+  for (const b of out) if (b.kind === 'text') b.text = b.text.replace(new RegExp(`\\s*${BR}+\\s*`, 'g'), '\n').trim();
+}
+
+function isBoldOnly(p) {
+  const kids = kidsOf(p).filter((k) => !(isText(k) && !textOf(k).trim()));
+  return kids.length === 1 && ['strong', 'b'].includes(tagOf(kids[0])) && textOf(kids[0]).trim().length <= 48;
 }
 
 function walk(node, ctx) {
@@ -74,7 +84,7 @@ function walk(node, ctx) {
     const tag = tagOf(n);
     if (!tag || tag === 'script' || tag === 'style') continue;
     if (tag === 'br') {
-      ctx.buf += '\n';
+      ctx.buf += BR;
     } else if (tag === 'pre') {
       ctx.flush();
       const code = textOf(n).replace(/^\n+|\s+$/g, '');
@@ -92,6 +102,11 @@ function walk(node, ctx) {
         .filter(Boolean)
         .map((t) => (tag === 'ol' ? `${i++}. ${t}` : `• ${t}`));
       if (items.length) ctx.out.push({ kind: 'list', text: items.join('\n') });
+    } else if (tag === 'p' && isBoldOnly(n)) {
+      // "<p><strong>Constraints</strong></p>" reads as a section heading.
+      ctx.flush();
+      const t = stripMarks(textOf(n)).trim().replace(/:\s*$/, '');
+      if (t) ctx.out.push({ kind: 'subheading', text: t });
     } else if (BLOCK_TAGS.has(tag) || tag === 'li') {
       ctx.buf += '\n\n';
       walk(n, ctx);

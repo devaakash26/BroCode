@@ -5,6 +5,7 @@ import { useTheme } from 'next-themes';
 import * as Y from 'yjs';
 import { Pencil, Eraser, Undo2, Trash2, Download, PenTool, MousePointer2, Type, Slash, MoveUpRight, Square } from 'lucide-react';
 import BoardNote, { NOTE_KINDS, layoutNote } from './BoardNote';
+import StatementCard, { STATEMENT_KIND, STATEMENT_W, statementHeight, drawStatement } from './StatementCard';
 import toast from 'react-hot-toast';
 import { colorFor, PANEL, PANEL_HEADER, ICON_BTN } from './utils';
 
@@ -98,7 +99,7 @@ function bandOf(st) {
   return b;
 }
 
-export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef }) {
+export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef, isHost = false }) {
   const { resolvedTheme } = useTheme();
   const dark = resolvedTheme !== 'light';
   const darkRef = useRef(dark);
@@ -228,6 +229,9 @@ export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef })
 
   // Text boxes push the page down too.
   const noteBottom = useCallback((m) => {
+    if (m.get('kind') === STATEMENT_KIND) {
+      return (m.get('y') || 0) + statementHeight(m.get('text')?.toString() || '', m.get('w') || STATEMENT_W);
+    }
     const kind = NOTE_KINDS[m.get('kind')] ? m.get('kind') : 'text';
     return (m.get('y') || 0) + layoutNote(kind, m.get('text')?.toString() || '', m.get('w') || NOTE_W).height;
   }, []);
@@ -473,7 +477,10 @@ export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef })
     if (!strokesRef.current.size && !notes.size) return;
     if (!window.confirm('Clear the whole board (drawings and text) for everyone?')) return;
     socket?.emit('pg:draw', { t: 'clear' });
-    doc.transact(() => [...notes.keys()].forEach((k) => notes.delete(k)));
+    // The problem statement belongs to the host; a member's clear leaves it.
+    doc.transact(() =>
+      [...notes.keys()].forEach((k) => (isHost || notes.get(k)?.get('kind') !== STATEMENT_KIND) && notes.delete(k)),
+    );
     setSelectedNote(null);
   };
 
@@ -494,9 +501,16 @@ export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef })
     const ctx = out.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, BOARD_W, H);
+    // Statements sit under the ink, like on screen.
+    notes.forEach((m) => {
+      if (m.get('kind') === STATEMENT_KIND) {
+        drawStatement(ctx, { x: m.get('x'), y: m.get('y'), w: m.get('w') || STATEMENT_W, text: m.get('text').toString() });
+      }
+    });
     ctx.drawImage(layer, 0, 0);
     // Text boxes, wrapped exactly like on screen.
     notes.forEach((m) => {
+      if (m.get('kind') === STATEMENT_KIND) return; // drawn above, under the ink
       const kind = NOTE_KINDS[m.get('kind')] ? m.get('kind') : 'text';
       const k = NOTE_KINDS[kind];
       const x = m.get('x');
@@ -615,7 +629,7 @@ export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef })
         >
           <canvas
             ref={canvasRef}
-            className="sticky top-0 block touch-none"
+            className="sticky top-0 z-[1] block touch-none"
             style={{ cursor: tool === 'eraser' ? 'cell' : tool === 'text' ? 'text' : tool === 'select' ? 'default' : 'crosshair' }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -625,6 +639,9 @@ export default function Whiteboard({ socket, snapshot, me, peers, doc, apiRef })
           {noteIds.map((id) => {
             const m = notes.get(id);
             if (!m || !(m.get('text') instanceof Y.Text)) return null;
+            if (m.get('kind') === STATEMENT_KIND) {
+              return <StatementCard key={id} id={id} ymap={m} scale={scale} isHost={isHost} onDelete={deleteNote} />;
+            }
             return (
               <BoardNote
                 key={id}

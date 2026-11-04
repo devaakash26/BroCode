@@ -241,8 +241,14 @@ export default function ProblemPicker({ open, onClose, onLoad, tabsFull }) {
                           disabled={!opts.code || tabsFull || !selected.samples?.length}
                           onChange={(v) => setOpts((o) => ({ ...o, inputs: v }))}
                           icon={FlaskConical}
-                          title="Sample inputs"
-                          hint={selected.samples?.length ? `${selected.samples.length} visible test case${selected.samples.length > 1 ? 's' : ''}` : 'This problem has no visible samples'}
+                          title="Sample test cases"
+                          hint={
+                            selected.samples?.length
+                              ? `${selected.samples.length} sample${selected.samples.length > 1 ? 's' : ''} as inputs${
+                                  selected.hiddenCount ? ` · ${selected.hiddenCount} hidden, checked on the server` : ''
+                                }`
+                              : 'This problem has no sample test cases'
+                          }
                         />
                         <Option
                           checked={opts.focus && opts.code && !tabsFull}

@@ -11,6 +11,7 @@ import { usePathname } from 'next/navigation';
 import { ProblemDrawerProvider } from './context/ProblemDrawerContext';
 import ProblemListDrawer from './components/problems/ProblemListDrawer';
 import PlaygroundInviteListener from './components/playground/PlaygroundInviteListener';
+import PlaygroundAnnouncement from './components/PlaygroundAnnouncement';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -156,8 +157,9 @@ export default function ClientLayout({ children }) {
   const isProblemPage = pathname.startsWith('/problems/');
   const isAdminPage = pathname.startsWith('/admin');
   const isPlaygroundRoom = pathname.startsWith('/playground/');
-  // Problem pages and playground rooms are full-width; their sidebar opens as a drawer from the navbar.
-  const sidebarHidden = !isMobile && !isAdminPage && (isProblemPage || isPlaygroundRoom);
+  // The full sidebar opens as a drawer from the navbar on phones, and on the
+  // full-width pages (problem pages, playground rooms) that hide the rail.
+  const sidebarHidden = !isAdminPage && (isMobile || isProblemPage || isPlaygroundRoom);
 
   useEffect(() => setDrawerOpen(false), [pathname]);
   useEffect(() => {
@@ -226,7 +228,7 @@ export default function ClientLayout({ children }) {
         </div>
 
         {isMobile && !isAdminPage && (
-          <SidebarNavigation />
+          <SidebarNavigation mobile />
         )}
         {sidebarHidden && (
           <div className={`fixed inset-0 z-[60] ${drawerOpen ? '' : 'pointer-events-none'}`} aria-hidden={!drawerOpen}>
@@ -245,6 +247,7 @@ export default function ClientLayout({ children }) {
           </div>
         )}
         <ProblemListDrawer />
+        <PlaygroundAnnouncement disabled={!!maintenanceInfo} />
         <PlaygroundInviteListener />
         {/* Maintenance overlay — shown when emergency maintenance activates while user is browsing */}
         {maintenanceInfo && <MaintenanceOverlay info={maintenanceInfo} />}

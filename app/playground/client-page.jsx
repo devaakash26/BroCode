@@ -231,7 +231,7 @@ function RunVisual() {
     <div className="absolute inset-x-6 top-6">
       <div className={`${MOCK} text-[10.5px] font-mono overflow-hidden`}>
         <div className="flex items-center gap-2 h-8 px-3 border-b border-gray-100 dark:border-white/[0.06] font-sans">
-          <span className="font-semibold text-gray-700 dark:text-gray-200">Inputs 5/5</span>
+          <span className="font-semibold text-gray-700 dark:text-gray-200">Inputs 5/10</span>
           <span className="ml-auto inline-flex items-center gap-1 h-5 px-2 rounded bg-emerald-600 text-white text-[10px] font-medium">
             <Play className="w-2.5 h-2.5 fill-current" /> Run
           </span>
@@ -547,7 +547,7 @@ export default function PlaygroundHome() {
           <Card
             delay={0.1}
             visual={<RunVisual />}
-            title="Run against five inputs"
+            title="Run against ten inputs"
             text="One click runs every input. Everyone sees the same results."
           />
           <Card
