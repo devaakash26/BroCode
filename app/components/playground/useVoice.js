@@ -46,6 +46,8 @@ export default function useVoice({ socket, peers, myPeerId }) {
   const [localStream, setLocalStream] = useState(null);
   const [streams, setStreams] = useState({}); // peerId → MediaStream
   const [speaking, setSpeaking] = useState(() => new Set()); // peerIds (and myPeerId)
+  const [connState, setConnState] = useState({}); // peerId → new | connecting | connected | failed | ...
+  const failToastRef = useRef(false);
 
   const localRef = useRef(null);
   const videoTrackRef = useRef(null);
@@ -92,6 +94,10 @@ export default function useVoice({ socket, peers, myPeerId }) {
         const { [peerId]: _gone, ...rest } = s;
         return rest;
       });
+      setConnState((s) => {
+        const { [peerId]: _gone, ...rest } = s;
+        return rest;
+      });
     },
     [unwatchLevel],
   );
@@ -101,7 +107,17 @@ export default function useVoice({ socket, peers, myPeerId }) {
       const existing = pcsRef.current.get(peerId);
       if (existing) return existing;
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      const entry = { pc, polite: myPeerId < peerId, makingOffer: false, ignoreOffer: false, videoSender: null };
+      // queue: signalling for this peer is handled strictly in order.
+      // pending: ICE candidates that arrived before the remote description.
+      const entry = {
+        pc,
+        polite: myPeerId < peerId,
+        makingOffer: false,
+        ignoreOffer: false,
+        videoSender: null,
+        queue: Promise.resolve(),
+        pending: [],
+      };
       pcsRef.current.set(peerId, entry);
 
       localRef.current?.getTracks().forEach((t) => {
@@ -133,6 +149,20 @@ export default function useVoice({ socket, peers, myPeerId }) {
       pc.oniceconnectionstatechange = () => {
         if (pc.iceConnectionState === 'failed') pc.restartIce();
       };
+      pc.onconnectionstatechange = () => {
+        const st = pc.connectionState;
+        setConnState((s) => (s[peerId] === st ? s : { ...s, [peerId]: st }));
+        if (st === 'failed' && !failToastRef.current) {
+          failToastRef.current = true;
+          toast.error(
+            ICE_SERVERS.length > 1
+              ? "Couldn't connect the call to someone — their network may be blocking it."
+              : "Couldn't connect the call — the networks can't reach each other directly. A TURN relay server is needed.",
+            { duration: 7000 },
+          );
+        }
+      };
+      setConnState((s) => ({ ...s, [peerId]: 'connecting' }));
       return entry;
     },
     [myPeerId, signal, watchLevel],
@@ -141,31 +171,43 @@ export default function useVoice({ socket, peers, myPeerId }) {
   // Incoming signalling.
   useEffect(() => {
     if (!socket) return;
-    const onSignal = async ({ from, data }) => {
+    // Each peer's messages are processed one at a time, in order. Before this,
+    // an ICE candidate could be applied while the offer was still being set,
+    // fail with InvalidStateError and be silently dropped, so calls often
+    // never connected and no audio came through in either direction.
+    const handle = async (entry, from, data) => {
+      const { pc } = entry;
+      if (data.description) {
+        const collision =
+          data.description.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
+        entry.ignoreOffer = !entry.polite && collision;
+        if (entry.ignoreOffer) return;
+        await pc.setRemoteDescription(data.description);
+        // Candidates that raced ahead of the description can be applied now.
+        const early = entry.pending.splice(0);
+        for (const c of early) await pc.addIceCandidate(c).catch(() => {});
+        if (data.description.type === 'offer') {
+          await pc.setLocalDescription();
+          signal(from, { description: pc.localDescription });
+        }
+      } else if (data.candidate) {
+        if (!pc.remoteDescription) {
+          entry.pending.push(data.candidate);
+          return;
+        }
+        try {
+          await pc.addIceCandidate(data.candidate);
+        } catch (err) {
+          if (!entry.ignoreOffer) throw err;
+        }
+      }
+    };
+    const onSignal = ({ from, data }) => {
       if (!localRef.current) return; // not in the call
       const entry = ensurePeer(from);
-      const { pc } = entry;
-      try {
-        if (data.description) {
-          const collision =
-            data.description.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
-          entry.ignoreOffer = !entry.polite && collision;
-          if (entry.ignoreOffer) return;
-          await pc.setRemoteDescription(data.description);
-          if (data.description.type === 'offer') {
-            await pc.setLocalDescription();
-            signal(from, { description: pc.localDescription });
-          }
-        } else if (data.candidate) {
-          try {
-            await pc.addIceCandidate(data.candidate);
-          } catch (err) {
-            if (!entry.ignoreOffer) throw err;
-          }
-        }
-      } catch (err) {
-        console.error('[call] signal error:', err);
-      }
+      entry.queue = entry.queue
+        .then(() => handle(entry, from, data))
+        .catch((err) => console.error('[call] signal error:', err));
     };
     socket.on('pg:signal', onSignal);
     return () => socket.off('pg:signal', onSignal);
@@ -237,6 +279,8 @@ export default function useVoice({ socket, peers, myPeerId }) {
     setInVoice(false);
     setMuted(false);
     setCamera(false);
+    setConnState({});
+    failToastRef.current = false;
     setLocalStream(null);
     setSpeaking(new Set());
     socket?.emit('pg:voice', { on: false });
@@ -333,6 +377,7 @@ export default function useVoice({ socket, peers, myPeerId }) {
     localStream,
     streams,
     speaking,
+    connState,
     join,
     leave,
     toggleMute,

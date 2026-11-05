@@ -34,14 +34,16 @@ function SessionTimer({ since }) {
   );
 }
 
-function RemoteAudio({ stream }) {
+function RemoteAudio({ stream, onBlocked }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!ref.current) return;
     ref.current.srcObject = stream;
-    ref.current.play().catch(() => {});
-  }, [stream]);
-  return <audio ref={ref} autoPlay playsInline />;
+    // Browsers (Safari especially) can refuse to start audio without a tap.
+    // Report it instead of failing silently, so we can ask for one.
+    ref.current.play().catch((err) => err?.name === 'NotAllowedError' && onBlocked?.());
+  }, [stream, onBlocked]);
+  return <audio ref={ref} autoPlay playsInline data-pg-remote-audio="" />;
 }
 
 function Avatar({ userId, name, size = 32, className = '' }) {
@@ -77,7 +79,9 @@ function usePeople(peers, speaking) {
   }, [peers, speaking]);
 }
 
-function PeopleMenu({ people, hostId, max, isHost, meId, onMute }) {
+const CONN_LABEL = { connecting: 'connecting audio…', new: 'connecting audio…', failed: "can't connect audio", disconnected: 'audio dropped, retrying…' };
+
+function PeopleMenu({ people, hostId, max, isHost, meId, onMute, connState }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -168,6 +172,12 @@ function PeopleMenu({ people, hostId, max, isHost, meId, onMute }) {
                     </span>
                     <span className="block text-[11px] text-gray-400">
                       {!u.voice ? 'Not in call' : u.muted ? 'In call · muted' : u.speaking ? 'Speaking' : 'In call'}
+                      {u.voice && u.userId !== meId && connState && CONN_LABEL[connState[u.peerId]] && (
+                        <span className={connState[u.peerId] === 'failed' ? 'text-rose-500' : 'text-amber-500'}>
+                          {' · '}
+                          {CONN_LABEL[connState[u.peerId]]}
+                        </span>
+                      )}
                       {u.camera ? ' · camera on' : ''}
                     </span>
                   </span>
@@ -469,6 +479,14 @@ export default function PlaygroundRoom({ roomId }) {
   const isHost = pg.room?.hostId === me.id;
   const closeInvite = useCallback(() => setInviteOpen(false), []);
 
+  // Remote audio the browser refused to autoplay; one tap starts it all.
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const onAudioBlocked = useCallback(() => setAudioBlocked(true), []);
+  const unlockAudio = useCallback(() => {
+    document.querySelectorAll('audio[data-pg-remote-audio]').forEach((a) => a.play().catch(() => {}));
+    setAudioBlocked(false);
+  }, []);
+
   // ── Call prompt: ring everyone who isn't in the call when someone joins it.
   const callers = useMemo(() => people.filter((p) => p.voice && p.userId !== me.id), [people, me.id]);
   const [callPrompt, setCallPrompt] = useState(null); // { names: [...] }
@@ -653,7 +671,7 @@ export default function PlaygroundRoom({ roomId }) {
           </button>
         </div>
 
-        <PeopleMenu people={people} hostId={pg.room.hostId} max={maxPeers} isHost={isHost} meId={me.id} onMute={pg.muteUser} />
+        <PeopleMenu people={people} hostId={pg.room.hostId} max={maxPeers} isHost={isHost} meId={me.id} onMute={pg.muteUser} connState={voice.inVoice ? voice.connState : null} />
 
         {/* Call controls */}
         {voice.inVoice ? (
@@ -769,8 +787,18 @@ export default function PlaygroundRoom({ roomId }) {
       </div>
 
       {Object.entries(voice.streams).map(([peerId, stream]) => (
-        <RemoteAudio key={peerId} stream={stream} />
+        <RemoteAudio key={peerId} stream={stream} onBlocked={onAudioBlocked} />
       ))}
+
+      {audioBlocked && voice.inVoice && (
+        <button
+          type="button"
+          onClick={unlockAudio}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[65] inline-flex items-center gap-2 h-11 px-5 rounded-full text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-2xl shadow-indigo-900/40"
+        >
+          <Headphones className="w-4 h-4" /> Tap to turn on call sound
+        </button>
+      )}
 
       <CallPrompt prompt={callPrompt} callers={callers} voice={voice} onDismiss={() => setCallPrompt(null)} />
 
